@@ -1,0 +1,14 @@
+# 架构规范
+
+极致轻量 TypeScript/Node agent 框架的架构规范索引。术语表在根目录 `CONTEXT.md`,决策依据在 `docs/adr/`,实施顺序在 `docs/ROADMAP.md`。
+
+各篇均按同一骨架展开:定位 → 定义表面/语义 → 与其它子系统的关系 → 依赖预算。建议阅读顺序:
+
+1. [model.md](model.md) — 模型层:模型契约(vendor 自 AI SDK provider spec 子集)与 chunk 协议,一切的地基
+2. [agent.md](agent.md) — Agent 核心抽象:五字段表面、动态参数、输出对象、loop、Processor、多 agent as-tool 组合
+3. [tools.md](tools.md) — Tools/MCP 抽象:四字段 Tool、execute 上下文、MCP server/client 能力包
+4. [workflows.md](workflows.md) — Workflow 引擎语义:扁平条目 + walker、suspend/resume 快照
+5. [memory.md](memory.md) — Memory 语义:thread/resource 双标识、消息历史、working memory
+6. [observability.md](observability.md) — Observability 形态:自有 span 模型、三事件、exporter 最小面、五边界埋点
+7. [storage.md](storage.md) — 存储适配策略:port 集合 + adapter 家族(非子系统)、additive-only 演化纪律
+8. [harness.md](harness.md) — Harness 语义集:durable 审批闸、signals、schedules(文档分类,非模块)
