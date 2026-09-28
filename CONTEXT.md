@@ -65,7 +65,7 @@ _Avoid_: 把工具做成 class / 注册表;工具携带框架引用(agent / memo
 _Avoid_: DAG 执行器(本框架 workflow 不是 DAG)、状态机 DSL
 
 **快照 (Snapshot)**:
-workflow run 在 step 边界的 JSON 化状态(stepResults + 位置);suspend/resume 与 Harness 持久执行的共用机制,经 storage port 读写,默认内存实现。
+run 的 JSON 化状态,两种:workflow 域 = step 边界的 stepResults + 位置;Harness 域 = durable agent loop 的消息列表 + step 计数 + 挂起点(仅工具调用边界审批闸产生)。suspend/resume 的共用机制,经 storage port 读写,默认内存实现。
 _Avoid_: 事件溯源、完整历史(只保留每 run 最新一份)
 
 **Memory**:
@@ -111,3 +111,19 @@ _Avoid_: 把存储层当子系统(它只是 port 集合 + adapter 家族)、核�
 **能力标志 (Capability flag)**:
 port 可选能力的声明与降级机制:可选方法的存在性即声明,核心调用前检测,缺席时按既定语义降级或显式报错(如 MemoryStore 条件 2 仅 working memory 启用时要求;快照 CAS 缺席即退回单进程语义)。additive-only 演化纪律的载体。
 _Avoid_: 基础 port 为覆盖场景而膨胀(基础形状冻结,扩展一律走可选方法)
+
+**Harness**:
+规范第六块 = **文档分类名而非统一模块**:持久执行与后台能力(durable 挂起/恢复、signals、schedules)的总称;各能力独立表面、按需取用,不存在 Harness 类/实例。
+_Avoid_: Harness 类、中央运行时(那是 mastra 已废弃的形状)
+
+**Durable agent**:
+经 `createDurableAgent` 包装的 agent:run 可在工具调用边界挂起(审批闸),loop 快照走 storage port,`resume` 携带审批结论恢复;挂起语义只存在于包装内,裸 agent 无挂起。
+_Avoid_: 崩溃自动恢复、resumable stream(已裁出;恢复 = resume 原语)
+
+**信号 (Signal)**:
+thread 导向的交互原语:向活跃 run 注入、唤醒空闲 thread 开新 run、或排队保序;注入内容落消息历史,单进程语义。
+_Avoid_: 跨实例 PubSub/租约(归能力包)、notification inbox(已裁出)
+
+**调度 (Schedule)**:
+未来触发 agent 的记录 + `tick` 原语(给定时刻返回到期项并触发);触发执行交给平台 cron 或可选进程内 ticker,核心不做轮询调度器。
+_Avoid_: 内建调度轮询循环、存储 CAS 认领(多实例安全归平台/部署方)

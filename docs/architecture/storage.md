@@ -7,12 +7,14 @@
 
 存储层是子系统持久化需求的 **port 集合 + adapter 家族**,本身不是子系统:核心只定义 port 类型与内存默认实现,真实后端经能力包接入。**无 mastra 式分域 composite**——`MastraCompositeStore` 的存在前提是强制中央实例(所有子系统共享一个 storage 入口,「不同域放不同后端」才需要框架内路由);本框架组合根可选(ADR-0002),子系统各自接收 store 实例,分后端是用户侧自由,不构成框架概念。**观测无 storage port**:tracing 走 exporter 流式模型(ADR-0009),span 不落库。
 
-## Port 清单(v1 两个,形状冻结)
+## Port 清单(v1 四个,形状冻结)
 
 - **`MemoryStore`**(6 必备 + 2 条件):定义见 `docs/architecture/memory.md`。
 - **`WorkflowSnapshotStore`**(2 方法 + JSON-only):定义见 `docs/architecture/workflows.md`。
+- **`AgentRunSnapshotStore`**(load/save + JSON-only;#18 新增):定义见 `docs/architecture/harness.md`。
+- **`ScheduleStore`**(5 方法;#18 新增):定义见 `docs/architecture/harness.md`。
 
-两个 port 独立定义、独立演化;一个 adapter 包可实现其一或两者(**统一 adapter 家族**)。port 类型由核心定义,adapter 包对核心仅 types 级依赖(同构于模型契约的反向)。
+各 port 独立定义、独立演化;一个 adapter 包可实现任意子集(**统一 adapter 家族**)。port 类型由核心定义,adapter 包对核心仅 types 级依赖(同构于模型契约的反向)。
 
 ## 扩展面:可选方法 + 能力标志
 
@@ -52,7 +54,7 @@ port 是框架唯一面向「生态作者」的契约,稳定性与核心同步:*
 | --- | --- |
 | 分域 composite / 域路由 | 子系统各自收 store 实例,分后端是用户侧自由 |
 | 观测存储域(span 落库) | exporter 流式模型(ADR-0009) |
-| harness 存储域(lease / notifications / schedules / thread-state) | 不预建;#18 需要时按「可选方法 + 能力标志」同模式扩展 |
+| harness 专属存储域(lease / notifications / thread-state) | 不建——#18 已裁决:挂起快照与调度 = 两个新最小 port(见 `docs/architecture/harness.md`),lease/PubSub 归能力包,inbox 裁出 |
 | PG / Redis 等第一方 adapter | 社区;作者指南见上 |
 | CAS 进基础 port | 可选扩展;内存版不必假装支持 |
 | 核心托管连接生命周期(进程 hook / settled 式) | adapter 自拥 `init?()`/`close?()`,应用或组合根调用 |
@@ -62,7 +64,7 @@ port 是框架唯一面向「生态作者」的契约,稳定性与核心同步:*
 - **Workflows(#11,已定)**:钉 `WorkflowSnapshotStore` 需求;CAS 与快照管理扩展承载其「跨进程 resume 去重」「保留期清理」缝。
 - **Memory(#12,已定)**:钉 `MemoryStore` 需求(6+2);其条件 2 即能力标志模式的首个实例。
 - **Observability(#14,已定)**:无 storage port;span 经 exporter 出进程。
-- **Harness(#18)**:durable 执行的存储输入 = 本规范的 port + 可选扩展;lease / PubSub / 调度等域不在此预建,归 #18 判断。
+- **Harness(#18,已定)**:`AgentRunSnapshotStore` 与 `ScheduleStore` 两个新 port 定义见 `docs/architecture/harness.md`,进统一 adapter 家族;lease / PubSub / notifications / thread-state 域不建。
 - **组合根(ADR-0002)**:可选薄注入点;持有 adapter 时可代管其 `init`/`close`,子系统独立 `new` 仍是一等用法。
 
 ## 依赖预算

@@ -5,7 +5,7 @@
 
 ## 定位
 
-Workflows 是框架的编排子系统:把 step 组合成可重复执行的图。API 形状与词汇对齐 mastra(`createStep` / `createWorkflow` builder),但语义内核只是「扁平 step-flow 条目列表 + for 循环 walker」——调研(#3)证明 mastra 的语义核心即此,其体量几乎全来自持久化钩子、streaming、tracing 与多引擎适配,而非语义本身。轻量落法:**存储做成 port,引擎本体零依赖、纯内存可跑**;durable 执行归 Harness(#18),外部 runner 适配是可能的能力包方向。
+Workflows 是框架的编排子系统:把 step 组合成可重复执行的图。API 形状与词汇对齐 mastra(`createStep` / `createWorkflow` builder),但语义内核只是「扁平 step-flow 条目列表 + for 循环 walker」——调研(#3)证明 mastra 的语义核心即此,其体量几乎全来自持久化钩子、streaming、tracing 与多引擎适配,而非语义本身。轻量落法:**存储做成 port,引擎本体零依赖、纯内存可跑**;durable 重启与调度的裁决见 Harness 规范(`docs/architecture/harness.md`),外部 runner 适配是可能的能力包方向。
 
 ## 定义表面
 
@@ -122,7 +122,7 @@ interface WorkflowSnapshotStore {
 | shouldPersistSnapshot / prune 钩子 | 固定 step 边界写 |
 | resume CAS / serializedStepGraph / 多引擎适配 | adapter 可选扩展(`docs/architecture/storage.md`)/ 外部 runner 能力包方向 |
 | chunk 级流式透传 | step 内自行消费;后加 minor |
-| durable sleep / schedule cron | Harness(#18)/ 平台 cron |
+| durable sleep / 长延时等待 | schedules + suspend 组合(`docs/architecture/harness.md`);调度触发归平台 cron / tick 原语 |
 | tripwire / canceled 状态 | AbortSignal → failed |
 
 ## 与其它子系统的关系
@@ -130,7 +130,7 @@ interface WorkflowSnapshotStore {
 - **模型层(#9,已定)**:事件流与快照中的流式词汇复用 chunk 协议;step 内用模型走 `ModelInput` 三形状。
 - **Agent(#10,已定)**:不复用 agent loop;agent 由用户一行包装进 step;agent 级审批/挂起归 Harness,本规范的快照机制是其底层机器。
 - **存储(#15,已定)**:本规范钉 `WorkflowSnapshotStore` port(两个方法 + JSON-only);adapter 家族与扩展面见 `docs/architecture/storage.md`。
-- **Harness(#18)**:durable 执行、跨进程恢复、durable timer 归它;load→重进原语与快照格式是它的输入。
+- **Harness(#18,已定)**:跨进程恢复与 durable timer 明确裁出;durable 重启 = 应用层用 load→重进原语 + `listSnapshots` 自举;agent 侧审批挂起机器与 schedules 见 `docs/architecture/harness.md`。
 - **Observability(#14,已定)**:span 挂在 run / step 边界,lifecycle 事件流是其事件锚点,traceId 随快照持久化;见 `docs/architecture/observability.md`。
 - **Memory(#12)**:无直接耦合。
 

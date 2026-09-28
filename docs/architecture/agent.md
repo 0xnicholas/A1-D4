@@ -42,7 +42,7 @@ interface AgentConfig {
 - **输入**:`string | Message[]`,Message **直通模型契约的 vendor prompt 类型**——不发明自有消息格式,内部流转与 Memory 存储同一格式;spec 升级时格式跟随,由模型层的 major 跟随策略兜底。
 - **输出对象**:`stream()` 返回的对象同时支持两种消费:`for await` 消费 chunk 协议流,`await` 其 promise getter(`text` / `object` / `toolCalls` / `toolResults` / `usage` / `steps` / `finishReason`)拿最终结果。**`generate()` 内部 = `stream()` + await 终值,单一代码路径**,不存在双实现。
 - **术语两层**:**run**(一次 generate/stream 调用的完整执行)> **step**(一轮模型调用 + 工具执行);mastra 的第三层 model step 不收。
-- **finishReason**:`'stop' | 'length' | 'tool-calls' | 'error'`(`tool-calls` 表示 maxSteps 耗尽时模型仍要求工具调用;审批挂起裁出核心,故无 `'suspended'`)。
+- **finishReason**:`'stop' | 'length' | 'tool-calls' | 'error' | 'suspended'`(`tool-calls` 表示 maxSteps 耗尽时模型仍要求工具调用;`'suspended'` 只在 `createDurableAgent` 包装内由审批闸产生,裸 agent 不出现——见 `docs/architecture/harness.md`)。
 - **steps[]**:每步的 text / toolCalls / toolResults / usage 轻量记录,调试、Observability、Workflow 快照共用;`usage` 另有全 run 累计值。
 - **执行选项**:`maxSteps`(默认 5)/ `modelSettings`(temperature 等透传袋)/ `providerOptions`(透传)/ `signal`(AbortSignal,沿工具调用与动态参数解析传播)。
 - **structuredOutput**:一等支持 `structuredOutput: { schema }`,schema 走 Standard Schema 契约(ADR-0003),结果落 `object`;校验策略固定 strict(失败即报错,不做 errorStrategy 多选一)。
@@ -52,7 +52,7 @@ interface AgentConfig {
 - **归属**:loop 是 Agent 子系统内部实现,围绕模型契约构建(继承「决策:模型层策略」);Workflows 不复用 agent loop,共享 chunk 协议与 step 词汇即可。
 - **停止条件**:模型返回不含 tool-call 即停;`maxSteps` 封顶。不做 stopWhen DSL。
 - **工具错误**:execute 抛错捕获为 error 工具结果**回喂模型**,由模型自行恢复或放弃,run 不中止;需要硬停的场景经 Processor 实现。
-- **审批 / 挂起**:不在核心。挂起-恢复需要 loop 快照,与 Harness 的 durable 是同一笔机器,已移交「决策:Harness 语义集」统一裁决。
+- **审批 / 挂起**:不在核心,由「决策:Harness 语义集」(#18,已定)承接——`createDurableAgent` 包装的工具调用边界审批闸 + loop 快照,见 `docs/architecture/harness.md`;核心 loop 保持无快照。
 
 ## 扩展点:Processor
 
@@ -75,7 +75,7 @@ chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展�
 - **Tools/MCP(#13,已定)**:容器形状 `Record<string, Tool>`;Tool 定义与 MCP 能力包见 `docs/architecture/tools.md`。
 - **Workflows(#11)**:不复用 agent loop;chunk / step 词汇共用。
 - **Observability(#14,已定)**:span 挂在 run / step / 模型调用上,形态见 `docs/architecture/observability.md`。
-- **Harness(#18)**:审批/挂起、durable、后台能力归它,是「决策:Agent 核心抽象」的正式输入。
+- **Harness(#18,已定)**:审批挂起、durable、signals 注入归它,形态见 `docs/architecture/harness.md`;loop 为它开的唯一缝 = step 边界注入检查(缺席零开销)。
 
 ## 依赖预算
 
