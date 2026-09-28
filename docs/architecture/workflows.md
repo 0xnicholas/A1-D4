@@ -131,7 +131,7 @@ interface WorkflowSnapshotStore {
 - **Agent(#10,已定)**:不复用 agent loop;agent 由用户一行包装进 step;agent 级审批/挂起归 Harness,本规范的快照机制是其底层机器。
 - **存储(#15)**:本规范钉 `WorkflowSnapshotStore` port(两个方法 + JSON-only);adapter 家族归它。
 - **Harness(#18)**:durable 执行、跨进程恢复、durable timer 归它;load→重进原语与快照格式是它的输入。
-- **Observability(#14)**:span 挂在 run / step 边界;lifecycle 事件流是其事件锚点。
+- **Observability(#14,已定)**:span 挂在 run / step 边界,lifecycle 事件流是其事件锚点,traceId 随快照持久化;见 `docs/architecture/observability.md`。
 - **Memory(#12)**:无直接耦合。
 
 ## 依赖预算

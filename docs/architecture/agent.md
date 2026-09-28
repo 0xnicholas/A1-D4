@@ -62,7 +62,7 @@ Processor 是 Agent 的**唯一横切扩展点**(ADR-0005):guardrails、evals、
 - `processOutputStep` — 每个 step 完成后,可见可改 step 记录
 - `processError` — provider / 工具错误时,观察并可替换错误;不做 abort/retry 机制
 
-chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展位。Observability 的 tracer 挂钩是内部缝,形态归「决策:Observability 形态」,不占 Processor 名额。
+chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展位。Observability 的 tracer 挂钩是内部缝(见 `docs/architecture/observability.md`),不占 Processor 名额。
 
 ## 多 agent 组合
 
@@ -74,7 +74,7 @@ chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展�
 - **Memory(#12)**:本规范钉住字段存在性与 recall/save 时机;接口与 thread/resource 语义归它。
 - **Tools/MCP(#13,已定)**:容器形状 `Record<string, Tool>`;Tool 定义与 MCP 能力包见 `docs/architecture/tools.md`。
 - **Workflows(#11)**:不复用 agent loop;chunk / step 词汇共用。
-- **Observability(#14)**:span 挂在 run / step / 模型调用上,形态归它。
+- **Observability(#14,已定)**:span 挂在 run / step / 模型调用上,形态见 `docs/architecture/observability.md`。
 - **Harness(#18)**:审批/挂起、durable、后台能力归它,是「决策:Agent 核心抽象」的正式输入。
 
 ## 依赖预算

@@ -56,5 +56,5 @@ type ModelInput =
 
 - **Agents(#10)**:继承 model 字段形状与 chunk 协议;agent loop 围绕模型契约构建。
 - **Workflows(#11)**:step 边界 JSON 快照与流式事件复用 chunk 协议词汇。
-- **Observability(#14)**:span 事件挂在模型调用与 chunk 流上。
+- **Observability(#14,已定)**:`agent-step` span 的 model/provider/usage/finishReason 取自模型契约的 finish/usage chunk;见 `docs/architecture/observability.md`。
 - **Memory(#12)**:如需 embedding 模型,复用同一契约模式(接受 AI SDK spec 的 EmbeddingModel 实例、vendor 结构类型),届时确认。

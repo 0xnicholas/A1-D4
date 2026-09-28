@@ -87,3 +87,15 @@ _Avoid_: short-term memory、chat history 作术语
 **工作记忆 (Working memory)**:
 可选的跨会话小块结构化记忆(用户画像/偏好/当前目标),resource 作用域;作为 system message 注入,agent 经 tool-call 更新。
 _Avoid_: long-term memory(向量召回、后台压缩类"长期记忆"机制不在核心,经能力包桥接)
+
+**Span**:
+观测域的单个操作记录:自有最小形状(id / 32-hex traceId / parentSpanId / name / type / 起止时间 / 一等公民 input/output / attributes / metadata / error / isEvent),非 OTel span——OTel 映射只发生在 OTLP 能力包。框架只写 5 个类型常量(agent-run / agent-step / tool-call / workflow-run / workflow-step),type 字段开放给用户自定义。
+_Avoid_: OTel span 作内核概念、metrics/logs 信号(v1 只定 tracing)
+
+**Tracer**:
+观测子系统的入口对象:`createTracer({ exporters, sampler?, spanProcessors? })` 产物,经组合根注入分发;负责 root 采样判定(不通过则 NoOpSpan 传播)与 span_started/updated/ended 三事件派发;缺席时全子系统零开销。
+_Avoid_: OTel Tracer、全局单例
+
+**观测导出器 (Observability exporter)**:
+把 tracing 事件送出进程的接口:`{ export(event), flush?(), shutdown?() }`;核心自带 console 与 memory 两个,OTLP(GenAI semconv 映射)在能力包,厂商专用 exporter 不做(裸 OTLP + gen_ai.* 已覆盖各家后端)。
+_Avoid_: plugin、integration(那是能力包的词)
