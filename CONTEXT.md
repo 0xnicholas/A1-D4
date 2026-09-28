@@ -41,11 +41,11 @@ _Avoid_: 仅个别字段支持动态(全字段统一,无一例外)
 _Avoid_: mastra 式 Map 类、泛型上下文参数
 
 **Run**:
-一次 generate()/stream() 调用的完整执行,从输入到 finishReason;包含零到多个 step。
+一次执行的完整生命周期。agent 域:一次 generate()/stream() 调用,从输入到 finishReason,包含零到多个 step;workflow 域:一次 workflow 执行,从 start/resume 到终态(success | failed | suspended)。
 _Avoid_: session、conversation(那是 Memory 域的词)
 
 **Step**:
-run 内的一轮"模型调用 + 工具执行";mastra 的第三层 model step 不收。
+两层含义,靠语境限定。agent 域:run 内的一轮"模型调用 + 工具执行"(mastra 的第三层 model step 不收);workflow 域:图中的一个节点(id + input/output schema + execute)。
 _Avoid_: iteration、loop iteration(规范统一用 step)
 
 **输出对象 (Output object)**:
@@ -55,3 +55,11 @@ _Avoid_: generate/stream 分离的双实现
 **Processor**:
 Agent 的唯一横切扩展点:挂在 run/step 边界钩子(processInput / processOutputStep / processError)上的有序处理器;guardrails、evals、脱敏、限流等横切能力的唯一合法承载点。
 _Avoid_: 中间件、plugin、以字段形式焊进 Agent 类
+
+**Workflow**:
+框架的编排子系统:用可变 builder 把 step 组成条目图,commit 冻结后 createRun 执行;语义内核 = 扁平条目列表 + for 循环 walker,suspend/resume 靠 step 边界快照。
+_Avoid_: DAG 执行器(本框架 workflow 不是 DAG)、状态机 DSL
+
+**快照 (Snapshot)**:
+workflow run 在 step 边界的 JSON 化状态(stepResults + 位置);suspend/resume 与 Harness 持久执行的共用机制,经 storage port 读写,默认内存实现。
+_Avoid_: 事件溯源、完整历史(只保留每 run 最新一份)
