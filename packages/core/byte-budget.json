@@ -1,0 +1,12 @@
+{
+  "metric": "esbuild-minified-bytes",
+  "entries": {
+    ".": 0,
+    "./model": 0,
+    "./agent": 0,
+    "./tools": 0,
+    "./observability": 0,
+    "./workflows": 0,
+    "./memory": 0
+  }
+}

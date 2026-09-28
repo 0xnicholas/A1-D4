@@ -13,6 +13,7 @@
 
 ## Consequences
 
+- **修订(#23 起)**:`pnpm verify` 的组成在原四步之外增加 `check:runtime-deps`(零运行时依赖硬线),见 ADR-0015。
 - 新增子系统 = 新建 `src/<名>/index.ts` + `exports` 一行 + `test/export-map.test.ts` 的清单加一项;`entry-points.test.ts` 与 `check:dist` 自动覆盖新入口。
 - 构建产物不 minify、含 sourcemap;CI 字节预算(#23)的口径在测量侧决定,与构建链解耦。
 - 测试从工作区根一把跑;单文件与过滤走 vitest CLI 的路径参数,包内不各自配 runner。

@@ -52,6 +52,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check:dist": "node scripts/check-dist.mjs"
+    "check:dist": "node scripts/check-dist.mjs",
+    "check:runtime-deps": "node scripts/check-runtime-deps.mjs",
+    "check:byte-budget": "node scripts/check-byte-budget.mjs",
+    "byte-budget:update": "node scripts/check-byte-budget.mjs --update"
   }
 }

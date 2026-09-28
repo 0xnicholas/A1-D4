@@ -1,0 +1,44 @@
+# CI(M1-02 #23):硬闸门 + 轻量红线黄灯。
+# 硬闸门(红)= `pnpm verify`(typecheck / build / test / check:dist / 零运行时依赖);
+# 黄灯(@ADR-0001:不卡合并)= 字节预算超限,以 GitHub 警告注释 + job summary 呈现。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 验证与轻量红线
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm(版本由 package.json 的 packageManager 固定)
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node(engines 基线 22.12.0:顺带验证 require(esm) 下限)
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: 硬闸门(typecheck / build / test / check:dist / 零运行时依赖)
+        run: pnpm verify
+
+      - name: 字节预算黄灯(ADR-0001:超预算不卡合并;口径/测量硬错误照常变红)
+        # 退出码契约(ADR-0015):0 在预算内 / 1 超预算(黄灯,本步容忍)/ 2 硬错误(失败)
+        run: pnpm check:byte-budget || test $? -eq 1
