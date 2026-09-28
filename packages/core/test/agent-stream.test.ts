@@ -1,21 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Agent } from '@balsa/core/agent';
 import { ModelContractError } from '@balsa/core/model';
 import type { Chunk } from '@balsa/core/model';
+import { assistant } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
-import type { FakeModel, FakeResponse } from './helpers/fake-model.js';
+import type { FakeResponse } from './helpers/fake-model.js';
 import { collect } from './helpers/collect.js';
 
 /**
  * stream() 输出对象双消费(M1-05 #26):同一个对象既可 `for await` 消费核心自有 chunk 协议流,
- * 又可 await 其终值 getter(text / usage / steps / finishReason);`generate()` = `stream()` + await
- * 终值,单一代码路径、行为一致(agent.md「执行语义」)。断言只走公开面(@balsa/core/agent)与脚本化
- * 假模型接缝(@see helpers/fake-model.ts),不触内部实现。
+ * 又可 await 其终值 getter(text / toolCalls / toolResults / usage / steps / finishReason);
+ * `generate()` = `stream()` + await 终值,单一代码路径、行为一致(agent.md「执行语义」)。断言只走
+ * 公开面(@balsa/core/agent)与脚本化假模型接缝(@see helpers/fake-model.ts),不触内部实现。
  */
-function assistant(model: FakeModel): Agent {
-  return new Agent({ name: 'assistant', instructions: 'You are concise.', model });
-}
-
 const UNKNOWN_USAGE = {
   inputTokens: undefined,
   outputTokens: undefined,
@@ -187,6 +183,8 @@ describe('单一路径回归:generate() = stream() + await 终值', () => {
     const result = assistant(fakeModel(script)).stream('Say hi.');
     const viaStream = {
       text: await result.text,
+      toolCalls: await result.toolCalls,
+      toolResults: await result.toolResults,
       usage: await result.usage,
       finishReason: await result.finishReason,
       steps: await result.steps,
@@ -221,6 +219,8 @@ describe('Agent.stream:错误路径', () => {
 
     expect(received).toEqual([{ type: 'text-delta', textDelta: 'partial' }]);
     await expect(result.text).rejects.toThrow('upstream exploded');
+    await expect(result.toolCalls).rejects.toThrow('upstream exploded');
+    await expect(result.toolResults).rejects.toThrow('upstream exploded');
     await expect(result.steps).rejects.toThrow('upstream exploded');
   });
 

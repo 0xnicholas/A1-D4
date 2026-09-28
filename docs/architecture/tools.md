@@ -51,6 +51,8 @@ interface ToolContext {
 2. execute 抛错
 3. output 校验失败(execute 返回不合 outputSchema)
 
+同语义的第四类:模型调用了工具容器中不存在的名字(Record 无此键)——框架没有可执行的 execute,同样直接以 error 结果回喂。
+
 第 3 条与 structuredOutput 的 strict 调子一致(失败即报错);注意此时**副作用已经发生**,重复执行防护归工具的幂等设计,框架提供 `toolCallId` 作幂等键。校验由框架调用点执行(agent loop、MCP server 包);手动直调 execute 时校验是调用方责任。
 
 ## 组合范式

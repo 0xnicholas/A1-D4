@@ -26,6 +26,8 @@ describe('Agent.generate:纯文本闭环', () => {
 
     expect(result).toEqual({
       text: 'Hello',
+      toolCalls: [],
+      toolResults: [],
       usage: { inputTokens: 3, outputTokens: 7, totalTokens: 10 },
       finishReason: 'stop',
       steps: [

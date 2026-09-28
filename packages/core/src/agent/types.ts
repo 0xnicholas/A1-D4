@@ -44,17 +44,39 @@ export type ModelSettings = Omit<
 >;
 
 /**
+ * The context of one run, resolved per call (`docs/architecture/agent.md`「定义表面」): the
+ * framework writes `signal` and `runId`, everything else is the user's per-call open bag. A plain
+ * object — no `Map` class, no generic context parameter.
+ *
+ * Dynamic argument resolution and tool `ctx.requestContext` both read the same object; the
+ * framework-written fields come last, so a per-call property cannot hijack them.
+ */
+export interface RequestContext {
+  /** Cancellation of this run — the per-call `signal`, or a never-aborting signal when none was passed. */
+  readonly signal: AbortSignal;
+  /** Identity of this run (generated per run). */
+  readonly runId: string;
+  /** User per-call properties, passed through untouched. */
+  readonly [key: string]: unknown;
+}
+
+/**
  * Per-call execution options. The open bag below is the user's per-call request context
- * (`RequestContext`'s user properties); M1-10 (#31) plumbs it into dynamic-argument resolution
- * and tool contexts.
+ * (`RequestContext`'s user properties); M1-10 (#31) plumbs it into dynamic-argument resolution.
  */
 export interface AgentRunOptions {
   /** Passthrough bag for the model call (temperature, maxOutputTokens, …). */
   readonly modelSettings?: ModelSettings;
   /** Provider-specific options, forwarded to the model call untouched. */
   readonly providerOptions?: ModelProviderOptions;
-  /** Cancels the run — propagated to the model call. */
+  /** Cancels the run — propagated to the model call, the tool loop and every tool context. */
   readonly signal?: AbortSignal;
+  /**
+   * The step cap: how many model calls one run may make (`docs/architecture/agent.md`「Agent
+   * loop」). When the cap is reached while the model still asks for tools, the terminal
+   * `finishReason` is `'tool-calls'`. Defaults to 5.
+   */
+  readonly maxSteps?: number;
   /** User per-call request context properties. */
   readonly [key: string]: unknown;
 }
@@ -62,8 +84,9 @@ export interface AgentRunOptions {
 /**
  * One step of a run: a single model call and the chunks the chunk protocol carried for it
  * (`docs/architecture/agent.md`「steps[]」). The step's tool calls are recorded as the protocol
- * saw them; executing them and feeding results back is the built-in loop (M1-07, #28) — until
- * then a tool-requesting step only carries its `toolCalls` (and any provider-executed result).
+ * saw them; the built-in loop executes the client-side ones and appends their results to this same
+ * step (results belong to the step whose calls they answer, even though they arrive after its
+ * `finish` chunk).
  */
 export interface AgentStep {
   /** The text the step produced, concatenated across its text deltas. */
@@ -88,13 +111,16 @@ export interface AgentStep {
  *   has not started yet; terminal values that are never read are never created, so a consumer
  *   that only iterates cannot be hit by unhandled rejections.
  *
- * The remaining getters the Agent spec enumerates land with their features: the run-level
- * `toolCalls` / `toolResults` with the built-in loop (M1-07, #28) and `object` with
+ * The remaining getter the Agent spec enumerates lands with its feature: `object` with
  * `structuredOutput` (M1-13, #34). Widening the surface is additive.
  */
 export interface AgentStreamResult extends AsyncIterable<Chunk> {
   /** Text of the run's final step (intermediate steps' text is in `steps`). */
   readonly text: Promise<string>;
+  /** Tool calls the model requested over the whole run — `steps` flattened, in step order. */
+  readonly toolCalls: Promise<readonly ToolCallChunk[]>;
+  /** Tool results recorded over the whole run (framework- and provider-executed) — `steps` flattened. */
+  readonly toolResults: Promise<readonly ToolResultChunk[]>;
   /** Per-step records: text, tool calls, tool results and usage of each model call. */
   readonly steps: Promise<readonly AgentStep[]>;
   /** Usage accumulated over the whole run. */
@@ -107,6 +133,10 @@ export interface AgentStreamResult extends AsyncIterable<Chunk> {
 export interface AgentGenerateResult {
   /** Text of the run's final step (intermediate steps' text is in `steps`). */
   readonly text: string;
+  /** Tool calls the model requested over the whole run — `steps` flattened, in step order. */
+  readonly toolCalls: readonly ToolCallChunk[];
+  /** Tool results recorded over the whole run (framework- and provider-executed) — `steps` flattened. */
+  readonly toolResults: readonly ToolResultChunk[];
   /** Usage accumulated over the whole run. */
   readonly usage: Usage;
   /** Why the model stopped: `'stop'` / `'length'` / `'tool-calls'` / `'error'`. */

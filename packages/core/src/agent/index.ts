@@ -13,4 +13,5 @@ export type {
   AgentStep,
   AgentStreamResult,
   ModelSettings,
+  RequestContext,
 } from './types.js';

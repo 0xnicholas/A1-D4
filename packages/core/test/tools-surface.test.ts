@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import type { RequestContext } from '@balsa/core/agent';
 import { createTool } from '@balsa/core/tools';
-import type { Tool, ToolConfig } from '@balsa/core/tools';
+import type { Tool, ToolConfig, ToolContext } from '@balsa/core/tools';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**
@@ -132,6 +133,52 @@ describe('createTool:类型从 schema 推出', () => {
       inputSchema: z.object({ city: z.string() }),
       execute: () => 'ok',
     });
+  });
+});
+
+describe('ToolContext:六件套', () => {
+  it('字段恰为六件套(signal / runId / toolCallId / requestContext / traceId / spanId)', () => {
+    type Pieces = 'signal' | 'runId' | 'toolCallId' | 'requestContext' | 'traceId' | 'spanId';
+    // 双向包含:既不多于六件、也不少于六件
+    expectAssignable<Pieces>(null as unknown as keyof ToolContext);
+    expectAssignable<keyof ToolContext>(null as unknown as Pieces);
+  });
+
+  it('requestContext 就是 agent 的 RequestContext(框架写入 signal / runId + 用户袋)', () => {
+    const signal = new AbortController().signal;
+    const requestContext: RequestContext = { signal, runId: 'run-1', userId: 'u-1' };
+    const ctx: ToolContext = {
+      signal,
+      runId: 'run-1',
+      toolCallId: 'call-1',
+      requestContext,
+      traceId: '',
+      spanId: '',
+    };
+
+    expectAssignable<RequestContext>(ctx.requestContext);
+    expect(ctx.requestContext).toBe(requestContext);
+  });
+
+  it('execute 的第二参由上下文类型推出为 ToolContext(工厂与手写字面量同形)', () => {
+    const fromFactory = createTool({
+      description: 'Looks up the weather.',
+      inputSchema: z.object({ city: z.string() }),
+      execute: (input, ctx) => {
+        expectAssignable<ToolContext>(ctx);
+        return input.city;
+      },
+    });
+    const handwritten: Tool = {
+      description: 'Looks up the weather.',
+      execute: (_input, ctx) => {
+        expectAssignable<ToolContext>(ctx);
+        return 'ok';
+      },
+    };
+
+    expectAssignable<Tool>(fromFactory);
+    expectAssignable<Tool>(handwritten);
   });
 });
 

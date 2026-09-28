@@ -1,14 +1,15 @@
-import { normalizeStream } from '../model/normalize.js';
-import { assertModel } from '../model/resolve.js';
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
+import { assertModel } from '../model/resolve.js';
 import type { Tool } from '../tools/index.js';
 import { toModelTools } from '../tools/to-model-tools.js';
+import { DEFAULT_MAX_STEPS, runAgentLoop } from './loop.js';
 import { createAgentStream } from './stream.js';
 import type {
   AgentConfig,
   AgentGenerateResult,
   AgentRunOptions,
   AgentStreamResult,
+  RequestContext,
 } from './types.js';
 
 /**
@@ -40,11 +41,13 @@ export class Agent {
 
   /**
    * Runs the agent once and returns the output object: `for await` consumes the core's own chunk
-   * protocol, while `text` / `usage` / `finishReason` / `steps` are awaitable terminal values on
-   * the same object. The run starts on first consumption.
+   * protocol, while `text` / `toolCalls` / `usage` / `finishReason` / `steps` are awaitable
+   * terminal values on the same object. The run starts on first consumption.
    *
-   * Tool calls are recorded on the step but not executed yet (the built-in loop lands with M1-07):
-   * a tool-requesting step ends with `finishReason: 'tool-calls'`.
+   * The built-in loop executes the tool calls a step requests (in call order), feeds the results
+   * back to the model and repeats until a step requests no tool call or `maxSteps` is reached;
+   * per-call behavior is controlled through `AgentRunOptions` — see `docs/architecture/agent.md`
+   *「Agent loop」.
    */
   stream(input: string | ModelMessage[], options: AgentRunOptions = {}): AgentStreamResult {
     const model = this.model;
@@ -52,9 +55,15 @@ export class Agent {
     const tools = this.tools;
     return createAgentStream(async function* () {
       // Call options are built per run — they are part of the run, not of creating the object.
-      const callOptions = toCallOptions(instructions, input, tools, options);
-      const { stream } = await model.doStream(callOptions);
-      yield* normalizeStream(stream);
+      const { prompt, callOptions } = toCallOptions(instructions, input, tools, options);
+      yield* runAgentLoop({
+        model,
+        prompt,
+        callOptions,
+        tools: tools ?? {},
+        maxSteps: toMaxSteps(options.maxSteps),
+        requestContext: toRequestContext(options),
+      });
     });
   }
 
@@ -68,41 +77,75 @@ export class Agent {
     options: AgentRunOptions = {},
   ): Promise<AgentGenerateResult> {
     const result = this.stream(input, options);
-    const [text, usage, finishReason, steps] = await Promise.all([
+    const [text, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
       result.text,
+      result.toolCalls,
+      result.toolResults,
       result.usage,
       result.finishReason,
       result.steps,
     ]);
 
-    return { text, usage, finishReason, steps };
+    return { text, toolCalls, toolResults, usage, finishReason, steps };
   }
 }
 
 /**
- * Builds the model call options: the agent's instructions plus the input become the prompt, the
- * tool container becomes the provider tool list, and the per-call passthroughs ride along.
- * Framework-owned fields (`prompt` / `abortSignal` / `providerOptions` / `tools`) are written
- * after the `modelSettings` spread, so settings cannot hijack them. An agent without tools sends
- * no `tools` field at all.
+ * Builds the model call inputs: the agent's instructions plus the input become the initial prompt,
+ * the tool container becomes the provider tool list, and the per-call passthroughs ride along.
+ * Framework-owned fields (`prompt` / `abortSignal` / `providerOptions` / `tools`) are written after
+ * the `modelSettings` spread, so settings cannot hijack them. An agent without tools sends no
+ * `tools` field at all; the loop writes `prompt` for every step.
  */
 function toCallOptions(
   instructions: string,
   input: string | ModelMessage[],
   tools: Record<string, Tool> | undefined,
   options: AgentRunOptions,
-): ModelCallOptions {
-  const callOptions: ModelCallOptions = {
-    ...options.modelSettings,
-    prompt: toPrompt(instructions, input),
-  };
+): { prompt: ModelPrompt; callOptions: Omit<ModelCallOptions, 'prompt'> } {
+  const callOptions: Omit<ModelCallOptions, 'prompt'> = { ...options.modelSettings };
   if (tools !== undefined && Object.keys(tools).length > 0) {
     callOptions.tools = toModelTools(tools);
   }
   if (options.signal !== undefined) callOptions.abortSignal = options.signal;
   if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
-  return callOptions;
+  return { prompt: toPrompt(instructions, input), callOptions };
 }
+
+/**
+ * The request context of one run (`docs/architecture/agent.md`「定义表面」): the user's per-call
+ * properties plus framework-written `signal` / `runId`, which are written last so a per-call
+ * property cannot hijack them. The framework-owned run options (`maxSteps` / `modelSettings` /
+ * `providerOptions`) are execution controls, not context, and are left out of the bag. The run id is
+ * generated per run; without a per-call `signal` the context carries a never-aborting one, so tools
+ * always receive an `AbortSignal`.
+ */
+function toRequestContext(options: AgentRunOptions): RequestContext {
+  const {
+    modelSettings: _modelSettings,
+    providerOptions: _providerOptions,
+    maxSteps: _maxSteps,
+    signal,
+    ...bag
+  } = options;
+  return {
+    ...bag,
+    signal: signal ?? NEVER_ABORTED,
+    runId: crypto.randomUUID(),
+  };
+}
+
+/** The step cap of a run: `maxSteps` when given, 5 (the documented default) otherwise. */
+function toMaxSteps(maxSteps: number | undefined): number {
+  const resolved = maxSteps ?? DEFAULT_MAX_STEPS;
+  if (!Number.isInteger(resolved) || resolved < 1) {
+    throw new Error(`maxSteps must be a positive integer, got ${String(resolved)}.`);
+  }
+  return resolved;
+}
+
+/** A signal that never aborts — the `signal` of runs that were started without one. */
+const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
  * Builds the model prompt: the agent's instructions as a system message, then the input — either

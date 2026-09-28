@@ -10,6 +10,19 @@ import { ModelContractError } from '../model/resolve.js';
 import type { AgentStep, AgentStreamResult } from './types.js';
 
 /**
+ * The contract violation of a model stream that ends without a `finish` part — `finishReason` and
+ * usage are unknown. The run engine raises it when the whole chunk stream ends without one; the
+ * loop raises it when a single step's model stream does, so a later step cannot settle the run on
+ * a previous step's finish chunk. Internal seam, not part of the entry's public surface.
+ */
+export function missingFinishError(): ModelContractError {
+  return new ModelContractError(
+    'The model stream ended without a finish part, so finishReason and usage are unknown. ' +
+      'The model does not implement the streaming contract of the AI SDK provider specification.',
+  );
+}
+
+/**
  * The run behind an output object (`docs/architecture/agent.md`「执行语义」「输出对象」).
  *
  * One pass over the core chunk protocol serves both consumption styles: the `for await` iterator
@@ -44,6 +57,8 @@ export function createAgentStream(chunks: () => AsyncIterable<Chunk>): AgentStre
   const text = createTerminal<string>();
   const usageTerminal = createTerminal<Usage>();
   const stepsTerminal = createTerminal<readonly AgentStep[]>();
+  const toolCallsTerminal = createTerminal<readonly ToolCallChunk[]>();
+  const toolResultsTerminal = createTerminal<readonly ToolResultChunk[]>();
   const finishReason = createTerminal<FinishReason>();
 
   function start(): void {
@@ -59,10 +74,7 @@ export function createAgentStream(chunks: () => AsyncIterable<Chunk>): AgentStre
         deliver(chunk);
       }
       if (finish === undefined) {
-        throw new ModelContractError(
-          'The model stream ended without a finish part, so finishReason and usage are unknown. ' +
-            'The model does not implement the streaming contract of the AI SDK provider specification.',
-        );
+        throw missingFinishError();
       }
       settle(finish);
     } catch (error) {
@@ -83,7 +95,7 @@ export function createAgentStream(chunks: () => AsyncIterable<Chunk>): AgentStre
         break;
       case 'tool-result':
         // Results belong to the step whose call they answer: provider-executed results arrive
-        // inside the step, framework-executed ones (the loop's job, M1-07) right after its finish
+        // inside the step, framework-executed ones (the loop's job) right after its finish
         // chunk — both land on the step that is current here.
         step.toolResults.push(chunk);
         break;
@@ -126,6 +138,8 @@ export function createAgentStream(chunks: () => AsyncIterable<Chunk>): AgentStre
     text.settle(steps.at(-1)?.text ?? '');
     usageTerminal.settle(usage);
     stepsTerminal.settle(steps);
+    toolCallsTerminal.settle(steps.flatMap((record) => record.toolCalls));
+    toolResultsTerminal.settle(steps.flatMap((record) => record.toolResults));
     finishReason.settle(final.finishReason);
   }
 
@@ -136,6 +150,8 @@ export function createAgentStream(chunks: () => AsyncIterable<Chunk>): AgentStre
     text.fail(error);
     usageTerminal.fail(error);
     stepsTerminal.fail(error);
+    toolCallsTerminal.fail(error);
+    toolResultsTerminal.fail(error);
     finishReason.fail(error);
   }
 
@@ -164,6 +180,14 @@ export function createAgentStream(chunks: () => AsyncIterable<Chunk>): AgentStre
     get text() {
       start();
       return text.promise();
+    },
+    get toolCalls() {
+      start();
+      return toolCallsTerminal.promise();
+    },
+    get toolResults() {
+      start();
+      return toolResultsTerminal.promise();
     },
     get usage() {
       start();

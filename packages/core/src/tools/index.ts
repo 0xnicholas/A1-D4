@@ -2,15 +2,16 @@
  * `@balsa/core/tools` — tools.
  *
  * The four-field `createTool` plain object (schema-derived input/output types, frozen), the
- * `Record<string, Tool>` container whose keys are the tool names, and the Standard Schema dual
- * interface the four fields speak (ADR-0003). The Agent turns the container into the provider tool
- * list; the three-line error normalization that feeds failures back to the model lands with the
- * tool loop (M1-07, #28).
+ * `Record<string, Tool>` container whose keys are the tool names, the six-piece `ToolContext`
+ * every `execute` receives, and the Standard Schema dual interface the four fields speak
+ * (ADR-0003). The Agent turns the container into the provider tool list and normalizes tool
+ * failures (input validation / throw / output validation) into error results fed back to the
+ * model (`docs/architecture/tools.md`).
  *
  * Spec: `docs/architecture/tools.md`.
  */
 export { createTool } from './tool.js';
-export type { Tool, ToolConfig } from './tool.js';
+export type { Tool, ToolConfig, ToolContext } from './tool.js';
 export type {
   StandardJSONSchemaV1,
   StandardSchema,
