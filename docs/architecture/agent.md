@@ -21,7 +21,7 @@ interface AgentConfig {
 
 - **动态参数**:所有字段接受 `T | ((ctx: RequestContext) => T | Promise<T>)`,每次执行按请求上下文解析。`RequestContext = { signal: AbortSignal, runId: string, ...用户 per-call 开放属性袋 }`,纯对象,无 `Agent<TContext>` 泛型。
 - **instructions 仅 string**:mastra 的 string[] / SystemMessage / providerOptions 联合全砍,provider 级能力(缓存控制等)证明需要后再加。
-- **tools 容器**:`Record<string, Tool>`,键即工具名,构造期完成唯一性校验。Tool 自身定义(Standard Schema 入参、execute 签名)见「Tools/MCP 抽象」规范(`docs/architecture/tools.md`)。
+- **tools 容器**:`Record<string, Tool>`,键即工具名,构造期完成唯一性校验(Record 键天然唯一,重名在编译期即被拦截)。Tool 自身定义(Standard Schema 入参、execute 签名)见「Tools/MCP 抽象」规范(`docs/architecture/tools.md`)。
 - **memory**:一等可选字段。本规范只钉三件事:字段存在、可选、读写时机固定(模型调用前 recall、每个 step 后 save);接口方法与 thread/resource 语义归「决策:Memory 语义」。
 - **组合根关系**:独立 `new Agent(...)` 是一等用法,不强制注入;横切依赖(tracer 等)经组合根分发时 Agent 被动接受,不感知其存在。
 

@@ -18,10 +18,10 @@ interface ToolConfig {
 }
 ```
 
-- **四字段,无 id/name**:名字的唯一真相源是容器 Record 键(Agent 规范已定 `Record<string, Tool>` + 构造期唯一性校验);MCP 暴露时同键。
+- **四字段,无 id/name**:名字的唯一真相源是容器 Record 键(Agent 规范已定 `Record<string, Tool>` + 构造期唯一性校验);MCP 暴露时同键。Record 键本身唯一——同一字面量里重名是 TypeScript 编译错误,构造期唯一性校验因此落在编译期;运行期无法表达重复键(程序化组装在到达容器前已被对象语义折叠)。
 - **`createTool(config)` 工厂仅为类型推断**(schema → input/output 类型),返回冻结普通对象;手写字面量合法(结构化类型,工厂不是必需)。
 - **字段不逐个动态化**:动态性由 Agent 的 tools 容器(`DynamicArgument<Record<string, Tool>>`)整组承载——per-request 换工具集在容器层整组替换,不在工具内部逐字段解析。
-- **schema 契约**:`StandardSchemaV1 & StandardJSONSchemaV1` 双接口(ADR-0003);`~standard.jsonSchema` 出 JSON Schema 发给 provider。
+- **schema 契约**:`StandardSchemaV1 & StandardJSONSchemaV1` 双接口(ADR-0003);`~standard.jsonSchema` 出 JSON Schema 发给 provider——目标固定 draft-07(与模型契约的 `JsonSchema` 子集一致),转换器产物原样直通,核心不改写 schema。
 - **无参工具**:inputSchema 省略时,发给 provider 的 parameters 补空 object schema(`{ type: 'object', properties: {} }`),`input` 类型为 `undefined`。
 
 ## 执行上下文

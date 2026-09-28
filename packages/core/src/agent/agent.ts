@@ -2,6 +2,7 @@ import { normalizeStream } from '../model/normalize.js';
 import { assertModel } from '../model/resolve.js';
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
 import type { Tool } from '../tools/index.js';
+import { toModelTools } from '../tools/to-model-tools.js';
 import { createAgentStream } from './stream.js';
 import type {
   AgentConfig,
@@ -48,9 +49,10 @@ export class Agent {
   stream(input: string | ModelMessage[], options: AgentRunOptions = {}): AgentStreamResult {
     const model = this.model;
     const instructions = this.instructions;
+    const tools = this.tools;
     return createAgentStream(async function* () {
       // Call options are built per run — they are part of the run, not of creating the object.
-      const callOptions = toCallOptions(instructions, input, options);
+      const callOptions = toCallOptions(instructions, input, tools, options);
       const { stream } = await model.doStream(callOptions);
       yield* normalizeStream(stream);
     });
@@ -78,19 +80,25 @@ export class Agent {
 }
 
 /**
- * Builds the model call options: the agent's instructions plus the input become the prompt, and
- * the per-call passthroughs ride along. Framework-owned fields (`prompt` / `abortSignal` /
- * `providerOptions`) are written after the `modelSettings` spread, so settings cannot hijack them.
+ * Builds the model call options: the agent's instructions plus the input become the prompt, the
+ * tool container becomes the provider tool list, and the per-call passthroughs ride along.
+ * Framework-owned fields (`prompt` / `abortSignal` / `providerOptions` / `tools`) are written
+ * after the `modelSettings` spread, so settings cannot hijack them. An agent without tools sends
+ * no `tools` field at all.
  */
 function toCallOptions(
   instructions: string,
   input: string | ModelMessage[],
+  tools: Record<string, Tool> | undefined,
   options: AgentRunOptions,
 ): ModelCallOptions {
   const callOptions: ModelCallOptions = {
     ...options.modelSettings,
     prompt: toPrompt(instructions, input),
   };
+  if (tools !== undefined && Object.keys(tools).length > 0) {
+    callOptions.tools = toModelTools(tools);
+  }
   if (options.signal !== undefined) callOptions.abortSignal = options.signal;
   if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
   return callOptions;
