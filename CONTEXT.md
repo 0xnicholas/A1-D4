@@ -60,6 +60,10 @@ _Avoid_: 中间件、plugin、以字段形式焊进 Agent 类
 框架的工具抽象:`description` + 可选 `inputSchema` / `outputSchema`(Standard Schema 双接口)+ `execute(input, ctx)` 的普通对象,经 `createTool` 工厂或手写字面量创建;自身无 id/name 字段,名字的唯一真相源是容器 Record 键。字段不逐个动态化——动态性由 Agent 的 tools 容器(DynamicArgument)整组承载。
 _Avoid_: 把工具做成 class / 注册表;工具携带框架引用(agent / memory 经 requestContext 用户袋或闭包获取,不作参数注入)
 
+**as-tool 组合 (As-tool composition)**:
+多 agent 协作的唯一规范形态:把一个 Agent 包装为 Tool 挂进另一 Agent 的工具容器,委派即一次普通工具调用;核心无 sub-agent 概念与委派协议。
+_Avoid_: supervisor 协议、sub-agent 字段、`.network()`
+
 **Workflow**:
 框架的编排子系统:用可变 builder 把 step 组成条目图,commit 冻结后 createRun 执行;语义内核 = 扁平条目列表 + for 循环 walker,suspend/resume 靠 step 边界快照。
 _Avoid_: DAG 执行器(本框架 workflow 不是 DAG)、状态机 DSL

@@ -1,7 +1,7 @@
 # Tools/MCP 抽象
 
 > 来源:wayfinder ticket #13(决策:Tools/MCP 抽象)。本文件是 Tools 子系统与 MCP 能力包的架构规范。
-> 决策记录见 `docs/adr/0008-tools-mcp-abstraction.md`;术语见 `CONTEXT.md`。
+> 决策记录见 `docs/adr/0008-tools-mcp-abstraction.md`(ctx 六件套修订见 `0012-multi-agent-collaboration.md`);术语见 `CONTEXT.md`。
 
 ## 定位
 
@@ -34,12 +34,14 @@ interface ToolContext {
   runId: string,                  // 日志/追踪关联
   toolCallId: string,             // provider 生成的调用 id;幂等键
   requestContext: RequestContext, // 用户 per-call 开放袋(嵌套不拍平,与 StepContext 对齐)
+  traceId: string,                // 当前 run 的 trace id;as-tool 组合时透传给委派 run(ADR-0012)
+  spanId: string,                 // 当前 tool-call span id;委派 run 经 run option 挂为其子 span
 }
 ```
 
 - **零权限模型**:取消 = `signal`;审批/挂起 = Harness(#18)统一裁决;授权 = 应用层(与 Memory 决策同一条线)。
 - **不注入 agent / memory 引用**:mastra 把两者传给工具,是耦合源;需要时经 `requestContext` 用户袋或闭包获取。
-- agent loop 内调用时框架保证四件套齐备(含 provider 真值 toolCallId);手动直调时 toolCallId 由调用方自供(如 workflow 包装用 step id)。
+- agent loop 内调用时框架保证六件套齐备(含 provider 真值 toolCallId);未挂 tracer 时 `traceId`/`spanId` 为空串(与观测规范的 NoOpSpan 语义对齐)。手动直调时 toolCallId 由调用方自供(如 workflow 包装用 step id),`traceId`/`spanId` 不需要时同样传空串。
 
 ## 校验与错误语义
 
@@ -59,7 +61,8 @@ agent as-tool(Agent 规范已钉一行包装):
 const agentAsTool = createTool({
   description: agent.description ?? agent.name,
   inputSchema: z.object({ prompt: z.string() }),
-  execute: (input, { signal }) => agent.generate(input.prompt, { signal }),
+  execute: (input, { signal, traceId, spanId }) =>
+    agent.generate(input.prompt, { signal, traceId, parentSpanId: spanId }),
 })
 ```
 
@@ -110,6 +113,7 @@ const client = await createMcpClient({ transport: … })
 - **Workflows(#11,已定)**:无特化重载,一行手写包装;`ToolContext` 与 `StepContext` 对齐(signal / runId / requestContext)。
 - **Memory(#12,已定)**:授权归应用层同一条线;工具要记忆经 requestContext 用户袋或闭包。
 - **Harness(#18)**:审批/挂起的统一裁决归它;届时若进核心按 minor 扩展(ADR-0005 consequence)。
+- **Observability(#14,已定)**:ctx 携带 `traceId`/`spanId`,供 as-tool 组合经 run option 续接 trace、把委派 run 挂为当前 tool-call span 的子 span(ADR-0012)。
 
 ## 依赖预算
 
