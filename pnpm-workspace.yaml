@@ -1,0 +1,4 @@
+packages:
+  - packages/*
+  # 预留:examples/minimal-agent 落地前先占 glob(见 docs/ROADMAP.md M1 验证两件套)
+  - examples/*

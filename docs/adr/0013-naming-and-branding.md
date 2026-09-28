@@ -15,5 +15,6 @@
 - 发布 0.1 前需创建 npm org `@balsa`(截至 2026-09-28,该 scope 名下无任何已发布包,可申领;`@balsa/core` 等全部 FREE);org 创建依赖 owner 的 npm 账号,属 M1 实施期 task。
 - `CONTEXT.md` 更名为 Balsa 并登记核心包/能力包的具体包名;`AGENTS.md` 同步仓库名;文档内 issue 链接统一改写为 `0xnicholas/balsa`(旧 `0xnicholas/A1-D4` 链接经 GitHub redirect 仍有效)。
 - 公共面(README、npm、GitHub description)英文为主;中文文档现状不动。
+- (澄清 2026-09-28)公共面含 npm 产物里的公开代码 JSDoc:`packages/**/src` 中会 emit 进 `.d.ts` 的注释用英文;仓库内部文档与实现注释维持中文。
 
 (来源:wayfinder ticket #20)
