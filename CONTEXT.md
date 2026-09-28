@@ -27,3 +27,31 @@ _Avoid_: 自有 provider SPI、provider 注册表、magic string
 **Chunk 协议 (Chunk protocol)**:
 核心自有的流式输出事件词汇(text-delta / tool-call / finish / usage 等最小集合),stream 输出、processors、workflow 快照、observability 共用;与外部格式(AI SDK UI stream 等)的转换只发生在互操作能力包。
 _Avoid_: 透出/复用 AI SDK 流格式
+
+**Agent**:
+框架的核心执行单元:把 name、instructions、model、tools 包装成可 generate()/stream() 的对象;定义表面刻意最小,横切能力一律走 Processor。
+_Avoid_: 模型本身(Agent 是模型+指令+工具的执行包装,不是 LLM 的同义词)、平台对象、上帝类
+
+**动态参数 (Dynamic argument)**:
+配置字段的形状约定:一切字段接受 `T | ((ctx: RequestContext) => T | Promise<T>)`,每次执行按请求上下文解析。
+_Avoid_: 仅个别字段支持动态(全字段统一,无一例外)
+
+**RequestContext**:
+每次执行传给动态参数解析的上下文对象:框架写入 `signal`(AbortSignal)与 `runId`,其余为用户 per-call 传入的开放属性袋;纯对象。
+_Avoid_: mastra 式 Map 类、泛型上下文参数
+
+**Run**:
+一次 generate()/stream() 调用的完整执行,从输入到 finishReason;包含零到多个 step。
+_Avoid_: session、conversation(那是 Memory 域的词)
+
+**Step**:
+run 内的一轮"模型调用 + 工具执行";mastra 的第三层 model step 不收。
+_Avoid_: iteration、loop iteration(规范统一用 step)
+
+**输出对象 (Output object)**:
+stream() 的返回对象:既可 for-await 消费 chunk 协议流,又可 await 其终值(text / usage / steps / finishReason 等);generate() 复用同一代码路径。
+_Avoid_: generate/stream 分离的双实现
+
+**Processor**:
+Agent 的唯一横切扩展点:挂在 run/step 边界钩子(processInput / processOutputStep / processError)上的有序处理器;guardrails、evals、脱敏、限流等横切能力的唯一合法承载点。
+_Avoid_: 中间件、plugin、以字段形式焊进 Agent 类
