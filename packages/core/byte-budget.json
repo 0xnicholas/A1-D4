@@ -2,7 +2,7 @@
   "metric": "esbuild-minified-bytes",
   "entries": {
     ".": 0,
-    "./model": 0,
+    "./model": 3476,
     "./agent": 0,
     "./tools": 0,
     "./observability": 0,

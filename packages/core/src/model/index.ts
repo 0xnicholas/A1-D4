@@ -1,9 +1,65 @@
 /**
  * `@balsa/core/model` — model layer.
  *
- * The model contract (a minimal vendor subset of the AI SDK provider spec) and the chunk protocol.
- * Spec: `docs/architecture/model.md`.
+ * The model contract (a minimal vendor subset of the AI SDK provider spec) and the chunk protocol,
+ * plus the thin normalization layer that turns a model-native stream into chunks of the core's own
+ * vocabulary.
  *
- * M1 scaffold entry — exports nothing yet; the model layer lands in M1.
+ * Spec: `docs/architecture/model.md`; decisions: ADR-0004.
  */
-export {};
+export type {
+  JsonObject,
+  JsonSchema,
+  JsonSchemaObject,
+  JsonSchemaTypeName,
+  JsonSchemaValue,
+  JsonValue,
+  Model,
+  ModelCallOptions,
+  ModelContent,
+  ModelCustomContent,
+  ModelCustomPart,
+  ModelFileContent,
+  ModelFileData,
+  ModelFilePart,
+  ModelFinishReason,
+  ModelFunctionTool,
+  ModelGenerateResult,
+  ModelMessage,
+  ModelPrompt,
+  ModelProviderMetadata,
+  ModelProviderOptions,
+  ModelProviderReference,
+  ModelProviderTool,
+  ModelReasoningContent,
+  ModelReasoningFileContent,
+  ModelReasoningFilePart,
+  ModelReasoningPart,
+  ModelResponseMetadata,
+  ModelSourceContent,
+  ModelStreamPart,
+  ModelStreamResult,
+  ModelTextContent,
+  ModelTextPart,
+  ModelToolApprovalRequest,
+  ModelToolApprovalResponsePart,
+  ModelToolCallContent,
+  ModelToolCallPart,
+  ModelToolChoice,
+  ModelToolResultContent,
+  ModelToolResultOutput,
+  ModelToolResultPart,
+  ModelUsage,
+  ModelWarning,
+} from './contract.js';
+export { MODEL_SPECIFICATION_VERSION, ModelContractError, ModelSpecificationVersionError, assertModel } from './resolve.js';
+export type {
+  Chunk,
+  FinishChunk,
+  FinishReason,
+  TextDeltaChunk,
+  ToolCallChunk,
+  ToolResultChunk,
+  Usage,
+} from './chunks.js';
+export { normalizePart, normalizeStream } from './normalize.js';

@@ -9,7 +9,8 @@
 
 ## 模型契约
 
-- 核心内 **vendor 最小结构类型声明**:当前一代 AI SDK provider spec 中实际被消费的接口子集(`specificationVersion` / `provider` / `modelId` / `doGenerate` / `doStream` + prompt 与流 part 类型,约百行纯类型)。核心零运行时依赖、零类型依赖;TS 结构类型使各 provider 包的实例天然满足契约。
+- 核心内 **vendor 最小结构类型声明**:当前一代 AI SDK provider spec 中实际被消费的接口子集(`specificationVersion` / `provider` / `modelId` / `doGenerate` / `doStream` + prompt 与流 part 类型)——语言模型接口之外的模型类型(embedding / image / speech …)不 vendor。核心零运行时依赖、零类型依赖;TS 结构类型使各 provider 包的实例天然满足契约。
+- **保真压过行数**:union 型 part(prompt 消息 / 模型 content / 流 part)必须逐 variant 覆盖,否则真实 provider 实例在结构上不可赋值;规模因此由 spec 表面决定(落地约 480 行纯类型,含 JSDoc),不设行数上限。工具 schema 用自有 `JsonSchema`(draft-07 子集),不引 `@types/json-schema`。
 - **锁定单一 spec 版本**。模型解析时硬断言 `specificationVersion`,不匹配即在解析期抛显式错误,指出该升级框架还是降级 provider 包。
 - **版本跟随策略**:AI SDK 发布新一代 spec → 本框架升自己的 major,只支持新 spec;留在旧 provider 包的用户留在本框架旧 major。永不做多 spec 适配器。
 - 漂移防护:CI 类型测试以 devDependency 中的真实 `@ai-sdk/provider` 对校 vendor 类型。
@@ -32,8 +33,9 @@ type ModelInput =
 
 ## Chunk 协议
 
-- 核心定义**自有最小 chunk 类型集**(text-delta / tool-call / finish / usage 量级的小集合),是 `stream()` 输出、processors、workflow step 快照、observability 事件共用的流式词汇。
-- 模型 spec 原生流 → chunk 协议的归一化层在核心内,保持薄。
+- 核心定义**自有最小 chunk 类型集**,是 `stream()` 输出、processors、workflow step 快照、observability 事件共用的流式词汇。落地四种:`text-delta` / `tool-call`(input 已解析为 JSON)/ `tool-result` / `finish`(携带 `FinishReason` 与 `Usage`);推理增量、参数增量等 part 不进协议。
+- `FinishReason` 收敛为 `'stop' | 'length' | 'tool-calls' | 'error' | 'suspended'`;provider 的 `content-filter` / `other` 归入 `'stop'`(终态但非失败——报 `'error'` 会诱使对已被策略拒绝的请求重试)。
+- 模型 spec 原生流 → chunk 协议的归一化层在核心内,保持薄:`error` part 直接抛出;非法工具输入保留原始字符串,交由工具边界作校验失败回喂模型。
 - **核心不透出 AI SDK 流格式**;chunk → AI SDK UI stream 的转换器在互操作能力包。
 
 ## Provider 生态
