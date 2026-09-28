@@ -1,13 +1,13 @@
 # 实施路线图
 
-极致轻量 TypeScript/Node agent 框架的粗粒度实施路线图:**只讲顺序、依赖与可验证产出,不含排期**。规范本体见 `docs/architecture/`(入口:`docs/architecture/README.md`),术语见 `CONTEXT.md`,决策依据见 `docs/adr/`。本图由 [决策:粗粒度实施路线图](https://github.com/0xnicholas/A1-D4/issues/16) 产出。
+极致轻量 TypeScript/Node agent 框架的粗粒度实施路线图:**只讲顺序、依赖与可验证产出,不含排期**。规范本体见 `docs/architecture/`(入口:`docs/architecture/README.md`),术语见 `CONTEXT.md`,决策依据见 `docs/adr/`。本图由 [决策:粗粒度实施路线图](https://github.com/0xnicholas/balsa/issues/16) 产出。
 
 ## 切分原则
 
 - **垂直切片(walking skeleton)**:每个里程碑都是一条可跑的细流,可独立验证、可提前叫停;不按子系统水平分层。
 - **Instrumentation-first**:观测内核(span 模型 / tracer / NoOpSpan)与五边界自动埋点随各子系统落地时就建进去;exporter 与 OTLP 能力包后置,永不对已完成子系统开膛回补。
 - **可验证产出两件套**:每个里程碑 = 可运行 example(`examples/`)+ 覆盖该范围的测试套件。
-- **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/A1-D4/issues/6))。
+- **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/balsa/issues/6))。
 - **串行默认**:小团队单线推进;各里程碑「依赖」行标注可并行项,不排双轨。
 
 ## 里程碑
@@ -59,7 +59,7 @@
 
 - **OTLP exporter 包**:GenAI semconv 映射,HTTP only(依赖 M1 观测内核)
 - **MCP server 包 / MCP client 包**:同一份 Tool 双向流通,桥接 schema 直通零适配(依赖 M1 工具)
-- **SQLite 参考 adapter**:实现全部四个存储 port;驱动选型留实现期,默认 `node:sqlite`(Node ≥22 基线,见 [决策:存储适配策略](https://github.com/0xnicholas/A1-D4/issues/15))(依赖 M2–M4 的 ports)
+- **SQLite 参考 adapter**:实现全部四个存储 port;驱动选型留实现期,默认 `node:sqlite`(Node ≥22 基线,见 [决策:存储适配策略](https://github.com/0xnicholas/balsa/issues/15))(依赖 M2–M4 的 ports)
 - **AI SDK 互操作包**:chunk 协议 ↔ AI SDK 流格式等外部格式转换(依赖 M1)
 - **bunfold 桥接包(按需可裁)**:外部记忆系统桥接参考实现,价值在验证 memory seam 设计(依赖 M2)
 
@@ -68,7 +68,7 @@
 
 ## 发布节奏与 v1.0 门槛
 
-- **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/A1-D4/issues/20)。
+- **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsa/issues/20)。
 - 之后每个里程碑一个 0.x;0.x 阶段允许跨里程碑破型。
 - **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
 
@@ -76,7 +76,7 @@
 
 以下能力经路线图裁决**延后**,不进 v1 任一里程碑;触发条件满足时再单独评估:
 
-- **Supervisor 能力包**(createSupervisor 类):as-tool 组合的语法糖;触发 = as-tool 模式的真实重复痛点(见 [决策:多 agent 协作语义](https://github.com/0xnicholas/A1-D4/issues/19) 演化门)
+- **Supervisor 能力包**(createSupervisor 类):as-tool 组合的语法糖;触发 = as-tool 模式的真实重复痛点(见 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsa/issues/19) 演化门)
 - **RAG / Evals / 字符串路由(models.dev)能力包 / OTel bridge 能力包**:需求驱动
 - **Background tasks**:v1 以「工具 ack + sendSignal 唤醒」组合承载(harness.md 文档范式)
 - **Goals / State signals**:可被 working memory + Processor 组合覆盖

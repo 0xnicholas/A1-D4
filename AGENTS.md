@@ -1,10 +1,10 @@
-# A1-D4
+# Balsa
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues are tracked as GitHub issues on this repo (`0xnicholas/A1-D4`), managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues are tracked as GitHub issues on this repo (`0xnicholas/balsa`), managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
