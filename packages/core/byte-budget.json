@@ -5,7 +5,7 @@
     "./model": 3476,
     "./agent": 9934,
     "./tools": 224,
-    "./observability": 0,
+    "./observability": 5261,
     "./workflows": 0,
     "./memory": 0
   }
