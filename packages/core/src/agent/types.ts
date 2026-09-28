@@ -6,11 +6,17 @@ import type {
   Usage,
 } from '../model/chunks.js';
 import type { Model, ModelCallOptions, ModelProviderOptions } from '../model/contract.js';
+import type { Tracer } from '../observability/index.js';
 import type { Tool } from '../tools/index.js';
 
 /**
  * The five-field Agent surface (`docs/architecture/agent.md`): `name`, `instructions`, `model`,
  * optional `tools`, optional `description` — nothing beyond it.
+ *
+ * `tracer` is not a sixth definition field: it is the observability injection seam of
+ * `docs/architecture/observability.md`「组合根分发」— a cross-cutting dependency the composition
+ * root hands to the subsystem (`createApp({ tracer })`), which a standalone `new` may also pass
+ * explicitly. Not attaching it leaves the whole observability subsystem at zero overhead.
  *
  * This is the static-value version of the final surface. Dynamic arguments
  * (`T | ((ctx: RequestContext) => T)`), the `ModelInput` fallback/function shapes, and the
@@ -30,6 +36,11 @@ export interface AgentConfig {
   readonly tools?: Record<string, Tool>;
   /** Shown to an upstream model when the agent is composed as a tool. */
   readonly description?: string;
+  /**
+   * The tracer this agent reports to, when one is attached (the composition root distributes it;
+   * a standalone `new` may pass it explicitly). Absent = no span is ever created for its runs.
+   */
+  readonly tracer?: Tracer | undefined;
 }
 
 /**
@@ -77,6 +88,24 @@ export interface AgentRunOptions {
    * `finishReason` is `'tool-calls'`. Defaults to 5.
    */
   readonly maxSteps?: number;
+  /**
+   * The trace to continue: the run's `agent-run` span attaches to a trace started elsewhere (an
+   * incoming `traceparent`, a parent run — as-tool composition reads it from the tool context).
+   * Absent = the run starts a fresh trace. Only meaningful with an attached tracer.
+   */
+  readonly traceId?: string | undefined;
+  /**
+   * The parent span inside the continued trace; requires `traceId` (the tracer rejects one without
+   * the other). Absent = the run's `agent-run` span hangs directly under the continued trace.
+   */
+  readonly parentSpanId?: string | undefined;
+  /**
+   * Erase `input` from every exported event of this run's trace, overriding the tracer-level
+   * default for this run. Trace-level: decided on the run's root span, inherited by its children.
+   */
+  readonly hideInput?: boolean | undefined;
+  /** Erase `output` from every exported event of this run's trace (see `hideInput`). */
+  readonly hideOutput?: boolean | undefined;
   /** User per-call request context properties. */
   readonly [key: string]: unknown;
 }

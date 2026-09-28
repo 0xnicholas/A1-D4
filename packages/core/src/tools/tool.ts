@@ -10,8 +10,8 @@ import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
  * - `signal` / `runId`: cancellation and correlation, propagated from the run.
  * - `toolCallId`: the provider's real id — the idempotency key (a retried call carries the same id).
  * - `requestContext`: the user's per-call open bag, framework-written `signal` / `runId` included.
- * - `traceId` / `spanId`: for as-tool composition; empty strings when no tracer is attached
- *   (observability auto-instrumentation, M1-09).
+ * - `traceId` / `spanId`: for as-tool composition; the tracer fills them from the call's span —
+ *   empty strings when no tracer is attached or the sampler rejected the trace (NoOpSpan).
  *
  * Manual direct calls (workflow wrappers, ad-hoc code) provide the same shape themselves; inside
  * the agent loop the framework guarantees all six.
@@ -25,9 +25,9 @@ export interface ToolContext {
   readonly toolCallId: string;
   /** The user's per-call request context (framework-written `signal` / `runId` included). */
   readonly requestContext: RequestContext;
-  /** Trace id of the current run; empty string when no tracer is attached. */
+  /** Trace id of the current run; empty string when no tracer is attached (or the trace was not sampled). */
   readonly traceId: string;
-  /** Span id of the current tool-call span; empty string when no tracer is attached. */
+  /** Span id of the current tool-call span; empty string when no tracer is attached (or the trace was not sampled). */
   readonly spanId: string;
 }
 

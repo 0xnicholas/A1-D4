@@ -13,7 +13,8 @@ import { collect } from './helpers/collect.js';
  * vendor prompt 类型回喂,多轮直至无 tool-call 或达到 maxSteps(默认 5);耗尽而模型仍要工具时
  * 终值 finishReason 为 'tool-calls';steps[] 与全 run 累计 usage 正确;input 校验失败 / execute
  * 抛错 / output 校验失败三线(另加未知工具)统一转为 error 工具结果回喂,run 不中止;工具 execute
- * 拿到六件套(traceId / spanId 暂为空串,归 M1-09)。断言只走公开面(@balsa/core 子路径导出)与
+ * 拿到六件套(未挂 tracer 时 traceId / spanId 为空串;挂上后为真值,断言见
+ * `agent-observability.test.ts`)。断言只走公开面(@balsa/core 子路径导出)与
  * 脚本化假模型接缝(@see helpers/fake-model.ts):假模型录制的 prompt 就是"模型看到的历史"。
  */
 
@@ -414,7 +415,7 @@ describe('Agent loop:三线错误回喂', () => {
 });
 
 describe('Agent loop:工具上下文六件套', () => {
-  it('toolCallId 为 provider 真值;traceId / spanId 为空串;signal / runId / requestContext 贯通', async () => {
+  it('toolCallId 为 provider 真值;未挂 tracer 时 traceId / spanId 为空串;signal / runId / requestContext 贯通', async () => {
     const model = fakeModel([
       {
         toolCalls: [
@@ -473,6 +474,9 @@ describe('Agent loop:工具上下文六件套', () => {
     await agent.generate('Go.', {
       maxSteps: 3,
       modelSettings: { temperature: 0.1 },
+      traceId: 'a'.repeat(32),
+      parentSpanId: 'b'.repeat(16),
+      hideInput: true,
       userId: 'u-1',
     });
 
@@ -480,6 +484,10 @@ describe('Agent loop:工具上下文六件套', () => {
     expect(context).not.toHaveProperty('maxSteps');
     expect(context).not.toHaveProperty('modelSettings');
     expect(context).not.toHaveProperty('providerOptions');
+    expect(context).not.toHaveProperty('traceId');
+    expect(context).not.toHaveProperty('parentSpanId');
+    expect(context).not.toHaveProperty('hideInput');
+    expect(context).not.toHaveProperty('hideOutput');
   });
 
   it('未传 signal 时工具 ctx 仍拿到 AbortSignal(空转信号)', async () => {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Agent } from '@balsa/core/agent';
-import type { AgentConfig } from '@balsa/core/agent';
+import type { AgentConfig, AgentRunOptions } from '@balsa/core/agent';
 import { ModelContractError, ModelSpecificationVersionError } from '@balsa/core/model';
 import type { Model } from '@balsa/core/model';
+import { createTracer } from '@balsa/core/observability';
 import { captureError, expectAssignable } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 
@@ -47,6 +48,35 @@ describe('Agent 五字段配置表面', () => {
       model: fakeModel([]),
       // @ts-expect-error 六号字段不存在(memory 归 M2)
       memory: {},
+    });
+  });
+
+  it('tracer 注入缝:横切依赖经配置传入(组合根分发或独立 new 显式传入),不进实例表面', () => {
+    const tracer = createTracer({ exporters: [] });
+
+    expectAssignable<AgentConfig>({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      tracer,
+    });
+
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      tracer,
+    });
+    // 注入缝不占实例表面(五字段之外无一物);挂上后自动埋点的断言在 agent-observability.test.ts
+    expect(agent).not.toHaveProperty('tracer');
+  });
+
+  it('trace 续接与 hide 覆盖是 run option 的一部分', () => {
+    expectAssignable<AgentRunOptions>({
+      traceId: '0'.repeat(32),
+      parentSpanId: '0'.repeat(16),
+      hideInput: true,
+      hideOutput: true,
     });
   });
 

@@ -9,7 +9,8 @@ import {
   createTracer,
   memoryExporter,
 } from '@balsa/core/observability';
-import type { ExportedSpan, Span, TracingEvent } from '@balsa/core/observability';
+import type { ExportedSpan, Span } from '@balsa/core/observability';
+import { SPAN_ID, TRACE_ID, kinds } from './helpers/spans.js';
 
 /**
  * 观测内核(M1-08 #29):`createTracer({ exporters, sampler?, spanProcessors? })` 后用户手动
@@ -20,14 +21,6 @@ import type { ExportedSpan, Span, TracingEvent } from '@balsa/core/observability
  * 断言只走公开面(`@balsa/core/observability` 子路径导出)与规范钦定的 memory exporter 断言抓手
  * (issue #21 测试决策),不触碰内部状态。
  */
-
-const SPAN_ID = /^[0-9a-f]{16}$/;
-const TRACE_ID = /^[0-9a-f]{32}$/;
-
-/** 事件的 kind 序列,断言三事件时序时用。 */
-function kinds(events: readonly TracingEvent[]): string[] {
-  return events.map((event) => event.kind);
-}
 
 describe('手动 span 生命周期', () => {
   it('startSpan → end:span_started / span_ended 各一次,事件携带 ExportedSpan 快照', () => {

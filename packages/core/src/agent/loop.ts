@@ -11,6 +11,8 @@ import type {
   ModelToolResultPart,
 } from '../model/contract.js';
 import { normalizeStream } from '../model/normalize.js';
+import { AGENT_RUN_SPAN, AGENT_STEP_SPAN, TOOL_CALL_SPAN } from '../observability/index.js';
+import type { Span, Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool, ToolContext } from '../tools/index.js';
 import { missingFinishError } from './stream.js';
@@ -31,8 +33,36 @@ export interface AgentLoopOptions {
   readonly tools: Record<string, Tool>;
   /** The step cap (≥ 1). */
   readonly maxSteps: number;
+  /** The agent's name — the name of the run's span and its `agentName` attribute. */
+  readonly agentName: string;
   /** The run's request context — framework-written `signal` / `runId` plus the user's bag. */
   readonly requestContext: RequestContext;
+  /**
+   * The run's observability wiring, present only when a tracer is attached (`AgentConfig.tracer`).
+   * Absent = the whole observability subsystem stays out of the loop: no span object is created
+   * anywhere in it.
+   */
+  readonly tracing?: AgentTracing | undefined;
+  /** The user's `modelSettings` passthrough, recorded on the step span as `parameters`. */
+  readonly parameters?: Record<string, unknown> | undefined;
+}
+
+/**
+ * The observability wiring of one run: the tracer plus the per-run options that only mean
+ * something with one. Grouped rather than flat so the loop's zero-overhead branch is a single
+ * presence check, and the trace/hiding options cannot travel without their tracer.
+ */
+export interface AgentTracing {
+  /** The tracer injected into the agent; span creation is the loop's only observability work. */
+  readonly tracer: Tracer;
+  /** The trace to continue (`AgentRunOptions.traceId`), when the run attaches to one. */
+  readonly traceId?: string | undefined;
+  /** The parent span inside the continued trace (requires `traceId`). */
+  readonly parentSpanId?: string | undefined;
+  /** Per-run `hideInput` override, decided on the run's root span and inherited by its children. */
+  readonly hideInput?: boolean | undefined;
+  /** Per-run `hideOutput` override (see `hideInput`). */
+  readonly hideOutput?: boolean | undefined;
 }
 
 /**
@@ -59,67 +89,176 @@ export interface AgentLoopOptions {
 export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<Chunk> {
   const { model, callOptions, tools, maxSteps, requestContext } = options;
   const prompt: ModelMessage[] = [...options.prompt];
+  // The run boundary: one root span per run, the parent every step span hangs under. Absent tracer
+  // ⇒ `undefined`, and no span is ever created — the loop's only zero-overhead branch.
+  const runSpan = startRunSpan(options);
 
-  for (let step = 0; step < maxSteps; step += 1) {
-    const { stream } = await model.doStream({ ...callOptions, prompt });
-    const stepText: string[] = [];
-    const toolCalls: ToolCallChunk[] = [];
-    /** Tool call ids that already have a result in this step (provider-executed). */
-    const answered = new Set<string>();
-    /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
-    const providerResults: ToolResultChunk[] = [];
-    let finish: FinishChunk | undefined;
+  try {
+    for (let step = 0; step < maxSteps; step += 1) {
+      // The step boundary: one span per model call, hanging under the run's root span. Tool calls
+      // of this step hang under it in turn, so the step span stays open until its tools are done.
+      const stepSpan = startStepSpan(options, runSpan, prompt);
+      const stepStartedAt = Date.now();
+      let timeToFirstChunk: number | undefined;
 
-    for await (const chunk of normalizeStream(stream)) {
-      switch (chunk.type) {
-        case 'text-delta':
-          stepText.push(chunk.textDelta);
-          yield chunk;
-          break;
-        case 'tool-call':
-          toolCalls.push(chunk);
-          yield chunk;
-          break;
-        case 'tool-result':
-          // A result already in the step's stream is provider-executed: it is echoed in the
-          // assistant message and never executed by the framework.
-          answered.add(chunk.toolCallId);
-          providerResults.push(chunk);
-          yield chunk;
-          break;
-        case 'finish':
-          // The step ends here, but the decision needs the whole step: yield it below.
-          finish = chunk;
-          break;
+      try {
+        const { stream } = await model.doStream({ ...callOptions, prompt });
+        const stepText: string[] = [];
+        const toolCalls: ToolCallChunk[] = [];
+        /** Tool call ids that already have a result in this step (provider-executed). */
+        const answered = new Set<string>();
+        /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
+        const providerResults: ToolResultChunk[] = [];
+        let finish: FinishChunk | undefined;
+
+        for await (const chunk of normalizeStream(stream)) {
+          if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
+          switch (chunk.type) {
+            case 'text-delta':
+              stepText.push(chunk.textDelta);
+              yield chunk;
+              break;
+            case 'tool-call':
+              toolCalls.push(chunk);
+              yield chunk;
+              break;
+            case 'tool-result':
+              // A result already in the step's stream is provider-executed: it is echoed in the
+              // assistant message and never executed by the framework.
+              answered.add(chunk.toolCallId);
+              providerResults.push(chunk);
+              yield chunk;
+              break;
+            case 'finish':
+              // The step ends here, but the decision needs the whole step: yield it below.
+              finish = chunk;
+              break;
+          }
+        }
+
+        if (finish === undefined) {
+          // A step's model stream without a finish part is a contract violation; failing here also
+          // covers later steps, which must not settle the run on a previous step's finish chunk.
+          throw missingFinishError();
+        }
+
+        // The step is complete: its text is the run's output so far (the last step's text settles
+        // the run's output — `stream()`'s `text` reads the same rule).
+        stepSpan?.update({
+          output: stepText.join(''),
+          attributes: {
+            usage: finish.usage,
+            finishReason: finish.finishReason,
+            ...(timeToFirstChunk === undefined ? {} : { timeToFirstChunk }),
+          },
+        });
+        runSpan?.update({ output: stepText.join('') });
+
+        const pending = toolCalls.filter((call) => !answered.has(call.toolCallId));
+        const lastStep = step + 1 >= maxSteps;
+        // The step boundary comes before the framework-executed results: consumers see the model's
+        // finish, then the results that answer the step's calls (results belong to that step).
+        yield pending.length > 0 && lastStep ? { ...finish, finishReason: 'tool-calls' } : finish;
+
+        if (pending.length === 0) return;
+
+        const results: ToolResultChunk[] = [];
+        for (const call of pending) {
+          const toolSpan = startToolCallSpan(options, stepSpan, call);
+          const { result, failure } = await executeToolCall(tools, call, requestContext, toolSpan);
+          if (failure !== undefined) toolSpan?.error(failure);
+          toolSpan?.update({ output: result.output });
+          toolSpan?.end();
+          results.push(result);
+          yield result;
+        }
+
+        if (lastStep) return;
+
+        prompt.push(toAssistantMessage(stepText.join(''), toolCalls, providerResults));
+        prompt.push({ role: 'tool', content: results.map(toModelToolResultPart) });
+      } catch (error) {
+        stepSpan?.error(error);
+        throw error;
+      } finally {
+        stepSpan?.end();
       }
     }
-
-    if (finish === undefined) {
-      // A step's model stream without a finish part is a contract violation; failing here also
-      // covers later steps, which must not settle the run on a previous step's finish chunk.
-      throw missingFinishError();
-    }
-
-    const pending = toolCalls.filter((call) => !answered.has(call.toolCallId));
-    const lastStep = step + 1 >= maxSteps;
-    // The step boundary comes before the framework-executed results: consumers see the model's
-    // finish, then the results that answer the step's calls (results belong to that step).
-    yield pending.length > 0 && lastStep ? { ...finish, finishReason: 'tool-calls' } : finish;
-
-    if (pending.length === 0) return;
-
-    const results: ToolResultChunk[] = [];
-    for (const call of pending) {
-      const result = await executeToolCall(tools, call, requestContext);
-      results.push(result);
-      yield result;
-    }
-
-    if (lastStep) return;
-
-    prompt.push(toAssistantMessage(stepText.join(''), toolCalls, providerResults));
-    prompt.push({ role: 'tool', content: results.map(toModelToolResultPart) });
+  } catch (error) {
+    // A failed run leaves both its root span and the failing step's span carrying the error.
+    runSpan?.error(error);
+    throw error;
+  } finally {
+    // Ends the run span on every exit path — normal completion, a model error, or the consumer
+    // abandoning the generator.
+    runSpan?.end();
   }
+}
+
+/**
+ * Starts the run's root span (`docs/architecture/observability.md`「自动埋点」): the run boundary.
+ * `runId` rides on the root span's attributes, so execution identity and trace identity can look
+ * each other up; `traceId` / `parentSpanId` continue a trace started elsewhere.
+ */
+function startRunSpan(options: AgentLoopOptions): Span | undefined {
+  const tracing = options.tracing;
+  if (tracing === undefined) return undefined;
+  return tracing.tracer.startSpan({
+    name: options.agentName,
+    type: AGENT_RUN_SPAN,
+    input: options.prompt,
+    attributes: { agentName: options.agentName, runId: options.requestContext.runId },
+    ...(tracing.traceId === undefined ? {} : { traceId: tracing.traceId }),
+    ...(tracing.parentSpanId === undefined ? {} : { parentSpanId: tracing.parentSpanId }),
+    ...(tracing.hideInput === undefined ? {} : { hideInput: tracing.hideInput }),
+    ...(tracing.hideOutput === undefined ? {} : { hideOutput: tracing.hideOutput }),
+  });
+}
+
+/**
+ * Starts one step's span (`docs/architecture/observability.md`「自动埋点」): one model call of the
+ * run. The step's tool calls hang under it, so it stays open until they have run too. Its prompt
+ * is copied — the loop appends to its own array, and a recorded span must not mutate after the fact.
+ */
+function startStepSpan(
+  options: AgentLoopOptions,
+  runSpan: Span | undefined,
+  prompt: readonly ModelMessage[],
+): Span | undefined {
+  const tracing = options.tracing;
+  if (tracing === undefined) return undefined;
+  return tracing.tracer.startSpan({
+    name: options.model.modelId,
+    type: AGENT_STEP_SPAN,
+    ...(runSpan === undefined ? {} : { parent: runSpan }),
+    input: [...prompt],
+    attributes: {
+      model: options.model.modelId,
+      provider: options.model.provider,
+      ...(options.parameters === undefined ? {} : { parameters: options.parameters }),
+    },
+  });
+}
+
+/**
+ * Starts one tool call's span (`docs/architecture/observability.md`「自动埋点」): a single tool
+ * execution inside the step that requested it. The span is the source of the tool context's
+ * `traceId` / `spanId`, so an as-tool delegation can hang its run under it (ADR-0012).
+ */
+function startToolCallSpan(
+  options: AgentLoopOptions,
+  stepSpan: Span | undefined,
+  call: ToolCallChunk,
+): Span | undefined {
+  const tracing = options.tracing;
+  if (tracing === undefined) return undefined;
+  return tracing.tracer.startSpan({
+    name: call.toolName,
+    type: TOOL_CALL_SPAN,
+    ...(stepSpan === undefined ? {} : { parent: stepSpan }),
+    input: call.input,
+    attributes: { toolCallId: call.toolCallId },
+  });
 }
 
 /**
@@ -130,60 +269,77 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
  * validation runs after it (side effects already happened — repeat protection is the tool's
  * idempotency job, keyed by `toolCallId`). A tool without `inputSchema` is argument-less and gets
  * `undefined`; a tool without `outputSchema` returns whatever it returns.
+ *
+ * The `failure` beside an `isError` result is what the tool-call span records: the original thrown
+ * error for `execute` throws (its message already rides on the result), a fresh error for the
+ * validation and unknown-tool lines.
  */
 async function executeToolCall(
   tools: Record<string, Tool>,
   call: ToolCallChunk,
   requestContext: RequestContext,
-): Promise<ToolResultChunk> {
+  toolSpan: Span | undefined,
+): Promise<ToolCallOutcome> {
   const tool = tools[call.toolName];
   if (tool === undefined) {
-    return errorResult(call, `Unknown tool '${call.toolName}': it is not in the agent's tool container.`);
+    const message = `Unknown tool '${call.toolName}': it is not in the agent's tool container.`;
+    return { result: errorResult(call, message), failure: new Error(message) };
   }
 
   let input: unknown;
   if (tool.inputSchema !== undefined) {
     const validation = await validate(tool.inputSchema, call.input);
     if ('message' in validation) {
-      return errorResult(call, `Invalid input for tool '${call.toolName}': ${validation.message}`);
+      const message = `Invalid input for tool '${call.toolName}': ${validation.message}`;
+      return { result: errorResult(call, message), failure: new Error(message) };
     }
     input = validation.value;
   }
 
   let output: unknown;
   try {
-    output = await tool.execute(input, toolContext(call, requestContext));
+    output = await tool.execute(input, toolContext(call, requestContext, toolSpan));
   } catch (error) {
-    return errorResult(call, `Tool '${call.toolName}' failed: ${messageOf(error)}`);
+    const message = `Tool '${call.toolName}' failed: ${messageOf(error)}`;
+    return { result: errorResult(call, message), failure: error };
   }
 
   if (tool.outputSchema !== undefined) {
     const validation = await validate(tool.outputSchema, output);
     if ('message' in validation) {
-      return errorResult(
-        call,
-        `Tool '${call.toolName}' returned an invalid output: ${validation.message}`,
-      );
+      const message = `Tool '${call.toolName}' returned an invalid output: ${validation.message}`;
+      return { result: errorResult(call, message), failure: new Error(message) };
     }
     output = validation.value;
   }
 
-  return toolResult(call, output, false);
+  return { result: toolResult(call, output, false) };
+}
+
+/** What one tool call produced: always a result, plus the failure an `isError` result answers. */
+interface ToolCallOutcome {
+  readonly result: ToolResultChunk;
+  readonly failure?: unknown;
 }
 
 /**
- * The six-piece context of a tool call (`docs/architecture/tools.md`「执行上下文」). Trace ids are
- * empty strings until the observability auto-instrumentation lands (M1-09); `toolCallId` is the
- * provider's real id.
+ * The six-piece context of a tool call (`docs/architecture/tools.md`「执行上下文」). Trace ids come
+ * from the call's span — real ids when a tracer is attached and the trace is sampled, empty strings
+ * when there is no tracer or the sampler rejected the trace (`NoOpSpan` semantics); `toolCallId` is
+ * the provider's real id.
  */
-function toolContext(call: ToolCallChunk, requestContext: RequestContext): ToolContext {
+function toolContext(
+  call: ToolCallChunk,
+  requestContext: RequestContext,
+  toolSpan: Span | undefined,
+): ToolContext {
   return {
     signal: requestContext.signal,
     runId: requestContext.runId,
     toolCallId: call.toolCallId,
     requestContext,
-    traceId: '',
-    spanId: '',
+    traceId: toolSpan?.traceId ?? '',
+    spanId: toolSpan?.id ?? '',
   };
 }
 

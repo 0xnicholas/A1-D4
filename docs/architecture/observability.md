@@ -76,7 +76,7 @@ createTracer({
 - **采样**:四档;只在 root span 创建时判定一次,子 span 继承;不通过返回 `NoOpSpan`(全方法 no-op),其后代自动全 NoOp——埋点代码无分支。没挂 tracer 时整个子系统零开销。
 - **spanProcessors**:导出前整形缝。同步、逐事件生效(每个事件派发前过一遍),原地改写或返回 `undefined` 丢弃该事件。规则库不进核心——PII 规则是应用域知识。
 - **`hideInput` / `hideOutput`**:trace 级开关,导出时擦字段;可在 run option per-call 覆盖(透传为 root span 的创建选项,并由子孙继承同一条 trace 的决定)。擦除发生在 spanProcessors 之后——exporters 永远看不到被擦字段,而处理器仍能拿到原始值做规则化脱敏。
-- **组合根分发**:`createApp({ tracer })`(ADR-0002 已有此位);子系统独立 `new` 时也可显式传入,不挂即零开销。
+- **组合根分发**:`createApp({ tracer })`(ADR-0002 已有此位);子系统独立 `new` 时也可显式传入(Agent 侧即 `AgentConfig.tracer` 注入缝),不挂即零开销。
 
 ## 自动埋点:五边界
 

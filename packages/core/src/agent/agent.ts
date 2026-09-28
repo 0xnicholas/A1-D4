@@ -1,8 +1,10 @@
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
 import { assertModel } from '../model/resolve.js';
+import type { Tracer } from '../observability/index.js';
 import type { Tool } from '../tools/index.js';
 import { toModelTools } from '../tools/to-model-tools.js';
 import { DEFAULT_MAX_STEPS, runAgentLoop } from './loop.js';
+import type { AgentTracing } from './loop.js';
 import { createAgentStream } from './stream.js';
 import type {
   AgentConfig,
@@ -28,6 +30,12 @@ export class Agent {
   readonly tools: Record<string, Tool> | undefined;
   /** Description shown to an upstream model when composed as a tool. */
   readonly description: string | undefined;
+  /**
+   * The observability seam, kept off the instance surface: a cross-cutting dependency the
+   * composition root (or an explicit `new`) hands in, not part of the five config fields. `undefined`
+   * = no span object is ever created for this agent's runs.
+   */
+  #tracer: Tracer | undefined;
 
   constructor(config: AgentConfig) {
     this.name = config.name;
@@ -37,6 +45,7 @@ export class Agent {
     this.model = assertModel(config.model);
     this.tools = config.tools;
     this.description = config.description;
+    this.#tracer = config.tracer;
   }
 
   /**
@@ -51,18 +60,24 @@ export class Agent {
    */
   stream(input: string | ModelMessage[], options: AgentRunOptions = {}): AgentStreamResult {
     const model = this.model;
+    const name = this.name;
     const instructions = this.instructions;
     const tools = this.tools;
+    const tracer = this.#tracer;
     return createAgentStream(async function* () {
       // Call options are built per run — they are part of the run, not of creating the object.
       const { prompt, callOptions } = toCallOptions(instructions, input, tools, options);
       yield* runAgentLoop({
         model,
+        agentName: name,
         prompt,
         callOptions,
         tools: tools ?? {},
         maxSteps: toMaxSteps(options.maxSteps),
         requestContext: toRequestContext(options),
+        tracing: toTracing(tracer, options),
+        // The user's model call settings are recorded on the step span under this name.
+        parameters: options.modelSettings,
       });
     });
   }
@@ -125,6 +140,10 @@ function toRequestContext(options: AgentRunOptions): RequestContext {
     modelSettings: _modelSettings,
     providerOptions: _providerOptions,
     maxSteps: _maxSteps,
+    traceId: _traceId,
+    parentSpanId: _parentSpanId,
+    hideInput: _hideInput,
+    hideOutput: _hideOutput,
     signal,
     ...bag
   } = options;
@@ -142,6 +161,22 @@ function toMaxSteps(maxSteps: number | undefined): number {
     throw new Error(`maxSteps must be a positive integer, got ${String(resolved)}.`);
   }
   return resolved;
+}
+
+/**
+ * The observability wiring of one run: `undefined` without a tracer, so the loop's only branch is
+ * one presence check. The trace continuation and hiding options only mean something with a tracer,
+ * hence the clump — they cannot travel alone.
+ */
+function toTracing(tracer: Tracer | undefined, options: AgentRunOptions): AgentTracing | undefined {
+  if (tracer === undefined) return undefined;
+  return {
+    tracer,
+    ...(options.traceId === undefined ? {} : { traceId: options.traceId }),
+    ...(options.parentSpanId === undefined ? {} : { parentSpanId: options.parentSpanId }),
+    ...(options.hideInput === undefined ? {} : { hideInput: options.hideInput }),
+    ...(options.hideOutput === undefined ? {} : { hideOutput: options.hideOutput }),
+  };
 }
 
 /** A signal that never aborts — the `signal` of runs that were started without one. */

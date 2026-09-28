@@ -17,8 +17,9 @@ export const WORKFLOW_STEP_SPAN = 'workflow-step';
 export type SpanType = string;
 
 /**
- * Attributes of an `agent-run` span. `runId` is written when the span starts a trace, so runId
- * (execution identity) and traceId (observation identity) can look each other up.
+ * Attributes of an `agent-run` span. The framework writes `runId` on every run root — fresh or
+ * continued trace — so runId (execution identity) and traceId (observation identity) can look
+ * each other up.
  */
 export type AgentRunAttributes = {
   readonly agentName: string;

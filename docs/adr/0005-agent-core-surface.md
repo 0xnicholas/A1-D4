@@ -14,5 +14,6 @@ Agent 定义表面收敛为五字段(`name / instructions / model / tools? / des
 - 能力默认长在 Processor、能力包或协作子系统上(Harness 持有 agent,而非 agent 持有 Harness);Agent 类停止生长。
 - 未来新增字段须先回答"为什么 Processor / 能力包承载不了",这是审查 PR 的固定一问。
 - 审批/挂起不在核心,`finishReason` 无 `'suspended'`;引入与否由 Harness 决议统一处理,届时若进核心按 minor 扩展。
+- **修订(M1-09 #30)**:`AgentConfig` 增可选 `tracer?: Tracer` 注入缝——观测子系统实例的分发位(组合根或独立 `new` 显式传入),不是第六个定义字段,也无 Processor 替代(Processor 是 run 内行为扩展, tracer 是子系统装配);缺席时 run 不创建任何 span 对象。
 
 (来源:wayfinder ticket #10)

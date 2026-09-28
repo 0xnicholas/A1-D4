@@ -16,6 +16,7 @@ interface AgentConfig {
   model: ModelInput                              // 必填,形状继承模型层规范
   tools?: DynamicArgument<Record<string, Tool>>  // 可选
   description?: DynamicArgument<string>          // 可选,as-tool 组合时给上游模型看
+  tracer?: Tracer                                // 非定义字段:观测注入缝(M1-09,见下)
 }
 ```
 
@@ -23,7 +24,7 @@ interface AgentConfig {
 - **instructions 仅 string**:mastra 的 string[] / SystemMessage / providerOptions 联合全砍,provider 级能力(缓存控制等)证明需要后再加。
 - **tools 容器**:`Record<string, Tool>`,键即工具名,构造期完成唯一性校验(Record 键天然唯一,重名在编译期即被拦截)。Tool 自身定义(Standard Schema 入参、execute 签名)见「Tools/MCP 抽象」规范(`docs/architecture/tools.md`)。
 - **memory**:一等可选字段。本规范只钉三件事:字段存在、可选、读写时机固定(模型调用前 recall、每个 step 后 save);接口方法与 thread/resource 语义归「决策:Memory 语义」。
-- **组合根关系**:独立 `new Agent(...)` 是一等用法,不强制注入;横切依赖(tracer 等)经组合根分发时 Agent 被动接受,不感知其存在。
+- **组合根关系**:独立 `new Agent(...)` 是一等用法,不强制注入;横切依赖(tracer 等)经组合根分发时 Agent 被动接受,不感知其存在。**tracer 注入缝**:`AgentConfig.tracer` 接受观测子系统实例(组合根分发或独立 new 显式传入),不属定义表面——不是可被 Processor/能力包承载的能力,而是子系统装配位;缺席时 run 不创建任何 span 对象(零开销),三边界埋点与 trace 续接见 `docs/architecture/observability.md`。
 
 砍单与承载缝(砍的是字段位置,不是能力):
 
@@ -44,7 +45,7 @@ interface AgentConfig {
 - **术语两层**:**run**(一次 generate/stream 调用的完整执行)> **step**(一轮模型调用 + 工具执行);mastra 的第三层 model step 不收。
 - **finishReason**:`'stop' | 'length' | 'tool-calls' | 'error' | 'suspended'`(`tool-calls` 表示 maxSteps 耗尽时模型仍要求工具调用;`'suspended'` 只在 `createDurableAgent` 包装内由审批闸产生,裸 agent 不出现——见 `docs/architecture/harness.md`)。
 - **steps[]**:每步的 text / toolCalls / toolResults / usage 轻量记录,调试、Observability、Workflow 快照共用;`usage` 另有全 run 累计值。
-- **执行选项**:`maxSteps`(默认 5)/ `modelSettings`(temperature 等透传袋)/ `providerOptions`(透传)/ `signal`(AbortSignal,沿工具调用与动态参数解析传播)/ `traceId?` + `parentSpanId?`(trace 续接,见 `docs/architecture/observability.md`;as-tool 组合经工具 ctx 六件套取值)。
+- **执行选项**:`maxSteps`(默认 5)/ `modelSettings`(temperature 等透传袋)/ `providerOptions`(透传)/ `signal`(AbortSignal,沿工具调用与动态参数解析传播)/ `traceId?` + `parentSpanId?`(trace 续接,见 `docs/architecture/observability.md`;as-tool 组合经工具 ctx 六件套取值)/ `hideInput?` + `hideOutput?`(本次 run 的擦除覆盖,透传为 root span 的创建选项,见 `docs/architecture/observability.md`)。
 - **structuredOutput**:一等支持 `structuredOutput: { schema }`,schema 走 Standard Schema 契约(ADR-0003),结果落 `object`;校验策略固定 strict(失败即报错,不做 errorStrategy 多选一)。
 
 ## Agent loop
