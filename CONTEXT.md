@@ -19,3 +19,11 @@ _Avoid_: plugin、integration
 **组合根 (Composition root)**:
 可选的薄组装点,负责把 storage/logger/tracer 等横切依赖注入给挂上来的子系统;子系统不挂它也能独立完整使用。
 _Avoid_: 中央实例、registry(易与模型注册表混淆)
+
+**模型契约 (Model contract)**:
+核心与"一个模型"对话的结构类型契约,vendor 自 AI SDK provider spec 当前一代的最小子集;用户直接传入 AI SDK 生态 provider 包的模型实例,核心保持零依赖。
+_Avoid_: 自有 provider SPI、provider 注册表、magic string
+
+**Chunk 协议 (Chunk protocol)**:
+核心自有的流式输出事件词汇(text-delta / tool-call / finish / usage 等最小集合),stream 输出、processors、workflow 快照、observability 共用;与外部格式(AI SDK UI stream 等)的转换只发生在互操作能力包。
+_Avoid_: 透出/复用 AI SDK 流格式
