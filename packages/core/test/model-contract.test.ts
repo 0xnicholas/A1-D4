@@ -19,17 +19,12 @@ import type {
   ModelStreamResult,
   ModelUsage,
 } from '@balsa/core/model';
+import { expectAssignable } from './helpers/assertions.js';
 
 /**
  * vendor 契约 ↔ devDependency 中真实 `@ai-sdk/provider` 的类型对校(ADR-0004 的漂移防护):
  * `pnpm typecheck` 覆盖 `test/`,上游 spec 的任何形状漂移都会让 CI 在这个文件变红。
- *
- * 断言是编译期的(函数体运行时为空):`expectAssignable<To>(value)` 要求 value 的类型可赋值给
- * `To`,不满足时 tsc 直接报 "not assignable"。不用 expect-type 的 `toExtend`,它在
- * `exactOptionalPropertyTypes` 下对含联合与可选属性的对象给出假阴性(普通赋值可通过)。
  */
-function expectAssignable<To>(_value: To): void {}
-
 describe('vendor 模型契约 ↔ @ai-sdk/provider', () => {
   it('生态包产出的模型实例结构上天然满足 vendor 契约(零适配)', () => {
     expectAssignable<Model>(null as unknown as LanguageModelV4);

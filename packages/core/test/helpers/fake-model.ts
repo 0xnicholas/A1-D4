@@ -46,6 +46,8 @@ export interface FakeResponse {
   fail?: unknown;
   /** 在脚本输出之后追发 `error` part(流中途失败)。 */
   errorAfter?: unknown;
+  /** 省略 finish part:模拟违背流契约的 provider(无 finish 也无 error)。 */
+  omitFinish?: boolean;
 }
 
 /** 假模型:除模型契约外,暴露录制的调用参数供断言。 */
@@ -226,7 +228,7 @@ function toStream(
   if (response.errorAfter !== undefined) {
     // 流中途失败:已产出的部分照常下发,但没有 finish(与真实 provider 一致)。
     parts.push({ type: 'error', error: response.errorAfter });
-  } else {
+  } else if (response.omitFinish !== true) {
     parts.push({
       type: 'finish',
       finishReason: finishReasonOf(response),

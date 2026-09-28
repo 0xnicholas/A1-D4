@@ -111,6 +111,16 @@ describe('fakeModel:脚本化假模型', () => {
     expect(parts.some((part) => part.type === 'finish')).toBe(false);
   });
 
+  it('omitFinish 让流在没有 finish 也没有 error 的情况下结束', async () => {
+    const model = fakeModel([{ text: 'partial', omitFinish: true }]);
+
+    const { stream } = await model.doStream({ prompt: [] });
+    const parts = await collect(stream);
+
+    expect(parts.some((part) => part.type === 'finish')).toBe(false);
+    expect(parts.some((part) => part.type === 'error')).toBe(false);
+  });
+
   it('调用时已中止的 signal 直接拒绝(不消费脚本)', async () => {
     const model = fakeModel([{ text: 'never sent' }]);
     const controller = new AbortController();

@@ -5,21 +5,13 @@ import {
   ModelSpecificationVersionError,
   assertModel,
 } from '@balsa/core/model';
+import { captureError } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**
  * 模型解析期的 specificationVersion 硬断言(ADR-0004):不匹配必须显式报错,并指点
  * 该升级框架还是降级 provider 包——错误发生在解析期,不在运行中途。
  */
-function captureError(run: () => unknown): Error {
-  try {
-    run();
-  } catch (error) {
-    if (error instanceof Error) return error;
-    throw error;
-  }
-  throw new Error('expected the call to throw an Error');
-}
 
 /** 结构上像模型、但不来自运行时的对象:只用来对断言接缝。 */
 function modelLike(fields: Record<string, unknown>): unknown {
