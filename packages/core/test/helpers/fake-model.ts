@@ -8,7 +8,7 @@ import type {
   LanguageModelV4StreamResult,
   LanguageModelV4Usage,
 } from '@ai-sdk/provider';
-import type { Model, ModelCallOptions } from '@balsa/core/model';
+import type { JsonValue, Model, ModelCallOptions } from '@balsa/core/model';
 
 /**
  * 脚本化假模型 —— M1 测试的规范接缝(替代一切真实 LLM,见 issue #21 测试决策)。
@@ -30,6 +30,17 @@ export interface FakeToolCall {
   inputRaw?: string;
 }
 
+/** 脚本中的一次 provider 执行的工具结果(provider-executed tool call 的回执)。 */
+export interface FakeToolResult {
+  /** 对应的工具调用 id(必须与流内 tool-call part 一致,故显式给出)。 */
+  toolCallId: string;
+  toolName: string;
+  /** 结果值;与 provider 契约的 `result` 字段同名。 */
+  result: NonNullable<JsonValue>;
+  /** 标记错误结果。 */
+  isError?: boolean;
+}
+
 /** 脚本中的一次模型回答(即一次 doGenerate / doStream 调用)。 */
 export interface FakeResponse {
   /** 文本增量;字符串按单个增量发送。 */
@@ -38,6 +49,8 @@ export interface FakeResponse {
   reasoning?: string | readonly string[];
   /** 本次回答请求的工具调用。 */
   toolCalls?: readonly FakeToolCall[];
+  /** 本次回答中 provider 自己执行并回报的工具结果(在 tool-call 之后下发)。 */
+  toolResults?: readonly FakeToolResult[];
   /** unified finish reason;缺省为有工具调用时的 `'tool-calls'`,否则 `'stop'`。 */
   finishReason?: LanguageModelV4FinishReason['unified'];
   /** finish part 上报告的 token 数。 */
@@ -184,6 +197,16 @@ function toGenerateResult(
     content.push({ type: 'tool-call', ...resolveToolCall(call) });
   }
 
+  for (const result of response.toolResults ?? []) {
+    content.push({
+      type: 'tool-result',
+      toolCallId: result.toolCallId,
+      toolName: result.toolName,
+      result: result.result,
+      ...(result.isError === undefined ? {} : { isError: result.isError }),
+    });
+  }
+
   return {
     content,
     finishReason: finishReasonOf(response),
@@ -223,6 +246,16 @@ function toStream(
     parts.push({ type: 'tool-input-delta', id: toolCallId, delta: input });
     parts.push({ type: 'tool-input-end', id: toolCallId });
     parts.push({ type: 'tool-call', toolCallId, toolName, input });
+  }
+
+  for (const result of response.toolResults ?? []) {
+    parts.push({
+      type: 'tool-result',
+      toolCallId: result.toolCallId,
+      toolName: result.toolName,
+      result: result.result,
+      ...(result.isError === undefined ? {} : { isError: result.isError }),
+    });
   }
 
   if (response.errorAfter !== undefined) {

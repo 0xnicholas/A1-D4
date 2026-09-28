@@ -6,12 +6,13 @@ import type { ModelMessage } from '@balsa/core/model';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**
- * generate() 文本闭环(M1-04 #25):Agent 挂单个模型实例,generate() 把自有 chunk 协议流收敛
- * 为 text / usage / finishReason。断言只走公开面(`@balsa/core/agent`)与脚本化假模型接缝
- * (@see helpers/fake-model.ts),不触内部实现。
+ * generate() 终值与执行选项透传(M1-04 #25 / M1-05 #26):generate() = stream() + await 终值,单一
+ * 代码路径。本文件钉住终值形状、prompt 形状与执行选项透传;输出对象的双消费、错误路径与
+ * generate()/stream() 单一路径回归见 `agent-stream.test.ts`。断言只走公开面(`@balsa/core/agent`)
+ * 与脚本化假模型接缝(@see helpers/fake-model.ts),不触内部实现。
  */
 describe('Agent.generate:纯文本闭环', () => {
-  it('脚本化假模型的文本回答收敛为 text / usage / finishReason', async () => {
+  it('脚本化假模型的文本回答收敛为终值(text / usage / finishReason / steps)', async () => {
     const model = fakeModel([
       { text: ['Hel', 'lo'], usage: { inputTokens: 3, outputTokens: 7 } },
     ]);
@@ -27,6 +28,14 @@ describe('Agent.generate:纯文本闭环', () => {
       text: 'Hello',
       usage: { inputTokens: 3, outputTokens: 7, totalTokens: 10 },
       finishReason: 'stop',
+      steps: [
+        {
+          text: 'Hello',
+          toolCalls: [],
+          toolResults: [],
+          usage: { inputTokens: 3, outputTokens: 7, totalTokens: 10 },
+        },
+      ],
     });
   });
 

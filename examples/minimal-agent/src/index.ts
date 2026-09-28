@@ -1,5 +1,5 @@
 /**
- * Balsa minimal example — a five-field agent, one text generation.
+ * Balsa minimal example — a five-field agent, streamed to the terminal.
  *
  * The model instance comes straight from an AI SDK provider package; it satisfies the core's
  * model contract structurally, no adapter or registration (ADR-0004).
@@ -30,10 +30,19 @@ const agent = new Agent({
   model: openai.chat('gpt-4o-mini'),
 });
 
-const result = await agent.generate('Why is the sky blue?');
+// One run, two consumption styles on the same object: `for await` yields the core's own chunk
+// protocol (text-delta / tool-call / tool-result / finish), while the terminal values are
+// awaitable promise getters. `generate()` is this same run collapsed to its terminal values
+// (single code path), e.g. `const { text, usage } = await agent.generate('…')`.
+const result = agent.stream('Why is the sky blue?');
 
-console.log(result.text);
-console.log(`\n[finishReason] ${result.finishReason}`);
+for await (const chunk of result) {
+  if (chunk.type === 'text-delta') process.stdout.write(chunk.textDelta);
+}
+
+const [finishReason, usage] = await Promise.all([result.finishReason, result.usage]);
+
+console.log(`\n\n[finishReason] ${finishReason}`);
 console.log(
-  `[usage] input=${result.usage.inputTokens ?? '-'} output=${result.usage.outputTokens ?? '-'} total=${result.usage.totalTokens ?? '-'}`,
+  `[usage] input=${usage.inputTokens ?? '-'} output=${usage.outputTokens ?? '-'} total=${usage.totalTokens ?? '-'}`,
 );

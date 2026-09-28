@@ -1,18 +1,19 @@
-import type { FinishChunk } from '../model/chunks.js';
 import { normalizeStream } from '../model/normalize.js';
-import { ModelContractError, assertModel } from '../model/resolve.js';
+import { assertModel } from '../model/resolve.js';
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
 import type { Tool } from '../tools/index.js';
+import { createAgentStream } from './stream.js';
 import type {
   AgentConfig,
   AgentGenerateResult,
   AgentRunOptions,
+  AgentStreamResult,
 } from './types.js';
 
 /**
- * The framework's execution unit: five config fields wrapped into an object that can
- * `generate()` (and, from M1-05 on, `stream()`). Independent `new Agent(...)` is first-class;
- * nothing else has to be instantiated (ADR-0002 / ADR-0005).
+ * The framework's execution unit: five config fields wrapped into an object that can `generate()`
+ * and `stream()`. Independent `new Agent(...)` is first-class; nothing else has to be instantiated
+ * (ADR-0002 / ADR-0005).
  */
 export class Agent {
   /** Unique identity of the agent. */
@@ -37,46 +38,62 @@ export class Agent {
   }
 
   /**
-   * Runs the agent once and returns the terminal result.
+   * Runs the agent once and returns the output object: `for await` consumes the core's own chunk
+   * protocol, while `text` / `usage` / `finishReason` / `steps` are awaitable terminal values on
+   * the same object. The run starts on first consumption.
    *
-   * The model is consumed through its streaming interface and normalized into the core's own
-   * chunk protocol — `stream()` (M1-05) will expose that same flow.
+   * Tool calls are recorded on the step but not executed yet (the built-in loop lands with M1-07):
+   * a tool-requesting step ends with `finishReason: 'tool-calls'`.
+   */
+  stream(input: string | ModelMessage[], options: AgentRunOptions = {}): AgentStreamResult {
+    const model = this.model;
+    const instructions = this.instructions;
+    return createAgentStream(async function* () {
+      // Call options are built per run — they are part of the run, not of creating the object.
+      const callOptions = toCallOptions(instructions, input, options);
+      const { stream } = await model.doStream(callOptions);
+      yield* normalizeStream(stream);
+    });
+  }
+
+  /**
+   * Runs the agent once and returns the terminal result — literally `stream()` awaited to its end.
    *
-   * Tool calls are not executed yet (the built-in loop lands with M1-07): a tool-requesting step
-   * returns `finishReason: 'tool-calls'` with its `tool-call` chunks dropped.
+   * `generate()` and `stream()` share the single code path, so their terminal values always agree.
    */
   async generate(
     input: string | ModelMessage[],
     options: AgentRunOptions = {},
   ): Promise<AgentGenerateResult> {
-    const callOptions: ModelCallOptions = {
-      ...options.modelSettings,
-      prompt: toPrompt(this.instructions, input),
-    };
-    if (options.signal !== undefined) callOptions.abortSignal = options.signal;
-    if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
+    const result = this.stream(input, options);
+    const [text, usage, finishReason, steps] = await Promise.all([
+      result.text,
+      result.usage,
+      result.finishReason,
+      result.steps,
+    ]);
 
-    const { stream } = await this.model.doStream(callOptions);
-
-    let text = '';
-    let finish: FinishChunk | undefined;
-    for await (const chunk of normalizeStream(stream)) {
-      if (chunk.type === 'text-delta') {
-        text += chunk.textDelta;
-      } else if (chunk.type === 'finish') {
-        finish = chunk;
-      }
-    }
-
-    if (finish === undefined) {
-      throw new ModelContractError(
-        'The model stream ended without a finish part, so finishReason and usage are unknown. ' +
-          'The model does not implement the streaming contract of the AI SDK provider specification.',
-      );
-    }
-
-    return { text, usage: finish.usage, finishReason: finish.finishReason };
+    return { text, usage, finishReason, steps };
   }
+}
+
+/**
+ * Builds the model call options: the agent's instructions plus the input become the prompt, and
+ * the per-call passthroughs ride along. Framework-owned fields (`prompt` / `abortSignal` /
+ * `providerOptions`) are written after the `modelSettings` spread, so settings cannot hijack them.
+ */
+function toCallOptions(
+  instructions: string,
+  input: string | ModelMessage[],
+  options: AgentRunOptions,
+): ModelCallOptions {
+  const callOptions: ModelCallOptions = {
+    ...options.modelSettings,
+    prompt: toPrompt(instructions, input),
+  };
+  if (options.signal !== undefined) callOptions.abortSignal = options.signal;
+  if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
+  return callOptions;
 }
 
 /**

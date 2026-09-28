@@ -2,16 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { normalizePart, normalizeStream } from '@balsa/core/model';
 import type { Chunk, ModelFinishReason, ModelStreamPart, ModelUsage } from '@balsa/core/model';
 import { fakeModel } from './helpers/fake-model.js';
+import { collect } from './helpers/collect.js';
 
 /**
  * chunk 协议与归一化层(ADR-0004):模型 spec 原生流是唯一输入,核心自有 chunk 词汇是唯一输出。
  * 归一化保持薄:一个 part 至多一个 chunk,不缓冲、不改写语义。
  */
-async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
-  const items: T[] = [];
-  for await (const item of iterable) items.push(item);
-  return items;
-}
 
 function providerUsage(inputTokens?: number, outputTokens?: number): ModelUsage {
   return {

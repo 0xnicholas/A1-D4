@@ -10,5 +10,7 @@ export type {
   AgentConfig,
   AgentGenerateResult,
   AgentRunOptions,
+  AgentStep,
+  AgentStreamResult,
   ModelSettings,
 } from './types.js';

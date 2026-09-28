@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { LanguageModelV4StreamPart, LanguageModelV4Usage } from '@ai-sdk/provider';
 import { fakeModel } from './helpers/fake-model.js';
+import { collect } from './helpers/collect.js';
 
 /**
  * 假模型底座自身的契约:`@ai-sdk/provider` 的真实类型保证其 spec 保真(见 helpers/fake-model.ts),
  * 本文件钉住它发出的流结构、脚本消费与录制行为——M1 后续测试全部站在这个接缝上。
  */
-async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
-  const items: T[] = [];
-  for await (const item of iterable) items.push(item);
-  return items;
-}
 
 const noUsage: LanguageModelV4Usage = {
   inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
@@ -152,6 +148,26 @@ describe('fakeModel:脚本化假模型', () => {
     expect(result.usage.inputTokens.total).toBe(1);
     expect(result.usage.outputTokens.total).toBe(2);
     expect(result.warnings).toEqual([]);
+  });
+
+  it('toolResults 在 tool-call 之后下发 provider 原生的 tool-result part', async () => {
+    const model = fakeModel([
+      {
+        toolCalls: [{ toolCallId: 'call-1', toolName: 'weather', input: { city: 'SF' } }],
+        toolResults: [
+          { toolCallId: 'call-1', toolName: 'weather', result: { temp: 21 } },
+          { toolCallId: 'call-1', toolName: 'weather', result: 'boom', isError: true },
+        ],
+      },
+    ]);
+
+    const { stream } = await model.doStream({ prompt: [] });
+    const results = (await collect(stream)).filter((part) => part.type === 'tool-result');
+
+    expect(results).toEqual([
+      { type: 'tool-result', toolCallId: 'call-1', toolName: 'weather', result: { temp: 21 } },
+      { type: 'tool-result', toolCallId: 'call-1', toolName: 'weather', result: 'boom', isError: true },
+    ] satisfies LanguageModelV4StreamPart[]);
   });
 
   it('provider / modelId 可定制,缺省为 fake 身份', async () => {
