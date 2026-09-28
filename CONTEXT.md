@@ -63,3 +63,23 @@ _Avoid_: DAG 执行器(本框架 workflow 不是 DAG)、状态机 DSL
 **快照 (Snapshot)**:
 workflow run 在 step 边界的 JSON 化状态(stepResults + 位置);suspend/resume 与 Harness 持久执行的共用机制,经 storage port 读写,默认内存实现。
 _Avoid_: 事件溯源、完整历史(只保留每 run 最新一份)
+
+**Memory**:
+框架的记忆子系统:thread/resource 身份 + 消息历史 + 可选工作记忆;存储走 port、默认内存实现;语义召回与 OM 类重机制不进核心,外部记忆系统(如 bunfold)经能力包桥接。
+_Avoid_: 把 Memory 等同于存储 adapter(adapter 归存储决策)、内建后台压缩管线
+
+**Thread**:
+Memory 域的会话身份:一次持久会话,消息按 thread 隔离,每个 thread 归属一个 owner(resourceId);per-call 经 `memory: { thread, resource }` 传入,不存在时自动创建。
+_Avoid_: session、conversation 作正式词(Run 是一次执行,Thread 是持久会话,两者正交)
+
+**Resource**:
+Memory 域的用户/实体稳定标识:跨 thread 共享的锚点,每条消息与每个 thread 都带 resourceId,是工作记忆的归属维度;memory 子系统不做访问控制,授权归应用层。
+_Avoid_: user(不总是人类用户)、tenant(多租户隔离是应用层职责)
+
+**消息历史 (Message history)**:
+唯一默认开启的记忆机制:消息持久化 + 最近 N 条窗口(lastMessages)在模型调用前注入 + `recall()` 单一查询入口;消息格式即模型契约的 vendor prompt 类型加存储信封(id/threadId/resourceId/createdAt)。
+_Avoid_: short-term memory、chat history 作术语
+
+**工作记忆 (Working memory)**:
+可选的跨会话小块结构化记忆(用户画像/偏好/当前目标),resource 作用域;作为 system message 注入,agent 经 tool-call 更新。
+_Avoid_: long-term memory(向量召回、后台压缩类"长期记忆"机制不在核心,经能力包桥接)
