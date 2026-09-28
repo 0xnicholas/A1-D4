@@ -58,7 +58,7 @@ interface MemoryStore {
 ```
 
 - 裁单(对照 mastra 10 必备 + 3 可选):`updateMessages`(消息不可变)、`listMessagesById`(语义召回延后连带裁)、`updateThread`(并入 upsert)、`cloneThread` / `copyThread`(延后)、`listMessagesByResourceId`(OM 遗物)。
-- 核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。adapter 家族归「决策:存储适配策略」(#15),本清单是其输入。
+- 核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。adapter 家族见 `docs/architecture/storage.md`(#15 已定),本清单是其输入。
 
 ## 配置表面
 
@@ -71,7 +71,7 @@ new Memory({
 ```
 
 - Agent 侧 `memory?: DynamicArgument<Memory>`(全域动态,ADR-0005);同一 Memory 实例可被多 agent 共享。
-- **无后台写、无 `settled()`**:所有写发生在请求内;存储连接生命周期归 adapter(#15)。
+- **无后台写、无 `settled()`**:所有写发生在请求内;存储连接生命周期归 adapter(见 `docs/architecture/storage.md`)。
 
 ## 砍单与承载缝
 
@@ -93,7 +93,7 @@ new Memory({
 - **Agent(#10,已定)**:`memory` 一等可选字段;recall/save 时机与 Processor 顺序见上。
 - **模型层(#9,已定)**:消息格式 = vendor prompt 类型;届时 embedder 复用同一契约模式(vendor EmbeddingModel 结构类型)。
 - **Tools(#13,已定)**:WM 更新工具是框架自挂的 Tool,定义规范见 `docs/architecture/tools.md`。
-- **存储(#15)**:MemoryStore port(6 必备 + 2 条件)是其输入,与 `WorkflowSnapshotStore` 统一 adapter 家族。
+- **存储(#15,已定)**:MemoryStore port(6 必备 + 2 条件)是其输入,与 `WorkflowSnapshotStore` 统一 adapter 家族;扩展面与 adapter 清单见 `docs/architecture/storage.md`。
 - **Observability(#14)**:recall/save 是 span 锚点,形态归它。
 - **Harness(#18)**:无耦合——无后台写意味着 memory 不需要 `settled()` 式生命周期。
 - **多 agent(#19)**:memory 身份经 per-call 显式传递;as-tool 组合时 thread/resource 由调用方决定,委派场景的隔离语义归它。

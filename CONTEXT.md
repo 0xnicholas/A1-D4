@@ -99,3 +99,15 @@ _Avoid_: OTel Tracer、全局单例
 **观测导出器 (Observability exporter)**:
 把 tracing 事件送出进程的接口:`{ export(event), flush?(), shutdown?() }`;核心自带 console 与 memory 两个,OTLP(GenAI semconv 映射)在能力包,厂商专用 exporter 不做(裸 OTLP + gen_ai.* 已覆盖各家后端)。
 _Avoid_: plugin、integration(那是能力包的词)
+
+**存储 port (Storage port)**:
+子系统持久化需求的最小接口,由核心定义类型并自带内存默认实现;v1 两个:`MemoryStore`(消息历史/工作记忆,6 必备 + 2 条件)与 `WorkflowSnapshotStore`(workflow 快照,2 方法 + JSON-only)。演化纪律 = additive-only:1.0 起必需方法签名永不改,新能力只以可选方法 + 能力标志增加,breaking 只在 major。
+_Avoid_: composite store、分域路由(mastra 式域路由为强制中央实例服务;本框架子系统各自接收 store 实例,分后端是用户侧自由)
+
+**存储 adapter (Storage adapter)**:
+实现一个或多个存储 port 的能力包(统一 adapter 家族);连接生命周期自拥(可选 `init?()` / `close?()`),核心永不隐式调用。第一方清单 = 核心内存实现 + 恰好一个 SQLite 系参考 adapter,其余后端归社区。
+_Avoid_: 把存储层当子系统(它只是 port 集合 + adapter 家族)、核心托管连接生命周期(进程 hook 与无运行时负担冲突)
+
+**能力标志 (Capability flag)**:
+port 可选能力的声明与降级机制:可选方法的存在性即声明,核心调用前检测,缺席时按既定语义降级或显式报错(如 MemoryStore 条件 2 仅 working memory 启用时要求;快照 CAS 缺席即退回单进程语义)。additive-only 演化纪律的载体。
+_Avoid_: 基础 port 为覆盖场景而膨胀(基础形状冻结,扩展一律走可选方法)

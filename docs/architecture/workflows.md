@@ -78,9 +78,9 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 - 快照 = JSON 可序列化的 `{ runId, status, input, stepResults, position }`(stepResults 记录每步 status / output / 起止时间 / suspendPayload;position 即 mastra 的 startIdx 等价物)。**JSON-only 约束**:大数据只存引用。
 - 恢复 = `run.resume({ step, resumeData? })`:load 快照 → resumeData 过 resumeSchema → 从 position 重进同一个 for 循环。time-travel / restart / restartAllActiveWorkflowRuns 是同一机制的变种,**全部裁出 v1**;引擎只暴露「load → 重进」原语,durable 重启归 Harness(#18)。
 - 持久化时机:有 storage 时**每个 step 完成后** + suspend + 终态,固定写;无 shouldPersistSnapshot / prune 钩子。
-- resume 并发去重:进程内锁;跨进程 CAS 归 adapter(#15 酌情)。
+- resume 并发去重:进程内锁;跨进程 CAS = adapter 可选扩展(`compareAndSave`,见 `docs/architecture/storage.md`)。
 
-### storage port(钉给 #15 的需求)
+### storage port(#15 已定)
 
 ```ts
 interface WorkflowSnapshotStore {
@@ -89,7 +89,7 @@ interface WorkflowSnapshotStore {
 }
 ```
 
-核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。adapter 家族(delete / list / CAS 等扩展)归「决策:存储适配策略」(#15)。
+核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。基础形状冻结;adapter 家族与 delete / list / CAS 可选扩展见 `docs/architecture/storage.md`。
 
 ## IO 校验
 
@@ -120,7 +120,7 @@ interface WorkflowSnapshotStore {
 | validateInputs 开关 | 永远校验 |
 | time-travel / restart / restartAll | 引擎 load→重进原语;durable 归 Harness(#18) |
 | shouldPersistSnapshot / prune 钩子 | 固定 step 边界写 |
-| resume CAS / serializedStepGraph / 多引擎适配 | adapter(#15)/ 外部 runner 能力包方向 |
+| resume CAS / serializedStepGraph / 多引擎适配 | adapter 可选扩展(`docs/architecture/storage.md`)/ 外部 runner 能力包方向 |
 | chunk 级流式透传 | step 内自行消费;后加 minor |
 | durable sleep / schedule cron | Harness(#18)/ 平台 cron |
 | tripwire / canceled 状态 | AbortSignal → failed |
@@ -129,7 +129,7 @@ interface WorkflowSnapshotStore {
 
 - **模型层(#9,已定)**:事件流与快照中的流式词汇复用 chunk 协议;step 内用模型走 `ModelInput` 三形状。
 - **Agent(#10,已定)**:不复用 agent loop;agent 由用户一行包装进 step;agent 级审批/挂起归 Harness,本规范的快照机制是其底层机器。
-- **存储(#15)**:本规范钉 `WorkflowSnapshotStore` port(两个方法 + JSON-only);adapter 家族归它。
+- **存储(#15,已定)**:本规范钉 `WorkflowSnapshotStore` port(两个方法 + JSON-only);adapter 家族与扩展面见 `docs/architecture/storage.md`。
 - **Harness(#18)**:durable 执行、跨进程恢复、durable timer 归它;load→重进原语与快照格式是它的输入。
 - **Observability(#14,已定)**:span 挂在 run / step 边界,lifecycle 事件流是其事件锚点,traceId 随快照持久化;见 `docs/architecture/observability.md`。
 - **Memory(#12)**:无直接耦合。
