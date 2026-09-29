@@ -25,7 +25,7 @@ interface AgentConfig {
 - **instructions 仅 string**:mastra 的 string[] / SystemMessage / providerOptions 联合全砍,provider 级能力(缓存控制等)证明需要后再加。
 - **tools 容器**:`Record<string, Tool>`,键即工具名,构造期完成唯一性校验(Record 键天然唯一,重名在编译期即被拦截)。Tool 自身定义(Standard Schema 入参、execute 签名)见「Tools/MCP 抽象」规范(`docs/architecture/tools.md`)。
 - **memory**:一等可选字段。本规范只钉三件事:字段存在、可选、读写时机固定(模型调用前 recall、每个 step 后 save);接口方法与 thread/resource 语义归「决策:Memory 语义」。
-- **组合根关系**:独立 `new Agent(...)` 是一等用法,不强制注入;横切依赖(tracer 等)经组合根分发时 Agent 被动接受,不感知其存在。**tracer 注入缝**:`AgentConfig.tracer` 接受观测子系统实例(组合根分发或独立 new 显式传入),不属定义表面——不是可被 Processor/能力包承载的能力,而是子系统装配位;缺席时 run 不创建任何 span 对象(零开销),三边界埋点与 trace 续接见 `docs/architecture/observability.md`。
+- **组合根关系**:独立 `new Agent(...)` 是一等用法,不强制注入;横切依赖(tracer 等)经组合根分发时 Agent 被动接受,不感知其存在——组合根 `createApp({ tracer })` 的 `app.agent(config)` 建出的 Agent 即已接受分发,配置自带 tracer 时显式优先。**tracer 注入缝**:`AgentConfig.tracer` 接受观测子系统实例(组合根分发或独立 new 显式传入),不属定义表面——不是可被 Processor/能力包承载的能力,而是子系统装配位;缺席时 run 不创建任何 span 对象(零开销),三边界埋点与 trace 续接见 `docs/architecture/observability.md`。
 
 砍单与承载缝(砍的是字段位置,不是能力):
 

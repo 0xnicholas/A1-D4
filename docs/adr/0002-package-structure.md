@@ -8,4 +8,8 @@ pnpm monorepo。**核心单包**以子路径导出各子系统入口(如 `core/a
 - **mastra 式每子系统一包**(core/memory/rag/evals/… 20+ 包):被否——发布与维护复杂度对小团队过重,且与子路径导出的粒度重复。
 - **强制中央实例**(mastra 式 `new Mastra({...})`):被否,理由见上。
 
+## Consequences
+
+- **修订(M1-15 #36)**:组合根落地为 `createApp({ tracer })` + `app.agent(config)` 工厂——经工厂建出的 Agent 被动接受分发的 tracer(配置自带 tracer 时显式优先),不经工厂的独立 `new Agent(...)` 照旧一等;M1 只分发 tracer,`logger` / `storage` 的位留给后续里程碑。
+
 (来源:wayfinder ticket #8)

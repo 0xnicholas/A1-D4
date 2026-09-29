@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Agent } from '@balsa/core/agent';
 import {
@@ -11,7 +11,7 @@ import {
 import { createTool } from '@balsa/core/tools';
 import type { ToolContext } from '@balsa/core/tools';
 import { fakeModel } from './helpers/fake-model.js';
-import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType } from './helpers/spans.js';
+import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType, withSpanIdProbe } from './helpers/spans.js';
 
 /**
  * 三边界自动埋点与 trace 续接(M1-09 #30):挂上 tracer 后 agent run / agent step / tool call
@@ -407,15 +407,10 @@ describe('不挂 tracer:零开销', () => {
     });
     // span / trace id 由 crypto.getRandomValues 生成(runId 走 randomUUID,不受影响);不挂 tracer
     // 时这个生成器一次都不应被碰到——这是“无 span 对象创建”可观察的边界。
-    const getRandomValues = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    const { result, spanIdsCreated } = await withSpanIdProbe(() => agent.generate('Go.'));
 
-    try {
-      const result = await agent.generate('Go.');
-      expect(result.text).toBe('done');
-      expect(getRandomValues).not.toHaveBeenCalled();
-    } finally {
-      getRandomValues.mockRestore();
-    }
+    expect(result.text).toBe('done');
+    expect(spanIdsCreated).toBe(false);
   });
 
   it('对照:挂上 tracer 后同一路径确实生成 span id(探针可观测,不是恒假)', async () => {
@@ -427,14 +422,9 @@ describe('不挂 tracer:零开销', () => {
       model: fakeModel([{ text: 'done' }]),
       tracer,
     });
-    const getRandomValues = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    const { spanIdsCreated } = await withSpanIdProbe(() => agent.generate('Go.'));
 
-    try {
-      await agent.generate('Go.');
-      expect(getRandomValues).toHaveBeenCalled();
-    } finally {
-      getRandomValues.mockRestore();
-    }
+    expect(spanIdsCreated).toBe(true);
   });
 });
 
