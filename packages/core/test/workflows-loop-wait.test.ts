@@ -29,7 +29,8 @@ function deferred() {
  *   只做一次(不重试)。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径,不触内部模块。循环条件「迭代前 / 迭代后」的
- * 求值点与 sleep 的动态时长参数包形状是本票的实施期裁决(spec 修订(#50))。
+ * 求值点与 sleep 的动态时长参数包形状是本票的实施期裁决(spec 修订(#50))。循环内每次迭代的事件
+ * 与 span 归 workflows-events / workflows-observability(记录仍按块记一条)。
  */
 
 const counter = z.object({ count: z.number() });

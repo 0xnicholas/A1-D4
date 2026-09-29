@@ -18,7 +18,8 @@ import { captureRejection, expectAssignable, expectSuccess, expectSuspended } fr
  * resumeSchema 校验 → 从 position 重进、resume 进程内锁去重。
  *
  * 本票裁决(v1):suspend 只在**顶层 then 条目**的 step 内成立;parallel / branch / foreach /
- * dowhile / dountil 体内调用 suspend 显式报错(迭代现场语义按地图升级为新 ticket)。
+ * dowhile / dountil 体内调用 suspend 显式报错(该边界的 `step-end` 读 `failed`、记录不落
+ * `suspended`,归一 workflows-events;迭代现场语义按地图升级为新 ticket)。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径:定义 → `createRun` → `run.start` / `run.resume`,
  * 以及 step `execute` 收到的 ctx 与注入的 store 观察到的快照。

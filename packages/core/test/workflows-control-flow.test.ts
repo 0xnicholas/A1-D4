@@ -15,7 +15,8 @@ import { captureError, captureRejection, expectSuccess } from './helpers/asserti
  * - foreach:输入必须是数组、concurrency 默认 1、>1 用自写并发闸(流式补位,不引 fastq)、保序收集、同步点,输出数组。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径,不触内部模块;并发断言用一次性闸门(deferred)自行
- * 控制 step 何时完成,不靠计时器。
+ * 控制 step 何时完成,不靠计时器。块内(parallel / branch 臂 / foreach)每次执行的事件与 span 归
+ * workflows-events / workflows-observability(run 的记录仍按块聚合一条)。
  */
 
 const topicInput = z.object({ topic: z.string() });
