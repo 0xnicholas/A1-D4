@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Agent } from '@balsa/core/agent';
-import type { AgentConfig, AgentRunOptions } from '@balsa/core/agent';
+import type {
+  AgentConfig,
+  AgentRunOptions,
+  DynamicArgument,
+  ModelInput,
+  RequestContext,
+} from '@balsa/core/agent';
 import { ModelContractError, ModelSpecificationVersionError } from '@balsa/core/model';
 import type { Model } from '@balsa/core/model';
 import { createTracer } from '@balsa/core/observability';
@@ -8,8 +14,10 @@ import { captureError, expectAssignable } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**
- * Agent 五字段配置表面与解析期模型断言(M1-04 #25,ADR-0004/0005):
- * 表面之外无一物;模型 specificationVersion 不匹配在构造期(解析期)显式报错,不拖到运行中途。
+ * Agent 五字段配置表面与解析期模型断言(M1-04 #25 / M1-10 #31,ADR-0004/0005):
+ * 表面之外无一物;一切配置字段接受静态值或 `(ctx) => T | Promise<T>` 动态形状,逐次解析;模型
+ * specificationVersion 不匹配在解析期显式报错(静态模型在构造期,动态解析出的模型在 run 解析时),
+ * 不拖到运行中途。
  */
 describe('Agent 五字段配置表面', () => {
   it('name / instructions / model 必填,tools / description 可选(静态值)', () => {
@@ -34,11 +42,46 @@ describe('Agent 五字段配置表面', () => {
     });
   });
 
-  it('instructions 仅 string —— 数组 / 函数形状被类型拒绝', () => {
-    // @ts-expect-error instructions 只接受 string
+  it('instructions 仅 string(动态形状也必须是 string 值):数组形状被类型拒绝', () => {
+    expectAssignable<AgentConfig>({
+      name: 'a',
+      instructions: () => 'You are concise.',
+      model: fakeModel([]),
+    });
+    expectAssignable<AgentConfig>({
+      name: 'a',
+      instructions: async () => 'You are concise.',
+      model: fakeModel([]),
+    });
+    // @ts-expect-error instructions 只接受 string 或其解析函数,数组形状不存在
     expectAssignable<AgentConfig>({ name: 'a', instructions: ['You are concise.'], model: fakeModel([]) });
-    // @ts-expect-error instructions 的动态函数形状留给 M1-10(#31)
-    expectAssignable<AgentConfig>({ name: 'a', instructions: () => 'You are concise.', model: fakeModel([]) });
+  });
+
+  it('一切配置字段接受动态形状 (ctx) => T | Promise<T>(M1-10 #31,ADR-0005)', () => {
+    expectAssignable<AgentConfig>({
+      name: 'assistant',
+      instructions: (ctx) => `You serve ${String(ctx.tenant)}.`,
+      model: (ctx) => fakeModel([{ text: String(ctx.tenant) }]),
+      tools: async (ctx) =>
+        ctx.canSearch === true
+          ? { search: { description: 'Searches the web.', execute: () => 'ok' } }
+          : {},
+      description: (ctx) => `Answers questions for ${String(ctx.tenant)}.`,
+    });
+  });
+
+  it('DynamicArgument<T> = T | ((ctx) => T | Promise<T>);ModelInput 已落实例与解析函数两形状', () => {
+    expectAssignable<DynamicArgument<string>>('You are concise.');
+    expectAssignable<DynamicArgument<string>>((ctx: RequestContext) => `You serve ${ctx.runId}.`);
+    expectAssignable<DynamicArgument<string>>(async (ctx: RequestContext) => ctx.runId);
+    expectAssignable<DynamicArgument<readonly string[]>>(['one', 'two']);
+
+    const model = fakeModel([]);
+    expectAssignable<ModelInput>(model);
+    expectAssignable<ModelInput>((ctx: RequestContext) => (ctx.tier === 'pro' ? model : model));
+    expectAssignable<ModelInput>(async () => model);
+    // @ts-expect-error fallback 链数组随 M1-11(#32)落地,当前不是 ModelInput 的形状
+    expectAssignable<ModelInput>([model]);
   });
 
   it('五字段之外无一物——多余字段被类型拒绝', () => {
@@ -80,7 +123,28 @@ describe('Agent 五字段配置表面', () => {
     });
   });
 
-  it('构造后的实例原样持有配置字段', () => {
+  it('构造后的实例原样持有配置字段(动态形状亦然——解析发生在每次 run 里)', () => {
+    const model = fakeModel([{ text: 'hi' }]);
+    const tools = { search: { description: 'Searches the web.', execute: () => 'ok' } };
+    const dynamic = {
+      name: 'assistant',
+      instructions: (ctx: RequestContext) => `You serve ${String(ctx.tenant)}.`,
+      model: (ctx: RequestContext) => (ctx.tier === 'pro' ? model : model),
+      tools: (ctx: RequestContext) => (ctx.canSearch === true ? tools : {}),
+      description: (ctx: RequestContext) => `Answers questions for ${String(ctx.tenant)}.`,
+    };
+    expectAssignable<AgentConfig>(dynamic);
+
+    const agent = new Agent(dynamic);
+
+    expect(agent.name).toBe('assistant');
+    expect(agent.instructions).toBe(dynamic.instructions);
+    expect(agent.model).toBe(dynamic.model);
+    expect(agent.tools).toBe(dynamic.tools);
+    expect(agent.description).toBe(dynamic.description);
+  });
+
+  it('静态配置原样持有(解析不重建对象)', () => {
     const model = fakeModel([{ text: 'hi' }]);
     const tools = { search: { description: 'Searches the web.', execute: () => 'ok' } };
 
@@ -149,5 +213,4 @@ describe('解析期模型断言', () => {
         }),
     ).toThrow(ModelContractError);
   });
-
 });

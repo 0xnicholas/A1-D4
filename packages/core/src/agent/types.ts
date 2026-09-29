@@ -18,24 +18,25 @@ import type { Tool } from '../tools/index.js';
  * root hands to the subsystem (`createApp({ tracer })`), which a standalone `new` may also pass
  * explicitly. Not attaching it leaves the whole observability subsystem at zero overhead.
  *
- * This is the static-value version of the final surface. Dynamic arguments
- * (`T | ((ctx: RequestContext) => T)`), the `ModelInput` fallback/function shapes, and the
- * `memory` field land with their own M1 tickets; widening a field is additive.
+ * Every config field accepts a static value or a resolver (`DynamicArgument`), resolved again for
+ * each run. The `memory` field lands with M2; widening a field is additive.
  */
 export interface AgentConfig {
   /** Unique identity of the agent. */
   readonly name: string;
   /** System instructions for every run — a plain string (no message-union passthrough). */
-  readonly instructions: string;
+  readonly instructions: DynamicArgument<string>;
   /**
-   * The language model instance to run. Any AI SDK provider package instance satisfies it
-   * structurally; a wrong specification version fails loudly when the Agent is constructed.
+   * The language model instance to run — or a resolver that picks one per request context. Any AI
+   * SDK provider package instance satisfies the contract structurally; a wrong specification
+   * version fails loudly when the field is resolved (at construction for a static model, at
+   * resolution time for a resolver's pick).
    */
-  readonly model: Model;
-  /** Tool container — the Record key is the tool name. Static for now (M1-10 dynamicizes it). */
-  readonly tools?: Record<string, Tool>;
-  /** Shown to an upstream model when the agent is composed as a tool. */
-  readonly description?: string;
+  readonly model: ModelInput;
+  /** Tool container — the Record key is the tool name. Static, or resolved per request context. */
+  readonly tools?: DynamicArgument<Record<string, Tool>>;
+  /** Shown to an upstream model when the agent is composed as a tool (`resolveDynamicArgument`). */
+  readonly description?: DynamicArgument<string>;
   /**
    * The tracer this agent reports to, when one is attached (the composition root distributes it;
    * a standalone `new` may pass it explicitly). Absent = no span is ever created for its runs.
@@ -72,8 +73,26 @@ export interface RequestContext {
 }
 
 /**
+ * The shape every Agent config field accepts (`docs/architecture/agent.md`「定义表面」): the value
+ * itself, or a resolver that answers per request context — each run resolves its fields again, so a
+ * per-call context changes behavior without rebuilding the agent.
+ *
+ * A `T` that is itself a function cannot be passed as a static value: function values are read as
+ * resolvers. No config field has a function as its static value.
+ */
+export type DynamicArgument<T> = T | ((ctx: RequestContext) => T | Promise<T>);
+
+/**
+ * The `model` field's accepted shapes (`docs/architecture/model.md`「model 字段形状」): a model
+ * instance satisfying the contract, or a resolver that picks one per request context. The
+ * fallback-chain array shape lands with M1-11 (#32); widening the union is additive.
+ */
+export type ModelInput = Model | ((ctx: RequestContext) => Model | Promise<Model>);
+
+/**
  * Per-call execution options. The open bag below is the user's per-call request context
- * (`RequestContext`'s user properties); M1-10 (#31) plumbs it into dynamic-argument resolution.
+ * (`RequestContext`'s user properties): it is what dynamic arguments resolve against, and the very
+ * same object is handed to tool contexts.
  */
 export interface AgentRunOptions {
   /** Passthrough bag for the model call (temperature, maxOutputTokens, …). */

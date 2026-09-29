@@ -20,7 +20,7 @@ interface AgentConfig {
 }
 ```
 
-- **动态参数**:所有字段接受 `T | ((ctx: RequestContext) => T | Promise<T>)`,每次执行按请求上下文解析。`RequestContext = { signal: AbortSignal, runId: string, ...用户 per-call 开放属性袋 }`,纯对象,无 `Agent<TContext>` 泛型。
+- **动态参数**:所有字段接受 `T | ((ctx: RequestContext) => T | Promise<T>)`,每次执行按请求上下文解析(实现原语 `resolveDynamicArgument(value, ctx)`)。run 在调用模型之前解析 `instructions` / `model` / `tools`,解析上下文与工具 `ctx.requestContext` 是同一份对象;`description` 不进 run——as-tool 包装在构造 Tool 时用同一原语取值(Tool 的 description 是构造期静态字段,见「多 agent 组合」)。`RequestContext = { signal: AbortSignal, runId: string, ...用户 per-call 开放属性袋 }`,纯对象,无 `Agent<TContext>` 泛型。
 - **instructions 仅 string**:mastra 的 string[] / SystemMessage / providerOptions 联合全砍,provider 级能力(缓存控制等)证明需要后再加。
 - **tools 容器**:`Record<string, Tool>`,键即工具名,构造期完成唯一性校验(Record 键天然唯一,重名在编译期即被拦截)。Tool 自身定义(Standard Schema 入参、execute 签名)见「Tools/MCP 抽象」规范(`docs/architecture/tools.md`)。
 - **memory**:一等可选字段。本规范只钉三件事:字段存在、可选、读写时机固定(模型调用前 recall、每个 step 后 save);接口方法与 thread/resource 语义归「决策:Memory 语义」。
@@ -68,15 +68,16 @@ chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展�
 
 ## 多 agent 组合
 
-**规范形态 = as-tool 组合,核心零内建协议**(ADR-0012,正式了结 ADR-0005 的暂缓项):Agent 不认识 sub-agent,无 `agents` 字段、无委派协议。组合 = 把 Agent 包装为 Tool 挂进父 agent 容器——`description` + `generate` 签名天然是一个 Tool 的 execute:
+**规范形态 = as-tool 组合,核心零内建协议**(ADR-0012,正式了结 ADR-0005 的暂缓项):Agent 不认识 sub-agent,无 `agents` 字段、无委派协议。组合 = 把 Agent 包装为 Tool 挂进父 agent 容器——`description` + `generate` 签名天然是一个 Tool 的 execute。Tool 的 description 是构造期静态字符串,故动态 description 在包装处用 `resolveDynamicArgument` 取值(包装本身可以是父 agent 动态 `tools` 解析器里的一次逐请求构造),委派 run 的输入仍由包装器显式构造:
 
 ```ts
-const researcher = createTool({
-  description: researchAgent.description ?? researchAgent.name,
-  inputSchema: z.object({ prompt: z.string() }),
-  execute: (input, { signal, traceId, spanId }) =>
-    researchAgent.generate(input.prompt, { signal, traceId, parentSpanId: spanId }),
-})
+const researcherAsTool = async (ctx: RequestContext) =>
+  createTool({
+    description: (await resolveDynamicArgument(researchAgent.description, ctx)) ?? researchAgent.name,
+    inputSchema: z.object({ prompt: z.string() }),
+    execute: (input, { signal, traceId, spanId }) =>
+      researchAgent.generate(input.prompt, { signal, traceId, parentSpanId: spanId }),
+  })
 ```
 
 组合语义要点:

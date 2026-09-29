@@ -57,15 +57,16 @@ interface ToolContext {
 
 ## 组合范式
 
-agent as-tool(Agent 规范已钉一行包装):
+agent as-tool(Agent 规范已钉包装形态;Agent 的 `description` 是动态参数,故它在包装处经 `resolveDynamicArgument` 取值——Tool 的 description 是构造期静态字段):
 
 ```ts
-const agentAsTool = createTool({
-  description: agent.description ?? agent.name,
-  inputSchema: z.object({ prompt: z.string() }),
-  execute: (input, { signal, traceId, spanId }) =>
-    agent.generate(input.prompt, { signal, traceId, parentSpanId: spanId }),
-})
+const agentAsTool = async (ctx: RequestContext) =>
+  createTool({
+    description: (await resolveDynamicArgument(agent.description, ctx)) ?? agent.name,
+    inputSchema: z.object({ prompt: z.string() }),
+    execute: (input, { signal, traceId, spanId }) =>
+      agent.generate(input.prompt, { signal, traceId, parentSpanId: spanId }),
+  })
 ```
 
 workflow 中用工具(无 `createStep(tool)` 特化,ADR-0006):

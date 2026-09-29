@@ -6,12 +6,15 @@
  * Spec: `docs/architecture/agent.md`.
  */
 export { Agent } from './agent.js';
+export { resolveDynamicArgument } from './dynamic.js';
 export type {
   AgentConfig,
   AgentGenerateResult,
   AgentRunOptions,
   AgentStep,
   AgentStreamResult,
+  DynamicArgument,
+  ModelInput,
   ModelSettings,
   RequestContext,
 } from './types.js';
