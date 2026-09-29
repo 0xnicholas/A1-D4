@@ -184,3 +184,11 @@ mastra 有三个引擎,边界划在 `ExecutionEngine` 抽象类 + DefaultExecuti
 | `packages/core/src/workflows/utils.ts` | `validateWithStandardSchema`、`abortableSleep` 等 |
 | `packages/schema-compat/src/standard-schema/` | Standard Schema 双接口契约与归一化 |
 | `workflows/inngest/src/execution-engine.ts` | Inngest 引擎:接缝覆写 = Inngest 原语 |
+
+## 附:补记(实施期核对,#50,2026-09-29)
+
+实施 M3 循环与等待票([实施:循环与等待——dowhile / dountil / sleep + retries](https://github.com/0xnicholas/balsa/issues/50))时对照 `main` 分支源码复核了三处本文未钉死的细节(核对的版本可能新于本文快照版本,仅作对照):
+
+- **循环求值点**:`handlers/control-flow.ts` 的 loop 就是一条 `do { 跑 step(iterationCount: iteration + 1) } while (loopType === 'dowhile' ? isTrue : !isTrue)`——**dowhile 与 dountil 都是迭代后求值**(do-while / repeat-until,各至少一次),条件收 `result.output`(上一次输出),迭代之间检查取消。本框架裁的是 while / until(dowhile 迭代前求值、可 0 次迭代,由 #47 的 cond 类型面钉死):差异见 `docs/architecture/workflows.md` 修订(#50)。
+- **重试**:`executeStepWithRetry` 是 `for (i = 0; i < retries + 1; i++)`——`retries` = **额外尝试数**、最多 `retries + 1` 次尝试;`retryConfig` 缺省 `{ attempts: 0, delay: 0 }`,即**间隔缺省 0(立即重试)**,且等待是裸 `setTimeout`、**不可被打断**。本框架:固定间隔 1000ms、等待可被 AbortSignal 打断(见修订(#50))。
+- **sleep**:`abortableSleep`(utils.ts:230)在 abort 时 **resolve**(不 reject),负时长 `Math.max(0, …)` 钳到 0;动态时长的 fn 收**完整 step 参数包**(含 `inputData: prevOutput`,即 tip 可见),引擎把 sleep 期记为 `waiting` 状态。本框架:sleep fn 收 `RequestContext`(tip 不可见)、abort 直接以 AbortError 失败、无 waiting 状态(见修订(#50))。
