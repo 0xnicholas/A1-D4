@@ -3,6 +3,7 @@
 > 来源:wayfinder ticket #11(决策:Workflow 引擎语义)。本文件是 Workflows 子系统的架构规范。
 > 决策记录见 `docs/adr/0006-workflow-engine-semantics.md`;术语见 `CONTEXT.md`。
 > 修订(#49):控制流算子表补钉两处实施期裁决——branch 无真分支输出空 keyed 对象 `{}`(tip 值不穿透);foreach concurrency 须为正整数,迭代失败后不再开新迭代。
+> 修订(#50):循环与等待补钉实施期裁决——dowhile 条件在**迭代前**求值(条件在 tip 上为假即可 0 次迭代,块输出 = tip 原样透传)、dountil 在**迭代后**求值(至少一次);两者 `iterationCount` = 已完成迭代数(条件里抛错即最大迭代闸),块按 step id 记一条(记录 = 最后一次迭代的输出)。sleep 的动态时长 fn 收 `RequestContext`(动态参数约定,非 step 参数包;非有限数报错,负值当 0);`retries` = **额外**尝试数(最多 `retries + 1` 次),固定间隔 1000ms、可被中止打断,step 边界校验只做一次不重试,定义期须为非负整数。
 
 ## 定位
 
@@ -68,8 +69,8 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 | `.parallel([a,b])` | `Promise.all` 全并发,无并发上限;任一步失败整块失败;同步点 | `{ [step.id]: output }` |
 | `.branch([[cond,step]...])` | 按定义序求值,第一个真分支执行;各分支 IO schema 一致;无真分支时输出空 keyed 对象 `{}`(tip 值不穿透) | keyed 对象,只有一个 key 有值 |
 | `.foreach(step, {concurrency})` | 输入必须是数组;默认 concurrency=1(须为正整数);>1 用并发闸,保序收集;同步点;任一次迭代失败整块失败,失败后不再开新迭代(在飞迭代完成) | 输出数组 |
-| `.dowhile` / `.dountil(step, cond)` | 循环至条件不满足/满足;输出 = 最后一次迭代的输出 | 透传 |
-| `.sleep(ms\|fn)` | 进程内 setTimeout + AbortSignal,**非 durable**(进程死即丢);fn 动态算时长 | — |
+| `.dowhile` / `.dountil(step, cond)` | 循环至条件不满足/满足;dowhile 迭代**前**求值(可 0 次迭代)、dountil 迭代**后**求值(至少 1 次);输出 = 最后一次迭代的输出 | 透传 |
+| `.sleep(ms\|fn)` | 进程内 setTimeout + AbortSignal,**非 durable**(进程死即丢);fn 动态算时长(收 `RequestContext`) | — |
 
 ## suspend/resume 与快照
 
@@ -106,7 +107,7 @@ interface WorkflowSnapshotStore {
 ## 错误、重试与状态机
 
 - run 状态机三态:`success | failed | suspended`。sleep 期间状态保持 running(无 waiting);AbortSignal 取消落 `failed`(AbortError),不单设 canceled / tripwire。
-- `retries?: number`:step 级,固定间隔重试;backoff 策略对象留扩展位。
+- `retries?: number`:step 级,最多 `retries + 1` 次尝试、固定间隔 1000ms;重试只包 `execute`(step 边界的 IO 校验只做一次),间隔等待可被 AbortSignal 打断,最后一次的错误原样抛出;backoff 策略对象留扩展位。
 - `bail(payload)` 裁出 v1:提前成功终止用 branch 建模,后加是 minor。
 
 ## 砍单与承载缝

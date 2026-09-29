@@ -64,7 +64,11 @@ export interface Step<
   readonly resumeSchema?: TResumeSchema | undefined;
   /** `suspend(payload)` payload schema. */
   readonly suspendSchema?: TSuspendSchema | undefined;
-  /** Fixed-interval retry count for this step (`docs/architecture/workflows.md`「错误、重试与状态机」). */
+  /**
+   * Fixed-interval retry count (`docs/architecture/workflows.md`「错误、重试与状态机」): `n` buys
+   * up to `n` extra attempts at the one fixed interval (`retry.ts`), the last error surfacing
+   * verbatim when they run out. A non-negative integer; anything else is a definition error.
+   */
   readonly retries?: number | undefined;
   /** Runs the step with the schema-validated upstream value and the framework context. */
   execute(
@@ -98,7 +102,7 @@ export interface StepConfig<
   readonly resumeSchema?: TResumeSchema;
   /** `suspend(payload)` payload schema; omitted = any payload. */
   readonly suspendSchema?: TSuspendSchema;
-  /** Fixed-interval retry count; omitted = no retries. */
+  /** Fixed-interval retry count; omitted = no retries. See `Step.retries` for the exact semantics. */
   readonly retries?: number;
   /** Runs the step with the schema-validated upstream value and the framework context. */
   execute(
@@ -132,6 +136,11 @@ export function createStep<
 >(
   config: StepConfig<TId, TInputSchema, TOutputSchema, TResumeSchema, TSuspendSchema>,
 ): Step<TId, TInputSchema, TOutputSchema, TResumeSchema, TSuspendSchema> {
+  if (config.retries !== undefined && (!Number.isInteger(config.retries) || config.retries < 0)) {
+    throw new Error(
+      `createStep("${config.id}"): retries must be an integer >= 0, got ${String(config.retries)}.`,
+    );
+  }
   return Object.freeze({
     id: config.id,
     inputSchema: config.inputSchema,

@@ -115,19 +115,19 @@ export interface WorkflowBuilder<
     options?: { readonly concurrency?: number },
   ): WorkflowBuilder<TInputSchema, TOutputSchema, DataSchema<StandardSchemaV1.InferOutput<TStepOutputSchema>[]>>;
 
-  /** Loops while the condition holds; output = the last iteration's output. */
+  /** Checks the condition before each iteration and loops while it holds; output = the last iteration's output. */
   dowhile<TId extends string, TStepInputSchema extends StandardSchema, TStepOutputSchema extends StandardSchema>(
     step: Step<TId, TStepInputSchema, TStepOutputSchema>,
     cond: LoopCondition<StandardSchemaV1.InferOutput<TStepInputSchema>>,
   ): WorkflowBuilder<TInputSchema, TOutputSchema, TStepOutputSchema>;
 
-  /** Loops until the condition holds; output = the last iteration's output. */
+  /** Checks the condition after each iteration (so the step runs at least once) and loops until it holds; output = the last iteration's output. */
   dountil<TId extends string, TStepInputSchema extends StandardSchema, TStepOutputSchema extends StandardSchema>(
     step: Step<TId, TStepInputSchema, TStepOutputSchema>,
     cond: LoopCondition<StandardSchemaV1.InferOutput<TStepOutputSchema>>,
   ): WorkflowBuilder<TInputSchema, TOutputSchema, TStepOutputSchema>;
 
-  /** In-process sleep (`setTimeout` + `AbortSignal`), not durable; the chain tip is unchanged. */
+  /** In-process sleep (`setTimeout` + `AbortSignal`), not durable; the duration is a `DynamicArgument`; the chain tip is unchanged. */
   sleep(duration: SleepDuration): WorkflowBuilder<TInputSchema, TOutputSchema, TPrevSchema>;
 
   /** Freezes the definition and returns it. Before this call the chain is not runnable. */

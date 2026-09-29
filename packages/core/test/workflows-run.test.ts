@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createStep, createWorkflow } from '@balsa/core/workflows';
+import { createStep, createWorkflow, createWorkflowRun } from '@balsa/core/workflows';
 import { WorkflowValidationError } from '@balsa/core/workflows';
 import type {
   StepContext,
+  WorkflowEntry,
   WorkflowRun,
   WorkflowRunOutcome,
   WorkflowStepResultSnapshot,
@@ -532,7 +533,7 @@ describe('createRun / start 约束', () => {
     expect(workflow.createRun()).not.toBe(run);
   });
 
-  it('未实现算子条目:执行到该条目时报错点名条目类型(非静默跳过)', async () => {
+  it('未知条目类型:执行到该条目时报错点名条目类型(非静默跳过)', async () => {
     const draftExecute = vi.fn(() => ({ draft: 'x' }));
     const draft = createStep({
       id: 'draft',
@@ -540,23 +541,23 @@ describe('createRun / start 约束', () => {
       outputSchema: z.object({ draft: z.string() }),
       execute: draftExecute,
     });
-    const workflow = createWorkflow({
+    // 七算子齐备后公开面造不出未知条目(#50 落地后 walker 覆盖全部条目类型):用底层
+    // createWorkflowRun 手搓一条,钉住「解释器不认识就显式报错」的语义。
+    const forged = {
       id: 'article',
       inputSchema: topicInput,
-      outputSchema: topicInput,
-    })
-      .then(draft)
-      // 循环与 sleep 条目归 #50;本票后仍未实现的算子用它钉住「报错不静默」语义
-      .sleep(0)
-      .commit();
+      entries: [{ type: 'then', step: draft }, { type: 'map' }] as unknown as readonly WorkflowEntry[],
+    };
 
     const error = await captureRejection(async () =>
-      workflow.createRun().start({ inputData: { topic: 'ts' } }).result.then(() => undefined),
+      createWorkflowRun(forged, {})
+        .start({ inputData: { topic: 'ts' } })
+        .result.then(() => undefined),
     );
 
-    expect(error.message).toMatch(/sleep/);
+    expect(error.message).toMatch(/map/);
     expect(error.message).toMatch(/article/);
-    // then 条目先执行(报错发生在执行到未实现条目的时刻)
+    // then 条目先执行(报错发生在执行到未知条目的时刻)
     expect(draftExecute).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,11 +1,14 @@
+import { resolveDynamicArgument } from '../agent/dynamic.js';
 import type { RequestContext } from '../agent/types.js';
 import type { StandardSchema } from '../standard-schema.js';
-import type { BranchEntry, ForeachEntry, ParallelEntry } from './entry.js';
+import { abortableSleep, throwIfAborted } from './abort.js';
+import type { BranchEntry, DowhileEntry, DountilEntry, ForeachEntry, ParallelEntry, SleepEntry } from './entry.js';
 import type { WorkflowStepResultSnapshot } from './snapshot.js';
 import type { Step, StepContext } from './step.js';
 import { validateRunInput, validateStepInput } from './validate.js';
 import type { Workflow } from './workflow.js';
 import type { WorkflowRunOutcome } from './run.js';
+import { executeWithRetries } from './retry.js';
 
 /**
  * The semantic kernel (`docs/architecture/workflows.md`「Workflow 与 builder」「Run」「控制流算子」):
@@ -14,7 +17,8 @@ import type { WorkflowRunOutcome } from './run.js';
  * output becomes the next entry's value: `then` pipes a step's output through, `parallel` runs
  * every step concurrently and keys the outputs by step id, `branch` runs the first step whose
  * condition is truthy and keys the output the same way, `foreach` maps an array through one step
- * and collects an array. The loop entries (dowhile / dountil) and sleep land with #50.
+ * and collects an array, `dowhile` / `dountil` fold a step until their condition stops holding, and
+ * `sleep` waits in process for a resolved duration.
  *
  * The walker is an async generator: it currently completes with the run's outcome and yields
  * nothing — the lifecycle events (run-start / step-start / step-end / run-end) are delivered
@@ -78,10 +82,19 @@ export async function* walk(
       case 'foreach':
         value = await runForeach(state, entry, value);
         break;
-      default:
-        throw new Error(
-          `workflow "${workflow.id}": the "${entry.type}" entry has no execution semantics yet`,
-        );
+      case 'dowhile':
+      case 'dountil':
+        value = await runLoop(state, entry, value);
+        break;
+      case 'sleep':
+        await runSleep(state, entry);
+        break;
+      default: {
+        // Every entry type of the spec is handled above; this guards a hand-built definition whose
+        // entries were cast past the types (`createWorkflowRun` takes a definition directly).
+        const { type } = entry as { readonly type: string };
+        throw new Error(`workflow "${workflow.id}": unknown workflow entry type "${type}"`);
+      }
     }
     // A step that ignored the abort at least cannot let the run succeed: the boundary after it
     // re-checks, so cancellation always lands the run in `failed` (AbortError).
@@ -89,19 +102,6 @@ export async function* walk(
   }
 
   return { status: 'success', output: value, stepResults: state.stepResults };
-}
-
-/**
- * Fails the walk when the signal is aborted: the signal's own reason as the run's error (an
- * `AbortError` DOMException for a plain `abort()`), or an `AbortError` of our own when the aborter
- * left a non-Error reason. Cancellation is a failed run — never a `canceled` state of its own.
- */
-function throwIfAborted(signal: AbortSignal): void {
-  if (!signal.aborted) return;
-  const reason: unknown = signal.reason;
-  throw reason instanceof Error
-    ? reason
-    : new DOMException('This operation was aborted', 'AbortError');
 }
 
 /** The recorded output of an already-run step; `undefined` when it has no recorded result. */
@@ -135,13 +135,18 @@ function recordStep(
 
 /**
  * Executes one step without recording it: the step boundary validation happens here (the upstream
- * value through this step's input schema), and the validated value is what `execute` receives.
- * `foreach` calls this per iteration, so N runs of one step id become one aggregate record instead
- * of N overwrites.
+ * value through this step's input schema), and the validated value is what `execute` receives —
+ * validated once, then retried as a whole on failure (`step.retries`, the fixed-interval policy of
+ * `retry.ts`). `foreach` and the loops call this per iteration, so N runs of one step id become one
+ * aggregate record instead of N overwrites.
  */
 async function executeStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
   const validated = await validateStepInput(state.workflow.id, step, inputData);
-  return step.execute(stepContext(state, validated));
+  return executeWithRetries(
+    async () => step.execute(stepContext(state, validated)),
+    step.retries ?? 0,
+    state.signal,
+  );
 }
 
 /** The context bag every step `execute` — and every branch condition — receives. */
@@ -248,6 +253,94 @@ async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unkn
   }
   recordStep(state, entry.step.id, startedAt, { status: 'success', output: outputs });
   return outputs;
+}
+
+/**
+ * `.dowhile(step, cond)` / `.dountil(step, cond)` (`docs/architecture/workflows.md`「控制流算子」):
+ * the same loop with two condition checkpoints — `dowhile` checks **before** every iteration
+ * (a condition false at `iterationCount: 0` runs the step zero times, the tip passing through
+ * untouched), `dountil` checks **after** every iteration (the step always runs at least once).
+ * Either way the condition sees the value that iteration consumed / produced — the previous entry's
+ * output first, the previous iteration's output afterwards — together with `iterationCount`, the
+ * number of iterations already completed.
+ *
+ * The step's output feeds its own input on the next iteration (validated at the boundary like any
+ * other input), so the loop is a fold until the condition stops holding. Output = the last
+ * iteration's output; the block records one result under the step id, written when the loop
+ * completes (like `foreach`: the block has no id of its own, and reading the step id from inside is
+ * unrecorded).
+ *
+ * Throwing from the condition is the maximum-iteration gate: the error fails the run verbatim.
+ * `iterationCount` counts completed iterations, so `if (iterationCount >= n) throw` caps the loop
+ * at `n` iterations.
+ */
+async function runLoop(
+  state: WalkState,
+  entry: DowhileEntry | DountilEntry,
+  inputData: unknown,
+): Promise<unknown> {
+  const startedAt = Date.now();
+  let value = inputData;
+  let iterationCount = 0;
+  try {
+    for (;;) {
+      if (
+        entry.type === 'dowhile' &&
+        !(await loopConditionHolds(state, entry, value, iterationCount))
+      ) {
+        break;
+      }
+      value = await executeStep(state, entry.step, value);
+      iterationCount += 1;
+      if (
+        entry.type === 'dountil' &&
+        (await loopConditionHolds(state, entry, value, iterationCount))
+      ) {
+        break;
+      }
+    }
+  } catch (error) {
+    recordStep(state, entry.step.id, startedAt, { status: 'failed' });
+    throw error;
+  }
+  recordStep(state, entry.step.id, startedAt, { status: 'success', output: value });
+  return value;
+}
+
+/**
+ * Evaluates a loop condition: cancellation first (never hand an aborted run's loop another
+ * evaluation), then the condition with the step context bag plus `iterationCount`.
+ */
+async function loopConditionHolds(
+  state: WalkState,
+  entry: DowhileEntry | DountilEntry,
+  inputData: unknown,
+  iterationCount: number,
+): Promise<boolean> {
+  throwIfAborted(state.signal);
+  return entry.cond({ ...stepContext(state, inputData), iterationCount });
+}
+
+/**
+ * `.sleep(ms | fn)` (`docs/architecture/workflows.md`「控制流算子」「错误、重试与状态机」): an
+ * in-process wait, cut short by the run's signal. The run keeps its `running` reading while it
+ * waits — the framework has no `waiting` state — and the wait is not durable: a dying process drops
+ * it. The tip passes through untouched and nothing is recorded: a sleep is a delay, not a step.
+ *
+ * The duration is a `DynamicArgument` (`CONTEXT.md`「动态参数」): milliseconds, or a resolver the
+ * run calls with its `RequestContext` (`signal` / `runId` reachable, the agent config fields'
+ * convention) — not a step context, since a delay consumes and produces no value. It must be a
+ * finite number of milliseconds; anything else is a broken computation and fails the run loudly. A
+ * negative one — a deadline already in the past — means "no wait".
+ */
+async function runSleep(state: WalkState, entry: SleepEntry): Promise<void> {
+  const duration = await resolveDynamicArgument(entry.duration, state.requestContext);
+  if (!Number.isFinite(duration)) {
+    throw new Error(
+      `workflow "${state.workflow.id}": the sleep duration must be a finite number of milliseconds, got ${String(duration)}`,
+    );
+  }
+  await abortableSleep(Math.max(0, duration), state.signal);
 }
 
 /**

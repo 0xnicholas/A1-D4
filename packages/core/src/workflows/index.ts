@@ -14,7 +14,9 @@
  * entry list in order: `then` pipes the previous output on, `parallel` runs the steps concurrently
  * and keys the outputs by step id, `branch` runs the first step whose condition is truthy and keys
  * the output the same way, `foreach` maps an array through one step through a concurrency gate and
- * collects an array (the loop and sleep entries land with #50). IO validation (start input + every
+ * collects an array, `dowhile` / `dountil` fold a step until their condition stops holding, and
+ * `sleep` waits in process for a resolved duration. Step-level `retries` retry a failing `execute`
+ * at a fixed interval. IO validation (start input + every
  * step's input) is always on, with the schema's value replacing the raw data. Suspend/resume
  * snapshots speak the `WorkflowSnapshotStore` port (2 methods, JSON-only) — the in-memory default
  * lands with #51. Spec: `docs/architecture/workflows.md`.

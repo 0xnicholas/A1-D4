@@ -22,8 +22,11 @@ export type BranchCondition<TInputData = unknown> = (
 ) => boolean | Promise<boolean>;
 
 /**
- * A loop condition: the branch-condition bag plus `iterationCount`, so a condition can cap the
- * loop by throwing or by counting (`docs/architecture/workflows.md`「控制流算子」).
+ * A loop condition: the branch-condition bag plus `iterationCount` — the number of iterations
+ * already completed — so a condition can cap the loop by throwing or by counting
+ * (`docs/architecture/workflows.md`「控制流算子」). Its `inputData` is the value of the checkpoint:
+ * the pending input for `dowhile` (checked before each iteration), the last output for `dountil`
+ * (checked after each iteration).
  */
 export type LoopCondition<TInputData = unknown> = (
   ctx: StepContext<TInputData> & { readonly iterationCount: number },
@@ -31,8 +34,9 @@ export type LoopCondition<TInputData = unknown> = (
 
 /**
  * A sleep duration: milliseconds, or a `DynamicArgument` resolver — the framework's dynamic
- * argument convention (`CONTEXT.md`「动态参数」), resolved per run against the request context so
- * the `signal` reaches it.
+ * argument convention (`CONTEXT.md`「动态参数」), resolved once per sleep entry against the run's
+ * request context so the `signal` reaches it. The tip is not visible to it: a delay consumes and
+ * produces no value.
  */
 export type SleepDuration = DynamicArgument<number>;
 
@@ -68,14 +72,14 @@ export interface ForeachEntry {
   readonly concurrency: number;
 }
 
-/** `.dowhile(step, cond)`: run while the condition holds; output = the last iteration's output. */
+/** `.dowhile(step, cond)`: condition before each iteration (false at the tip = zero iterations); output = the last iteration's output. */
 export interface DowhileEntry {
   readonly type: 'dowhile';
   readonly step: Step;
   readonly cond: LoopCondition;
 }
 
-/** `.dountil(step, cond)`: run until the condition holds; output = the last iteration's output. */
+/** `.dountil(step, cond)`: condition after each iteration (so it runs at least once); output = the last iteration's output. */
 export interface DountilEntry {
   readonly type: 'dountil';
   readonly step: Step;
