@@ -12,11 +12,10 @@ one workflow over a real OpenAI model and walks three acts:
 1. **Start — the front runs, the memo is drafted, the gate suspends.** A `foreach` checks the line
    items against the per-item cap through a concurrency gate, a `parallel` runs the policy and
    budget audits at once, a `branch` picks the review lane, and a hand-written one-line agent step
-   drafts the approval memo.
-   The gate step then calls `suspend({ question, memo })`: the run unwinds at that entry, the
-   envelope lands `suspended`, and the engine writes its snapshot. The act consumes the run's
-   lifecycle event stream (`for await`) *and* its settled envelope (`await out.result`) from the
-   same execution.
+   drafts the approval memo. The gate step then calls `suspend({ question, memo })`: the run unwinds
+   at that entry, the envelope lands `suspended`, and the engine writes its snapshot. The act
+   consumes the run's lifecycle event stream (`for await`) *and* its settled envelope
+   (`await out.result`) from the same execution.
 2. **The snapshot — what a resume needs.** A snapshot store is a port: any object with `load` /
    `save`. The example decorates the core's in-memory default with a write log, so the engine's
    fixed persistence moments are visible (one `running` snapshot per completed entry, one
