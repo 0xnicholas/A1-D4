@@ -1,6 +1,8 @@
 import type { Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { BranchCondition, LoopCondition, SleepDuration, WorkflowEntry } from './entry.js';
+import { createWorkflowRun } from './run.js';
+import type { WorkflowCreateRunOptions, WorkflowRun } from './run.js';
 import type { WorkflowSnapshotStore } from './snapshot.js';
 import type { Step } from './step.js';
 
@@ -41,7 +43,7 @@ export interface WorkflowConfig<
 /**
  * The committed workflow — what `.commit()` returns: the frozen definition the walker reads. A
  * builder is not runnable; `createRun` can only ever exist here (the type-state enforces "no run
- * before commit"), landing in #48.
+ * before commit").
  */
 export interface Workflow<
   TInputSchema extends StandardSchema = StandardSchema,
@@ -59,6 +61,16 @@ export interface Workflow<
   readonly storage: WorkflowSnapshotStore | undefined;
   /** The frozen, flat entry list the walker interprets. */
   readonly entries: readonly WorkflowEntry[];
+  /**
+   * Creates a run of this workflow (`docs/architecture/workflows.md`「Run」): identity now, execution
+   * on `start`. The workflow's declared IO schemas type the run's input and output.
+   */
+  createRun(
+    options?: WorkflowCreateRunOptions,
+  ): WorkflowRun<
+    StandardSchemaV1.InferInput<TInputSchema>,
+    StandardSchemaV1.InferOutput<TOutputSchema>
+  >;
 }
 
 /**
@@ -181,13 +193,18 @@ export function createWorkflow<
     const existing = committed;
     if (existing !== undefined) return existing;
     for (const entry of entries) freezeEntry(entry);
-    const definition: Workflow<TInputSchema, TOutputSchema> = Object.freeze({
+    const base = {
       id: config.id,
       inputSchema: config.inputSchema,
       outputSchema: config.outputSchema,
       tracer: config.tracer,
       storage: config.storage,
       entries: Object.freeze(entries),
+    };
+    const definition: Workflow<TInputSchema, TOutputSchema> = Object.freeze({
+      ...base,
+      createRun: (options?: WorkflowCreateRunOptions) =>
+        createWorkflowRun<TInputSchema, StandardSchemaV1.InferOutput<TOutputSchema>>(base, options),
     });
     committed = definition;
     return definition;

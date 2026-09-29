@@ -6,14 +6,28 @@
  * `createWorkflow` builder whose seven operators (then / parallel / branch / foreach / dowhile /
  * dountil / sleep) each push one flat `{ type, … }` entry until `.commit()` freezes the
  * definition. Type safety rides a type-state: `then` is strict, parallel/branch infer keyed
- * objects. Suspend/resume snapshots speak the `WorkflowSnapshotStore` port (2 methods,
- * JSON-only) — the in-memory default lands with #51; the walker and run surface with #48.
- * Spec: `docs/architecture/workflows.md`.
+ * objects.
+ *
+ * The run surface: a committed workflow's `createRun` gives a run identity, and `start` returns
+ * the output object whose `result` resolves the run's outcome envelope (or rejects when the run
+ * fails). Start is lazy — the walker executes on the first read. IO validation (start input +
+ * every step's input) is always on, with the schema's value replacing the raw data.
+ * Suspend/resume snapshots speak the `WorkflowSnapshotStore` port (2 methods, JSON-only) — the
+ * in-memory default lands with #51. Spec: `docs/architecture/workflows.md`.
  */
 export { createStep } from './step.js';
 export type { Step, StepConfig, StepContext } from './step.js';
 export { createWorkflow } from './workflow.js';
 export type { Workflow, WorkflowBuilder, WorkflowConfig } from './workflow.js';
+export { createWorkflowRun } from './run.js';
+export type {
+  WorkflowCreateRunOptions,
+  WorkflowRun,
+  WorkflowRunOutcome,
+  WorkflowRunOutput,
+  WorkflowStartOptions,
+} from './run.js';
+export { WorkflowValidationError } from './validate.js';
 export type {
   BranchCondition,
   BranchEntry,

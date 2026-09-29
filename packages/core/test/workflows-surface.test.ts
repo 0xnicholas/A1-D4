@@ -268,7 +268,7 @@ describe('createWorkflow:builder 七算子条目化 + commit 冻结', () => {
     ]);
   });
 
-  it('commit:返回冻结的普通对象,定义字段原样(tracer / storage 挂接点在位)', () => {
+  it('commit:返回冻结的普通对象,定义字段原样(tracer / storage 挂接点、createRun 运行面在位)', () => {
     const tracer = createTracer({ exporters: [] });
     const storage: WorkflowSnapshotStore = {
       load: async () => null,
@@ -279,6 +279,7 @@ describe('createWorkflow:builder 七算子条目化 + commit 冻结', () => {
     expect(Object.isFrozen(wf)).toBe(true);
     expect(Object.getPrototypeOf(wf)).toBe(Object.prototype);
     expect(Object.keys(wf).sort()).toEqual([
+      'createRun',
       'entries',
       'id',
       'inputSchema',
@@ -286,6 +287,7 @@ describe('createWorkflow:builder 七算子条目化 + commit 冻结', () => {
       'storage',
       'tracer',
     ]);
+    expect(wf.createRun).toBeTypeOf('function');
     expect(wf.id).toBe('article');
     expect(wf.inputSchema).toBe(inputSchema);
     expect(wf.outputSchema).toBe(outputSchema);
