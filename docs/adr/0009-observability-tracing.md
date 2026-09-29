@@ -19,5 +19,6 @@
 - `gen_ai.*` 映射层须跟随 semconv 演进(全 Development),变更被关在 OTLP 能力包内;核心模型不随动。
 - 采样判定只在 root span;`NoOpSpan` 传播是埋点代码无分支的前提,所有自动埋点必须经 tracer API,不自建旁路。
 - OTel bridge 与 metrics 均为后加位:bridge 待路线图阶段判断(雾区),metrics 真要做时 exporter 加回调是向后兼容。
+- **修订(M2-05 #42)**:自动埋点由五边界增为七边界——memory recall / save 各成一个普通 span(新常量 `memory-recall` / `memory-save`,additive,归 minor):recall 挂 `agent-run` 下(每 run 一次)、save 挂 `agent-step` 下(每 step 一次)。run span 相应先于 recall 创建,其 input(处理器处理后的 prompt)以一次 `span_updated` 落定。细节见 `docs/architecture/observability.md`。
 
 (来源:wayfinder ticket #14)

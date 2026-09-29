@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
+  MEMORY_RECALL_SPAN,
+  MEMORY_SAVE_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
@@ -10,6 +12,8 @@ import type {
   AgentRunAttributes,
   AgentStepAttributes,
   ExportedSpan,
+  MemoryRecallAttributes,
+  MemorySaveAttributes,
   Span,
   SpanAttributes,
   SpanError,
@@ -24,7 +28,7 @@ import type {
 import { expectAssignable } from './helpers/assertions.js';
 
 /**
- * 观测内核的类型表面(M1-08 #29):Span / ExportedSpan 形状与 5 类型常量、采样四档、processor 签名、
+ * 观测内核的类型表面(M1-08 #29):Span / ExportedSpan 形状与 7 类型常量、采样四档、processor 签名、
  * startSpan 选项都在公开面导出且形状正确——编译期断言,运行时只留最小声明性检查。
  */
 describe('观测内核类型表面', () => {
@@ -74,7 +78,7 @@ describe('观测内核类型表面', () => {
     expect(exported.id).toBe('1a2b3c4d5e6f7a8b');
   });
 
-  it('attributes 按 5 个框架类型各自的形状 + 开放袋', () => {
+  it('attributes 按 7 个框架类型各自的形状 + 开放袋', () => {
     expectAssignable<AgentRunAttributes>({ agentName: 'assistant', runId: 'run-1' });
     expectAssignable<AgentStepAttributes>({
       model: 'gpt-4o',
@@ -86,23 +90,31 @@ describe('观测内核类型表面', () => {
     });
     expectAssignable<ToolCallAttributes>({ toolCallId: 'call-1' });
     expectAssignable<WorkflowRunAttributes>({ workflowId: 'w-1' });
+    expectAssignable<MemoryRecallAttributes>({ threadId: 'thread-1' });
+    expectAssignable<MemorySaveAttributes>({ threadId: 'thread-1', resourceId: 'user-1' });
 
     expectAssignable<SpanAttributes>({ agentName: 'assistant' });
     expectAssignable<SpanAttributes>({ model: 'gpt-4o', provider: 'openai' });
     expectAssignable<SpanAttributes>({ toolCallId: 'call-1' });
     expectAssignable<SpanAttributes>({ workflowId: 'w-1' });
+    expectAssignable<SpanAttributes>({ threadId: 'thread-1' });
+    expectAssignable<SpanAttributes>({ threadId: 'thread-1', resourceId: 'user-1' });
     // workflow-step 的空属性与用户自建 span 的开放袋
     expectAssignable<SpanAttributes>({});
     expectAssignable<SpanAttributes>({ anything: 1 });
 
     // @ts-expect-error agent-step 缺 provider
     expectAssignable<AgentStepAttributes>({ model: 'gpt-4o' });
+    // @ts-expect-error memory-save 缺 resourceId
+    expectAssignable<MemorySaveAttributes>({ threadId: 'thread-1' });
   });
 
   it('startSpan 选项:type 开放字符串,name 必填', () => {
     expectAssignable<StartSpanOptions>({ name: 'a', type: AGENT_RUN_SPAN });
     expectAssignable<StartSpanOptions>({ name: 'a', type: AGENT_STEP_SPAN, parent: null as unknown as Span });
     expectAssignable<StartSpanOptions>({ name: 'a', type: TOOL_CALL_SPAN, input: 1, output: 2 });
+    expectAssignable<StartSpanOptions>({ name: 'a', type: MEMORY_RECALL_SPAN, parent: null as unknown as Span });
+    expectAssignable<StartSpanOptions>({ name: 'a', type: MEMORY_SAVE_SPAN, input: [], output: [] });
     expectAssignable<StartSpanOptions>({ name: 'a', type: 'my-own-type', isEvent: true });
     expectAssignable<StartSpanOptions>({
       name: 'a',

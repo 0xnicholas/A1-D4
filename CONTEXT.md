@@ -93,7 +93,7 @@ _Avoid_: short-term memory、chat history 作术语
 _Avoid_: long-term memory(向量召回、后台压缩类"长期记忆"机制不在核心,经能力包桥接)
 
 **Span**:
-观测域的单个操作记录:自有最小形状(id / 32-hex traceId / parentSpanId / name / type / 起止时间 / 一等公民 input/output / attributes / metadata / error / isEvent),非 OTel span——OTel 映射只发生在 OTLP 能力包。框架只写 5 个类型常量(agent-run / agent-step / tool-call / workflow-run / workflow-step),type 字段开放给用户自定义。
+观测域的单个操作记录:自有最小形状(id / 32-hex traceId / parentSpanId / name / type / 起止时间 / 一等公民 input/output / attributes / metadata / error / isEvent),非 OTel span——OTel 映射只发生在 OTLP 能力包。框架只写 7 个类型常量(agent-run / agent-step / tool-call / workflow-run / workflow-step / memory-recall / memory-save),type 字段开放给用户自定义。
 _Avoid_: OTel span 作内核概念、metrics/logs 信号(v1 只定 tracing)
 
 **Tracer**:

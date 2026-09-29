@@ -13,7 +13,7 @@ import type {
 import { modelChainExhausted } from '../model/fallback.js';
 import type { ModelFallbackFailure } from '../model/fallback.js';
 import { normalizeStream } from '../model/normalize.js';
-import { AGENT_RUN_SPAN, AGENT_STEP_SPAN, TOOL_CALL_SPAN } from '../observability/index.js';
+import { AGENT_STEP_SPAN, MEMORY_SAVE_SPAN, TOOL_CALL_SPAN } from '../observability/index.js';
 import type { Span, Tracer } from '../observability/index.js';
 import { formatIssues, messageOf, validateSchema } from '../standard-schema-runtime.js';
 import type { Memory, MemoryThreadRef } from '../memory/index.js';
@@ -45,8 +45,6 @@ export interface AgentLoopOptions {
   readonly maxSteps: number;
   /** The run's processors, in declaration order (`AgentConfig.processors`); empty = none. */
   readonly processors: readonly Processor[];
-  /** The agent's name — the name of the run's span and its `agentName` attribute. */
-  readonly agentName: string;
   /**
    * The run's memory wiring — present only when the run reads and writes memory (`AgentConfig.memory`
    * resolved plus the per-call identity). `undefined` = the loop does no memory I/O at all.
@@ -65,7 +63,8 @@ export interface AgentLoopOptions {
   /**
    * The run's observability wiring, present only when a tracer is attached (`AgentConfig.tracer`).
    * Absent = the whole observability subsystem stays out of the loop: no span object is created
-   * anywhere in it.
+   * anywhere in it. The wiring's root span is created by the agent (it has to exist before memory
+   * recall); the loop hangs its own span boundaries — step, tool call, memory save — under it.
    */
   readonly tracing?: AgentTracing | undefined;
   /** The user's `modelSettings` passthrough, recorded on the step span as `parameters`. */
@@ -92,21 +91,17 @@ export interface AgentRunMemory {
 }
 
 /**
- * The observability wiring of one run: the tracer plus the per-run options that only mean
- * something with one. Grouped rather than flat so the loop's zero-overhead branch is a single
- * presence check, and the trace/hiding options cannot travel without their tracer.
+ * The observability wiring of one run (`docs/architecture/observability.md`「自动埋点」): the tracer
+ * plus the run's root span. The agent creates it before memory recall — the root span has to exist
+ * for the recall span to hang under it — and owns its lifecycle (error / end) at the run boundary;
+ * the loop hangs its step / tool / memory-save spans under it and reports the run's terminal output
+ * on it. Grouped rather than flat so the loop's zero-overhead branch is a single presence check.
  */
 export interface AgentTracing {
-  /** The tracer injected into the agent; span creation is the loop's only observability work. */
+  /** The tracer injected into the agent; every child span of the run is started through it. */
   readonly tracer: Tracer;
-  /** The trace to continue (`AgentRunOptions.traceId`), when the run attaches to one. */
-  readonly traceId?: string | undefined;
-  /** The parent span inside the continued trace (requires `traceId`). */
-  readonly parentSpanId?: string | undefined;
-  /** Per-run `hideInput` override, decided on the run's root span and inherited by its children. */
-  readonly hideInput?: boolean | undefined;
-  /** Per-run `hideOutput` override (see `hideInput`). */
-  readonly hideOutput?: boolean | undefined;
+  /** The run's root span (`agent-run`) — the parent every child span of the run hangs under. */
+  readonly runSpan: Span;
 }
 
 /**
@@ -160,9 +155,9 @@ export async function* runAgentLoop(
   const prompt: ModelMessage[] = [...options.prompt];
   /** The run's authoritative step records — the processors' rewrites included. */
   const steps: AgentStep[] = [];
-  // The run boundary: one root span per run, the parent every step span hangs under. Absent tracer
-  // ⇒ `undefined`, and no span is ever created — the loop's only zero-overhead branch.
-  const runSpan = startRunSpan(options);
+  // The run's root span, created by the agent before memory recall; `undefined` without a tracer —
+  // the loop's only zero-overhead branch, and no child span object is ever created below it.
+  const runSpan = options.tracing?.runSpan;
   /**
    * The terminal reason of the step that ended the run — set by the step whose tools left nothing
    * pending, or by the cap's last step. The run's terminal values are built after the loop, outside
@@ -172,253 +167,263 @@ export async function* runAgentLoop(
    */
   let settled: FinishReason | undefined;
 
-  try {
-    for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
-      const stepStartedAt = Date.now();
-      let timeToFirstChunk: number | undefined;
-      let finish: FinishChunk | undefined;
-      const stepText: string[] = [];
-      const toolCalls: ToolCallChunk[] = [];
-      /** Tool call ids that already have a result in this step (provider-executed). */
-      const answered = new Set<string>();
-      /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
-      const providerResults: ToolResultChunk[] = [];
-      /** The candidates that failed before producing a chunk, in chain order. */
-      const failures: ModelFallbackFailure[] = [];
-      /**
-       * The candidate that served this step, with its finish chunk. Set when a candidate completes
-       * (its stream ended with a finish part); its span stays open until the step's tools have run.
-       */
-      let served: { readonly span: Span | undefined; readonly finish: FinishChunk } | undefined;
+  for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
+    const stepStartedAt = Date.now();
+    let timeToFirstChunk: number | undefined;
+    let finish: FinishChunk | undefined;
+    const stepText: string[] = [];
+    const toolCalls: ToolCallChunk[] = [];
+    /** Tool call ids that already have a result in this step (provider-executed). */
+    const answered = new Set<string>();
+    /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
+    const providerResults: ToolResultChunk[] = [];
+    /** The candidates that failed before producing a chunk, in chain order. */
+    const failures: ModelFallbackFailure[] = [];
+    /**
+     * The candidate that served this step, with its finish chunk. Set when a candidate completes
+     * (its stream ended with a finish part); its span stays open until the step's tools have run.
+     */
+    let served: { readonly span: Span | undefined; readonly finish: FinishChunk } | undefined;
 
-      // The step boundary: one span per model call, hanging under the run's root span — a fallback
-      // chain's failed attempts get their own spans, so a switch is visible in the trace, and the
-      // attempt that serves the step carries its usage / finishReason. Every attempt walks the
-      // chain in array order. Tool calls of the step hang under the serving attempt's span, so that
-      // span stays open until they are done too.
-      for (const candidate of models) {
-        const candidateSpan = startStepSpan(options, runSpan, prompt, candidate);
-        let producedChunk = false;
-
-        try {
-          const { stream } = await candidate.doStream({ ...callOptions, prompt });
-
-          for await (const chunk of normalizeStream(stream)) {
-            // Point of no return for this step: a chunk is on its way to the caller, so a later
-            // failure must propagate — the next candidate would continue someone else's answer.
-            producedChunk = true;
-            if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
-            switch (chunk.type) {
-              case 'text-delta':
-                stepText.push(chunk.textDelta);
-                yield chunk;
-                break;
-              case 'tool-call':
-                toolCalls.push(chunk);
-                yield chunk;
-                break;
-              case 'tool-result':
-                // A result already in the step's stream is provider-executed: it is echoed in the
-                // assistant message and never executed by the framework.
-                answered.add(chunk.toolCallId);
-                providerResults.push(chunk);
-                yield chunk;
-                break;
-              case 'finish':
-                // The step ends here, but the decision needs the whole step: yield it below.
-                finish = chunk;
-                break;
-            }
-          }
-
-          if (finish === undefined) {
-            // A step's model stream without a finish part is a contract violation; failing here also
-            // covers later steps, which must not settle the run on a previous step's finish chunk.
-            throw missingFinishError();
-          }
-
-          served = { span: candidateSpan, finish };
-          break;
-        } catch (error) {
-          // Cancellation is the run's outcome, not a chain failure and not a processor's business:
-          // an aborted run surfaces its own reason untouched (`processError` is for provider errors).
-          if (requestContext.signal.aborted) {
-            candidateSpan?.error(error);
-            throw error;
-          }
-          // A mid-stream failure cannot fall back — partial output has already reached the caller:
-          // it surfaces through `processError`, which may replace the error the run ends with.
-          if (producedChunk) {
-            const surfaced = await runProcessError(
-              processors,
-              error,
-              { source: 'model', stepIndex },
-              requestContext,
-            );
-            candidateSpan?.error(surfaced);
-            throw surfaced;
-          }
-          candidateSpan?.error(error);
-          failures.push({ model: candidate, error });
-        } finally {
-          // A candidate that did not serve the step is over here: its span carries the failure (or
-          // the abandoned attempt) and closes. The serving candidate's span stays open for its
-          // tools, which hang under it.
-          if (served === undefined) candidateSpan?.end();
-        }
-      }
-
-      if (served === undefined) {
-        // Every candidate failed before producing a chunk: the run ends here — with the original
-        // error when there was nothing to fall back to, with the chain's context when there was.
-        // The surfaced error walks the processors' error chain before it becomes the run's error.
-        throw await runProcessError(
-          processors,
-          modelChainExhausted(failures),
-          { source: 'model', stepIndex },
-          requestContext,
-        );
-      }
-
-      const { span: stepSpan, finish: stepFinish } = served;
+    // The step boundary: one span per model call, hanging under the run's root span — a fallback
+    // chain's failed attempts get their own spans, so a switch is visible in the trace, and the
+    // attempt that serves the step carries its usage / finishReason. Every attempt walks the
+    // chain in array order. Tool calls of the step hang under the serving attempt's span, so that
+    // span stays open until they are done too.
+    for (const candidate of models) {
+      const candidateSpan = startStepSpan(options, prompt, candidate);
+      let producedChunk = false;
 
       try {
-        // The step is complete: its text is the run's output so far (the last step's text settles
-        // the run's output — `stream()`'s `text` reads the same rule).
-        stepSpan?.update({
-          output: stepText.join(''),
-          attributes: {
-            usage: stepFinish.usage,
-            finishReason: stepFinish.finishReason,
-            ...(timeToFirstChunk === undefined ? {} : { timeToFirstChunk }),
-          },
-        });
+        const { stream } = await candidate.doStream({ ...callOptions, prompt });
 
-        const pending = toolCalls.filter((call) => !answered.has(call.toolCallId));
-        const lastStep = stepIndex + 1 >= maxSteps;
-        // The step boundary comes before the framework-executed results: consumers see the model's
-        // finish, then the results that answer the step's calls (results belong to that step).
-        const terminalFinish: FinishChunk =
-          pending.length > 0 && lastStep ? { ...stepFinish, finishReason: 'tool-calls' } : stepFinish;
-        yield terminalFinish;
-
-        const results: ToolResultChunk[] = [];
-        for (const call of pending) {
-          const toolSpan = startToolCallSpan(options, stepSpan, call);
-          const outcome = await executeToolCall(tools, call, requestContext, toolSpan);
-          let result: ToolResultChunk;
-          if ('result' in outcome) {
-            result = outcome.result;
-          } else {
-            // The failure walks the processors' error chain before the error tool result is built;
-            // the replacement is the error the model sees (and the span records).
-            const failure = await runProcessError(
-              processors,
-              outcome.failure.error,
-              { source: 'tool', stepIndex, toolCall: call },
-              requestContext,
-            );
-            result = toolResult(call, outcome.failure.toMessage(failure), true);
-            toolSpan?.error(failure);
+        for await (const chunk of normalizeStream(stream)) {
+          // Point of no return for this step: a chunk is on its way to the caller, so a later
+          // failure must propagate — the next candidate would continue someone else's answer.
+          producedChunk = true;
+          if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
+          switch (chunk.type) {
+            case 'text-delta':
+              stepText.push(chunk.textDelta);
+              yield chunk;
+              break;
+            case 'tool-call':
+              toolCalls.push(chunk);
+              yield chunk;
+              break;
+            case 'tool-result':
+              // A result already in the step's stream is provider-executed: it is echoed in the
+              // assistant message and never executed by the framework.
+              answered.add(chunk.toolCallId);
+              providerResults.push(chunk);
+              yield chunk;
+              break;
+            case 'finish':
+              // The step ends here, but the decision needs the whole step: yield it below.
+              finish = chunk;
+              break;
           }
-          toolSpan?.update({ output: result.output });
-          toolSpan?.end();
-          results.push(result);
-          yield result;
         }
 
-        // The step is over: its full record (text / tool calls / tool results / usage) goes through
-        // the processors, and the record they return is the run's authoritative one — it settles
-        // the run's terminal values and is what the next prompt (and memory) is built from.
-        const record = await runProcessOutputStep(
-          processors,
-          {
-            text: stepText.join(''),
-            toolCalls,
-            toolResults: [...providerResults, ...results],
-            usage: stepFinish.usage,
-          },
-          stepIndex,
-          requestContext,
-        );
-        steps.push(record);
-        // The run span carries the run's terminal text — the processed record, same as the output
-        // object's `text` (`observability.md`「自动埋点」; the step span keeps the model's response).
-        runSpan?.update({ output: record.text });
-
-        // Memory save (`memory.md`「消息历史」时机): once per completed step, after
-        // `processOutputStep` — a processor's rewrite (redaction) is what lands in storage — with
-        // the run's own input messages carried by the first step's save. A run with no memory
-        // wiring does no I/O here at all.
-        if (loopMemory !== undefined) {
-          const stepMessages = toStepMessages(record, answered);
-          await loopMemory.memory.save({
-            thread: loopMemory.thread,
-            resource: loopMemory.resource,
-            messages:
-              stepIndex === 0 ? [...loopMemory.inputMessages, ...stepMessages] : stepMessages,
-          });
+        if (finish === undefined) {
+          // A step's model stream without a finish part is a contract violation; failing here also
+          // covers later steps, which must not settle the run on a previous step's finish chunk.
+          throw missingFinishError();
         }
 
-        if (pending.length === 0 || lastStep) {
-          settled = terminalFinish.finishReason;
-          break;
-        }
-
-        // Provider-executed results stay paired with their calls inside the assistant message;
-        // framework-executed ones follow in the `tool` message (the vendor-shaped split, from the
-        // processed record — a processor's rewrite is what the next model call sees).
-        prompt.push(...toStepMessages(record, answered));
+        served = { span: candidateSpan, finish };
+        break;
       } catch (error) {
-        stepSpan?.error(error);
-        throw error;
+        // Cancellation is the run's outcome, not a chain failure and not a processor's business:
+        // an aborted run surfaces its own reason untouched (`processError` is for provider errors).
+        if (requestContext.signal.aborted) {
+          candidateSpan?.error(error);
+          throw error;
+        }
+        // A mid-stream failure cannot fall back — partial output has already reached the caller:
+        // it surfaces through `processError`, which may replace the error the run ends with.
+        if (producedChunk) {
+          const surfaced = await runProcessError(
+            processors,
+            error,
+            { source: 'model', stepIndex },
+            requestContext,
+          );
+          candidateSpan?.error(surfaced);
+          throw surfaced;
+        }
+        candidateSpan?.error(error);
+        failures.push({ model: candidate, error });
       } finally {
-        stepSpan?.end();
+        // A candidate that did not serve the step is over here: its span carries the failure (or
+        // the abandoned attempt) and closes. The serving candidate's span stays open for its
+        // tools, which hang under it.
+        if (served === undefined) candidateSpan?.end();
       }
     }
 
-    if (settled === undefined) {
-      // Unreachable: `maxSteps` is at least 1, so the last iteration always takes the terminal
-      // branch — its step set `settled`, or it ran that step's tools first and then did.
-      throw new Error('The agent loop ended without settling its run.');
+    if (served === undefined) {
+      // Every candidate failed before producing a chunk: the run ends here — with the original
+      // error when there was nothing to fall back to, with the chain's context when there was.
+      // The surfaced error walks the processors' error chain before it becomes the run's error.
+      throw await runProcessError(
+        processors,
+        modelChainExhausted(failures),
+        { source: 'model', stepIndex },
+        requestContext,
+      );
     }
 
-    const outcome = await runOutcome(steps, settled, structuredOutput);
-    // A structured run's span reports the structured result — it is what the caller consumes
-    // (`observability.md`「自动埋点」: agent-run output is the terminal text or the structured result).
-    if (structuredOutput !== undefined) runSpan?.update({ output: outcome.object });
-    return outcome;
-  } catch (error) {
-    // A failed run leaves its root span carrying the error (a failed step also carries it on its
-    // own step span; a structured-output failure has no failing step — the run did not meet its
-    // output contract).
-    runSpan?.error(error);
-    throw error;
-  } finally {
-    // Ends the run span on every exit path — normal completion, a model error, or the consumer
-    // abandoning the generator.
-    runSpan?.end();
+    const { span: stepSpan, finish: stepFinish } = served;
+
+    try {
+      // The step is complete: its text is the run's output so far (the last step's text settles
+      // the run's output — `stream()`'s `text` reads the same rule).
+      stepSpan?.update({
+        output: stepText.join(''),
+        attributes: {
+          usage: stepFinish.usage,
+          finishReason: stepFinish.finishReason,
+          ...(timeToFirstChunk === undefined ? {} : { timeToFirstChunk }),
+        },
+      });
+
+      const pending = toolCalls.filter((call) => !answered.has(call.toolCallId));
+      const lastStep = stepIndex + 1 >= maxSteps;
+      // The step boundary comes before the framework-executed results: consumers see the model's
+      // finish, then the results that answer the step's calls (results belong to that step).
+      const terminalFinish: FinishChunk =
+        pending.length > 0 && lastStep ? { ...stepFinish, finishReason: 'tool-calls' } : stepFinish;
+      yield terminalFinish;
+
+      const results: ToolResultChunk[] = [];
+      for (const call of pending) {
+        const toolSpan = startToolCallSpan(options, stepSpan, call);
+        const outcome = await executeToolCall(tools, call, requestContext, toolSpan);
+        let result: ToolResultChunk;
+        if ('result' in outcome) {
+          result = outcome.result;
+        } else {
+          // The failure walks the processors' error chain before the error tool result is built;
+          // the replacement is the error the model sees (and the span records).
+          const failure = await runProcessError(
+            processors,
+            outcome.failure.error,
+            { source: 'tool', stepIndex, toolCall: call },
+            requestContext,
+          );
+          result = toolResult(call, outcome.failure.toMessage(failure), true);
+          toolSpan?.error(failure);
+        }
+        toolSpan?.update({ output: result.output });
+        toolSpan?.end();
+        results.push(result);
+        yield result;
+      }
+
+      // The step is over: its full record (text / tool calls / tool results / usage) goes through
+      // the processors, and the record they return is the run's authoritative one — it settles
+      // the run's terminal values and is what the next prompt (and memory) is built from.
+      const record = await runProcessOutputStep(
+        processors,
+        {
+          text: stepText.join(''),
+          toolCalls,
+          toolResults: [...providerResults, ...results],
+          usage: stepFinish.usage,
+        },
+        stepIndex,
+        requestContext,
+      );
+      steps.push(record);
+      // The run span carries the run's terminal text — the processed record, same as the output
+      // object's `text` (`observability.md`「自动埋点」; the step span keeps the model's response).
+      runSpan?.update({ output: record.text });
+
+      // Memory save (`memory.md`「消息历史」时机): once per completed step, after
+      // `processOutputStep` — a processor's rewrite (redaction) is what lands in storage — with
+      // the run's own input messages carried by the first step's save. A run with no memory
+      // wiring does no I/O here at all; with one, the save gets its own `memory-save` span under
+      // the step's span (`observability.md`「自动埋点」).
+      if (loopMemory !== undefined) {
+        const stepMessages = toStepMessages(record, answered);
+        await saveStepMessages(
+          loopMemory,
+          stepIndex === 0 ? [...loopMemory.inputMessages, ...stepMessages] : stepMessages,
+          stepSpan,
+          options.tracing,
+        );
+      }
+
+      if (pending.length === 0 || lastStep) {
+        settled = terminalFinish.finishReason;
+        break;
+      }
+
+      // Provider-executed results stay paired with their calls inside the assistant message;
+      // framework-executed ones follow in the `tool` message (the vendor-shaped split, from the
+      // processed record — a processor's rewrite is what the next model call sees).
+      prompt.push(...toStepMessages(record, answered));
+    } catch (error) {
+      stepSpan?.error(error);
+      throw error;
+    } finally {
+      stepSpan?.end();
+    }
   }
+
+  if (settled === undefined) {
+    // Unreachable: `maxSteps` is at least 1, so the last iteration always takes the terminal
+    // branch — its step set `settled`, or it ran that step's tools first and then did.
+    throw new Error('The agent loop ended without settling its run.');
+  }
+
+  const outcome = await runOutcome(steps, settled, structuredOutput);
+  // A structured run's span reports the structured result — it is what the caller consumes
+  // (`observability.md`「自动埋点」: agent-run output is the terminal text or the structured result).
+  if (structuredOutput !== undefined) runSpan?.update({ output: outcome.object });
+  return outcome;
 }
 
 /**
- * Starts the run's root span (`docs/architecture/observability.md`「自动埋点」): the run boundary.
- * `runId` rides on the root span's attributes, so execution identity and trace identity can look
- * each other up; `traceId` / `parentSpanId` continue a trace started elsewhere.
+ * Persists one step's messages (`docs/architecture/memory.md`「消息历史」时机), wrapped in the
+ * step's `memory-save` span (`docs/architecture/observability.md`「自动埋点」): the span hangs under
+ * the span of the step that produced the messages — the explicit parent passed down, no
+ * AsyncLocalStorage — carrying the batch as input and the messages as persisted (envelope
+ * included) as output. A failed save records the error on the span and propagates, so the run
+ * fails with it; without a tracer the save runs directly and no span object is created.
  */
-function startRunSpan(options: AgentLoopOptions): Span | undefined {
-  const tracing = options.tracing;
-  if (tracing === undefined) return undefined;
-  return tracing.tracer.startSpan({
-    name: options.agentName,
-    type: AGENT_RUN_SPAN,
-    input: options.prompt,
-    attributes: { agentName: options.agentName, runId: options.requestContext.runId },
-    ...(tracing.traceId === undefined ? {} : { traceId: tracing.traceId }),
-    ...(tracing.parentSpanId === undefined ? {} : { parentSpanId: tracing.parentSpanId }),
-    ...(tracing.hideInput === undefined ? {} : { hideInput: tracing.hideInput }),
-    ...(tracing.hideOutput === undefined ? {} : { hideOutput: tracing.hideOutput }),
+async function saveStepMessages(
+  loopMemory: AgentRunMemory,
+  messages: readonly ModelMessage[],
+  stepSpan: Span | undefined,
+  tracing: AgentTracing | undefined,
+): Promise<void> {
+  const save = () =>
+    loopMemory.memory.save({
+      thread: loopMemory.thread,
+      resource: loopMemory.resource,
+      messages,
+    });
+  if (tracing === undefined) {
+    await save();
+    return;
+  }
+  const span = tracing.tracer.startSpan({
+    name: loopMemory.threadId,
+    type: MEMORY_SAVE_SPAN,
+    ...(stepSpan === undefined ? {} : { parent: stepSpan }),
+    input: messages,
+    attributes: { threadId: loopMemory.threadId, resourceId: loopMemory.resource },
   });
+  try {
+    span.update({ output: await save() });
+  } catch (error) {
+    span.error(error);
+    throw error;
+  } finally {
+    span.end();
+  }
 }
 
 /**
@@ -431,7 +436,6 @@ function startRunSpan(options: AgentLoopOptions): Span | undefined {
  */
 function startStepSpan(
   options: AgentLoopOptions,
-  runSpan: Span | undefined,
   prompt: readonly ModelMessage[],
   model: Model,
 ): Span | undefined {
@@ -440,7 +444,7 @@ function startStepSpan(
   return tracing.tracer.startSpan({
     name: model.modelId,
     type: AGENT_STEP_SPAN,
-    ...(runSpan === undefined ? {} : { parent: runSpan }),
+    parent: tracing.runSpan,
     input: [...prompt],
     attributes: {
       model: model.modelId,

@@ -9,6 +9,6 @@
 3. [tools.md](tools.md) — Tools/MCP 抽象:四字段 Tool、execute 上下文、MCP server/client 能力包
 4. [workflows.md](workflows.md) — Workflow 引擎语义:扁平条目 + walker、suspend/resume 快照
 5. [memory.md](memory.md) — Memory 语义:thread/resource 双标识、消息历史、working memory
-6. [observability.md](observability.md) — Observability 形态:自有 span 模型、三事件、exporter 最小面、五边界埋点
+6. [observability.md](observability.md) — Observability 形态:自有 span 模型、三事件、exporter 最小面、七边界埋点
 7. [storage.md](storage.md) — 存储适配策略:port 集合 + adapter 家族(非子系统)、additive-only 演化纪律
 8. [harness.md](harness.md) — Harness 语义集:durable 审批闸、signals、schedules(文档分类,非模块)

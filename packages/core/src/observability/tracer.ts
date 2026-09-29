@@ -32,7 +32,7 @@ export type Sampler =
 export interface StartSpanOptions {
   /** Human-readable operation name. */
   name: string;
-  /** Open span type; the five framework constants are exported by this entry. */
+  /** Open span type; the framework's seven constants are exported by this entry. */
   type: SpanType;
   /** The live parent span, when this span hangs under another one. */
   parent?: Span;

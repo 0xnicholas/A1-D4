@@ -17,7 +17,7 @@ interface Span {
   traceId: string,                    // 32-hex,OTel 兼容
   parentSpanId?: string,
   name: string,
-  type: string,                       // 开放字符串;框架只写 5 个常量(下表)
+  type: string,                       // 开放字符串;框架只写 7 个常量(下表)
   startTime: Date,
   endTime?: Date,
   input?: unknown,                    // 一等公民:prompt 是 LLM 调试主体
@@ -29,16 +29,20 @@ interface Span {
 }
 ```
 
-- **5 个框架类型常量**(kebab-case,与 chunk 协议词汇同构):`agent-run` / `agent-step` / `tool-call` / `workflow-run` / `workflow-step`。`type` 是开放 string,用户自建 span 任意取名;核心导出 5 个常量。
+- **7 个框架类型常量**(kebab-case,与 chunk 协议词汇同构):`agent-run` / `agent-step` / `tool-call` / `workflow-run` / `workflow-step` / `memory-recall` / `memory-save`。`type` 是开放 string,用户自建 span 任意取名;核心导出 7 个常量。
 - **attributes 判别联合**(运行时零成本,OTLP 映射包读取有类型安全):
 
 | type | attributes | input / output |
 | --- | --- | --- |
-| `agent-run` | `{ agentName }` | 入参消息 / 终值 text(或 structured 结果) |
+| `agent-run` | `{ agentName }` | 处理后 prompt(模型所见)/ 终值 text(或 structured 结果) |
 | `agent-step` | `{ model, provider, parameters?, usage?, finishReason?, timeToFirstChunk? }` | prompt 消息 / 模型响应 |
 | `tool-call` | `{ toolCallId }` | 参数 / 结果;失败落 `error` |
 | `workflow-run` | `{ workflowId }` | 触发输入 / 终态结果 |
 | `workflow-step` | `{ }`(name 即 step id) | step 输入 / 输出 |
+| `memory-recall` | `{ threadId }`(name 即 thread id) | recall 查询 / 召回的消息(含存储信封) |
+| `memory-save` | `{ threadId, resourceId }`(name 即 thread id) | 落库批次 / 持久化后的消息(含存储信封) |
+
+`agent-run` span 先于 memory recall 创建(root span 存在,recall span 才能挂它下),其 input 是 `processInput` 处理后的 prompt(含注入的工作记忆与历史),故以一次 `span_updated` 落定而非创建时;memory 两侧的失败落在各自 span 的 `error` 上并随 run 抛出。
 
 - **root span attribute 带 `runId`**:runId 是执行身份(快照/Memory 已用),traceId 是观测身份,两者不同词、靠 root span 互查。
 - **`isEvent` span**:无生命周期,创建即完成,只派发一次 `span_ended`(无 duration)。是「不想开完整 span 只打时间戳」的逃生口。
@@ -78,7 +82,7 @@ createTracer({
 - **`hideInput` / `hideOutput`**:trace 级开关,导出时擦字段;可在 run option per-call 覆盖(透传为 root span 的创建选项,并由子孙继承同一条 trace 的决定)。擦除发生在 spanProcessors 之后——exporters 永远看不到被擦字段,而处理器仍能拿到原始值做规则化脱敏。
 - **组合根分发**:`createApp({ tracer })`(ADR-0002 已有此位)以 `app.agent(config)` 建出的 Agent 被动接受分发的 tracer(配置自带 tracer 时显式优先),无需逐 agent 传入;子系统独立 `new` 时也可显式传入(Agent 侧即 `AgentConfig.tracer` 注入缝),不挂即零开销。
 
-## 自动埋点:五边界
+## 自动埋点:七边界
 
 tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 
@@ -87,6 +91,8 @@ tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 3. **tool call** — agent loop 内每次工具执行
 4. **workflow run** — start/resume 到终态
 5. **workflow step** — 每个 step 边界
+6. **memory recall** — run 开始、`processInput` 之前的历史召回(每 run 一次),挂 `agent-run` 下
+7. **memory save** — 每 step 完成、下一轮 prompt 构造之前的落库(每 step 一次),挂 `agent-step` 下
 
 裁掉:mastra 的 `MODEL_CHUNK`(chunk 已在 chunk 协议流里,观测侧可从流事件重建,不为此开 span)与 `MODEL_GENERATION` 中间层(run→step 两级已够表达)。sub-agent 由 Agent 规范定为 as-tool 兜底,自然落成 `tool-call` span,无专门类型。
 
@@ -108,7 +114,7 @@ tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 - **模型层(#9,已定)**:chunk 协议是共用流式词汇;`agent-step` 的 model/provider/usage 取自模型契约的 finish/usage chunk。
 - **Agent(#10,已定)**:tracer 挂钩是内部缝,不占 Processor 名额;span 挂 run / step / 工具执行三边界;run option 携带外部 trace 延续与 `hideInput/hideOutput` 覆盖。
 - **Workflows(#11,已定)**:span 挂 run / step 边界;lifecycle 事件流是事件锚点;traceId 随快照持久化。
-- **Memory(#12,已定)**:无直接耦合。
+- **Memory(#12,已定)**:recall / save 各成一个普通 span 锚点(带时长):`memory-recall` 挂 `agent-run` 下、`memory-save` 挂 `agent-step` 下;无 memory 身份的 run 不开这两个 span。
 - **Harness(#18)**:持久执行跨进程恢复时 trace 延续语义归它,本规范的 traceId-进快照是其底层机器。
 
 ## 依赖预算

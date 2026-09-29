@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
+  MEMORY_RECALL_SPAN,
+  MEMORY_SAVE_SPAN,
   NoOpSpan,
   TOOL_CALL_SPAN,
   WORKFLOW_RUN_SPAN,
@@ -67,14 +69,24 @@ describe('手动 span 生命周期', () => {
     expect(span.endTime).toBeInstanceOf(Date);
   });
 
-  it('框架 5 个 span 类型常量:workflow 两常量只导出(本票不产生埋点)', () => {
+  it('框架 7 个 span 类型常量:workflow 两常量只导出、memory 两常量归 agent 埋点', () => {
     expect([
       AGENT_RUN_SPAN,
       AGENT_STEP_SPAN,
       TOOL_CALL_SPAN,
       WORKFLOW_RUN_SPAN,
       WORKFLOW_STEP_SPAN,
-    ]).toEqual(['agent-run', 'agent-step', 'tool-call', 'workflow-run', 'workflow-step']);
+      MEMORY_RECALL_SPAN,
+      MEMORY_SAVE_SPAN,
+    ]).toEqual([
+      'agent-run',
+      'agent-step',
+      'tool-call',
+      'workflow-run',
+      'workflow-step',
+      'memory-recall',
+      'memory-save',
+    ]);
   });
 
   it('无 exporters 的 tracer 不报错:手动 span 照常可用', () => {

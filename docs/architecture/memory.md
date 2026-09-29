@@ -94,7 +94,7 @@ new Memory({
 - **模型层(#9,已定)**:消息格式 = vendor prompt 类型;届时 embedder 复用同一契约模式(vendor EmbeddingModel 结构类型)。
 - **Tools(#13,已定)**:WM 更新工具是框架自挂的 Tool,定义规范见 `docs/architecture/tools.md`。
 - **存储(#15,已定)**:MemoryStore port(6 必备 + 2 条件)是其输入,与 `WorkflowSnapshotStore` 统一 adapter 家族;扩展面与 adapter 清单见 `docs/architecture/storage.md`。
-- **Observability(#14)**:recall/save 是 span 锚点,形态归它。
+- **Observability(#14,已定)**:recall / save 各成一个 span 锚点(`memory-recall` / `memory-save`),类型常量、挂点与字段形状见 `docs/architecture/observability.md`。
 - **Harness(#18)**:无耦合——无后台写意味着 memory 不需要 `settled()` 式生命周期。
 - **多 agent(#19)**:memory 身份经 per-call 显式传递;as-tool 组合时 thread/resource 由调用方决定,委派场景的隔离语义归它。
 

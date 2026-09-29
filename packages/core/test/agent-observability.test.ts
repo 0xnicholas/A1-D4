@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Agent } from '@balsa/core/agent';
+import { Memory, createInMemoryStore } from '@balsa/core/memory';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
+  MEMORY_RECALL_SPAN,
+  MEMORY_SAVE_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
@@ -14,20 +17,21 @@ import { fakeModel } from './helpers/fake-model.js';
 import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType, withSpanIdProbe } from './helpers/spans.js';
 
 /**
- * 三边界自动埋点与 trace 续接(M1-09 #30):挂上 tracer 后 agent run / agent step / tool call
- * 三边界自动开 span,parent 沿执行树显式传播(无 AsyncLocalStorage);root span attribute 带
- * runId;agent-step 携带 model / provider / usage / finishReason / timeToFirstChunk;tool-call
- * 携带 toolCallId、失败落 error;run option traceId / parentSpanId 续接外部 trace;ToolContext 的
- * traceId / spanId 为真值;不挂 tracer 时整个子系统零开销。
+ * 自动埋点与 trace 续接(M1-09 #30 + M2 memory #42):挂上 tracer 后 agent run / agent step /
+ * tool call 三边界与 memory recall / save 两个锚点自动开 span,parent 沿执行树显式传播
+ * (无 AsyncLocalStorage);root span attribute 带 runId;agent-step 携带 model / provider / usage /
+ * finishReason / timeToFirstChunk;tool-call 携带 toolCallId、失败落 error;memory-recall 挂
+ * agent-run 下、memory-save 挂 agent-step 下;run option traceId / parentSpanId 续接外部 trace;
+ * ToolContext 的 traceId / spanId 为真值;不挂 tracer 时整个子系统零开销。
  *
  * 断言只走公开面(@balsa/core 子路径导出)与规范钦定的 memory exporter 抓手(issue #21 测试
- * 决策):span 树结构、三事件序列与 span 快照都在这里读。
+ * 决策):span 树结构、事件序列与 span 快照都在这里读。
  */
 
 const INSTRUCTIONS = 'You are concise.';
 
 describe('agent run span:root 边界', () => {
-  it('挂 tracer 后 generate() 自动开 agent-run root span:name / 三事件序列 / input / output / runId', async () => {
+  it('挂 tracer 后 generate() 自动开 agent-run root span:name / 生命周期事件序列 / input / output / runId', async () => {
     const memory = memoryExporter();
     const tracer = createTracer({ exporters: [memory] });
     const model = fakeModel([{ text: 'hello' }]);
@@ -35,9 +39,11 @@ describe('agent run span:root 边界', () => {
 
     await agent.generate('Hi.');
 
-    // 三事件:started → updated → ended,每类各一次
+    // root span 在 recall / processInput 之前就开(内存埋点要挂它下),input 是处理器跑完才落定的
+    // prompt——所以单步 run 的事件是 started → updated(input) → updated(output) → ended。
     expect(kinds(eventsOfType(memory, AGENT_RUN_SPAN))).toEqual([
       'span_started',
+      'span_updated',
       'span_updated',
       'span_ended',
     ]);
@@ -233,6 +239,7 @@ describe('tool call span:工具执行边界', () => {
     expect(kinds(eventsOfType(memory, AGENT_RUN_SPAN))).toEqual([
       'span_started',
       'span_updated',
+      'span_updated',
       'span_ended',
     ]);
     expect(kinds(eventsOfType(memory, AGENT_STEP_SPAN))).toEqual([
@@ -393,6 +400,309 @@ describe('run option:hideInput / hideOutput 覆盖', () => {
   });
 });
 
+describe('memory span:recall 挂 agent-run 下,save 挂 agent-step 下', () => {
+  const THREAD = 'thread-1';
+  const RESOURCE = 'user-1';
+
+  /** 带两条历史消息的 memory,recall 的期望输出。 */
+  async function memoryWithHistory(): Promise<Memory> {
+    const memory = new Memory();
+    await memory.save({
+      thread: THREAD,
+      resource: RESOURCE,
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'earlier question' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'earlier answer' }] },
+      ],
+    });
+    return memory;
+  }
+
+  it('每 run 一次 memory-recall:parent = agent-run、step 之前完成,input = 查询,output = 召回的消息', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter] });
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'ok' }]),
+      memory: await memoryWithHistory(),
+      tracer,
+    });
+
+    await agent.generate('current question', { memory: { thread: THREAD, resource: RESOURCE } });
+
+    const run = spanOfType(exporter, AGENT_RUN_SPAN);
+    const recall = spanOfType(exporter, MEMORY_RECALL_SPAN);
+    expect(exporter.spans().filter((span) => span.type === MEMORY_RECALL_SPAN)).toHaveLength(1);
+    expect(recall.parentSpanId).toBe(run.id);
+    expect(recall.traceId).toBe(run.traceId);
+    expect(recall.name).toBe(THREAD);
+    expect(recall.attributes).toEqual({ threadId: THREAD });
+    expect(recall.input).toEqual({ threadId: THREAD });
+    expect(recall.output).toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: [{ type: 'text', text: 'earlier question' }],
+      }),
+      expect.objectContaining({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'earlier answer' }],
+      }),
+    ]);
+    expect(recall.endTime).toBeInstanceOf(Date);
+    expect(kinds(eventsOfType(exporter, MEMORY_RECALL_SPAN))).toEqual([
+      'span_started',
+      'span_updated',
+      'span_ended',
+    ]);
+
+    // 执行树位置:run 先开,recall 在 run 之下闭合,之后才有第一个 step
+    const at = (kind: string, id: string): number =>
+      exporter.events.findIndex((event) => event.kind === kind && event.span.id === id);
+    const step = spanOfType(exporter, AGENT_STEP_SPAN);
+    expect(at('span_started', run.id)).toBeLessThan(at('span_started', recall.id));
+    expect(at('span_ended', recall.id)).toBeLessThan(at('span_started', step.id));
+
+    // run span 的 input 是处理后 prompt(含召回历史),在 processInput 之后才落定;召回消息带存储信封
+    expect(run.input).toMatchObject([
+      { role: 'system', content: INSTRUCTIONS },
+      { role: 'user', content: [{ type: 'text', text: 'earlier question' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'earlier answer' }] },
+      { role: 'user', content: [{ type: 'text', text: 'current question' }] },
+    ]);
+  });
+
+  it('无 per-call memory identity 的 run:recall / save 都不发生,也不开 memory span', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter] });
+    const memory = new Memory();
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'ok' }]),
+      memory,
+      tracer,
+    });
+
+    await agent.generate('hi');
+
+    expect(
+      exporter
+        .spans()
+        .some(
+          (span) => span.type === MEMORY_RECALL_SPAN || span.type === MEMORY_SAVE_SPAN,
+        ),
+    ).toBe(false);
+    expect(await memory.recall({ threadId: THREAD })).toEqual([]);
+    // run / step 照常
+    expect(spanOfType(exporter, AGENT_RUN_SPAN).output).toBe('ok');
+  });
+
+  it('每 step 一次 memory-save:parent = 该步 agent-step;首步携带用户输入,其后只带该步消息', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter] });
+    const model = fakeModel([
+      {
+        text: 'Let me check.',
+        toolCalls: [{ toolCallId: 'call-1', toolName: 'weather', input: { city: 'SF' } }],
+      },
+      { text: 'It is 21°C.' },
+    ]);
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model,
+      memory: new Memory(),
+      tools: { weather: { description: 'Looks up the weather.', execute: () => ({ celsius: 21 }) } },
+      tracer,
+    });
+
+    await agent.generate('What is the weather in SF?', {
+      memory: { thread: THREAD, resource: RESOURCE },
+    });
+
+    const run = spanOfType(exporter, AGENT_RUN_SPAN);
+    const steps = exporter.spans().filter((span) => span.type === AGENT_STEP_SPAN);
+    const saves = exporter.spans().filter((span) => span.type === MEMORY_SAVE_SPAN);
+    expect(saves).toHaveLength(2);
+    expect(saves.map((span) => span.parentSpanId)).toEqual([steps[0]?.id, steps[1]?.id]);
+    expect(saves.map((span) => span.traceId)).toEqual([run.traceId, run.traceId]);
+    expect(saves[0]?.name).toBe(THREAD);
+    expect(saves[0]?.attributes).toEqual({ threadId: THREAD, resourceId: RESOURCE });
+    // 首步落库批 = 用户输入消息 + 该步 assistant / tool 消息(处理后的权威记录)
+    expect(saves[0]?.input).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'What is the weather in SF?' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Let me check.' },
+          { type: 'tool-call', toolCallId: 'call-1', toolName: 'weather', input: { city: 'SF' } },
+        ],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-1',
+            toolName: 'weather',
+            output: { type: 'json', value: { celsius: 21 } },
+          },
+        ],
+      },
+    ]);
+    // 后续步只带该步消息(增量落库)
+    expect(saves[1]?.input).toEqual([
+      { role: 'assistant', content: [{ type: 'text', text: 'It is 21°C.' }] },
+    ]);
+    // output = save 返回的持久化消息:同内容 + 存储信封
+    expect(saves[0]?.output).toEqual([
+      expect.objectContaining({ id: expect.any(String), threadId: THREAD, resourceId: RESOURCE, createdAt: expect.any(Date) }),
+      expect.objectContaining({ id: expect.any(String), role: 'assistant' }),
+      expect.objectContaining({ id: expect.any(String), role: 'tool' }),
+    ]);
+    for (const save of saves) {
+      expect(save.endTime).toBeInstanceOf(Date);
+      expect(save.error).toBeUndefined();
+    }
+    expect(kinds(eventsOfType(exporter, MEMORY_SAVE_SPAN)).slice(0, 3)).toEqual([
+      'span_started',
+      'span_updated',
+      'span_ended',
+    ]);
+  });
+
+  it('hideInput 从 run span 继承:memory span 的 input 同被擦除,output 保留', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter] });
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'ok' }]),
+      memory: await memoryWithHistory(),
+      tracer,
+    });
+
+    await agent.generate('current question', {
+      memory: { thread: THREAD, resource: RESOURCE },
+      hideInput: true,
+    });
+
+    for (const type of [MEMORY_RECALL_SPAN, MEMORY_SAVE_SPAN]) {
+      for (const event of eventsOfType(exporter, type)) {
+        expect(event.span).not.toHaveProperty('input');
+      }
+    }
+    // 擦除是逐字段的:同一棵 trace 的 output 不受影响
+    expect(spanOfType(exporter, MEMORY_RECALL_SPAN).output).toBeDefined();
+    expect(spanOfType(exporter, MEMORY_SAVE_SPAN).output).toBeDefined();
+  });
+
+  it('hideOutput 从 run span 继承:memory span 的 output 同被擦除,input 保留', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter], hideOutput: true });
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'ok' }]),
+      memory: await memoryWithHistory(),
+      tracer,
+    });
+
+    await agent.generate('current question', { memory: { thread: THREAD, resource: RESOURCE } });
+
+    for (const type of [MEMORY_RECALL_SPAN, MEMORY_SAVE_SPAN]) {
+      for (const event of eventsOfType(exporter, type)) {
+        expect(event.span).not.toHaveProperty('output');
+      }
+    }
+    expect(spanOfType(exporter, MEMORY_RECALL_SPAN).input).toEqual({ threadId: THREAD });
+    expect(spanOfType(exporter, MEMORY_SAVE_SPAN).input).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'current question' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+    ]);
+  });
+
+  it('采样不通过:memory span 全 NoOp,recall / save 照常发生', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter], sampler: 'never' });
+    const memory = new Memory();
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'ok' }]),
+      memory,
+      tracer,
+    });
+
+    const result = await agent.generate('hi', { memory: { thread: THREAD, resource: RESOURCE } });
+
+    expect(result.text).toBe('ok');
+    expect(exporter.events).toEqual([]);
+    // NoOp 只关掉 span:recall / save 的语义照旧(消息确实落库)
+    const persisted = await memory.recall({ threadId: THREAD });
+    expect(persisted.map(({ role }) => role)).toEqual(['user', 'assistant']);
+  });
+
+  it('recall 失败:memory-recall span 落 error 并闭合,run 随之失败(模型未被调用)', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter] });
+    const explosion = new Error('store down');
+    const memory = new Memory({
+      storage: {
+        ...createInMemoryStore(),
+        listMessages: () => Promise.reject(explosion),
+      },
+    });
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'never reached' }]),
+      memory,
+      tracer,
+    });
+
+    await expect(
+      agent.generate('hi', { memory: { thread: THREAD, resource: RESOURCE } }),
+    ).rejects.toBe(explosion);
+
+    const recall = spanOfType(exporter, MEMORY_RECALL_SPAN);
+    expect(recall.error).toEqual({ message: 'store down', details: explosion });
+    expect(recall.endTime).toBeInstanceOf(Date);
+    expect(spanOfType(exporter, AGENT_RUN_SPAN).error?.message).toBe('store down');
+    expect(exporter.spans().some((span) => span.type === AGENT_STEP_SPAN)).toBe(false);
+  });
+
+  it('save 失败:memory-save span 落 error 并闭合,run 随之失败', async () => {
+    const exporter = memoryExporter();
+    const tracer = createTracer({ exporters: [exporter] });
+    const explosion = new Error('write down');
+    const memory = new Memory({
+      storage: {
+        ...createInMemoryStore(),
+        saveMessages: () => Promise.reject(explosion),
+      },
+    });
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'ok' }]),
+      memory,
+      tracer,
+    });
+
+    await expect(
+      agent.generate('hi', { memory: { thread: THREAD, resource: RESOURCE } }),
+    ).rejects.toBe(explosion);
+
+    const save = spanOfType(exporter, MEMORY_SAVE_SPAN);
+    expect(save.error).toEqual({ message: 'write down', details: explosion });
+    expect(save.endTime).toBeInstanceOf(Date);
+    expect(spanOfType(exporter, AGENT_RUN_SPAN).error?.message).toBe('write down');
+    expect(spanOfType(exporter, AGENT_STEP_SPAN).error?.message).toBe('write down');
+  });
+});
+
 describe('不挂 tracer:零开销', () => {
   it('一整轮带工具的 run 不创建任何 span 对象(不触碰 span id 生成)', async () => {
     const model = fakeModel([
@@ -411,6 +721,25 @@ describe('不挂 tracer:零开销', () => {
 
     expect(result.text).toBe('done');
     expect(spanIdsCreated).toBe(false);
+  });
+
+  it('带 memory 的一整轮 run 同样不创建任何 span 对象(recall / save 不例外)', async () => {
+    const memory = new Memory();
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'done' }]),
+      memory,
+    });
+
+    const { result, spanIdsCreated } = await withSpanIdProbe(() =>
+      agent.generate('Go.', { memory: { thread: 'thread-1', resource: 'user-1' } }),
+    );
+
+    expect(result.text).toBe('done');
+    expect(spanIdsCreated).toBe(false);
+    // 探针之外的行为照旧:消息确实落库
+    expect(await memory.recall({ threadId: 'thread-1' })).toHaveLength(2);
   });
 
   it('对照:挂上 tracer 后同一路径确实生成 span id(探针可观测,不是恒假)', async () => {

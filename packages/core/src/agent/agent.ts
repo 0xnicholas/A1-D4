@@ -1,9 +1,10 @@
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
 import { assertModelChain } from '../model/fallback.js';
 import { assertModel } from '../model/resolve.js';
-import type { Memory, MemoryThreadRef } from '../memory/index.js';
+import type { Memory, MemoryThreadRef, StoredMessage } from '../memory/index.js';
 import { loadRunWorkingMemory } from '../memory/working-memory.js';
 import type { RunWorkingMemory } from '../memory/working-memory.js';
+import { AGENT_RUN_SPAN, MEMORY_RECALL_SPAN } from '../observability/index.js';
 import type { Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
@@ -122,50 +123,69 @@ export class Agent {
         ]);
       const inputMessages = toInputMessages(input);
       const runMemory = toRunMemory(resolvedMemory, options.memory, inputMessages);
-      // Message history is recalled once per run, before the input processors run (`memory.md`
-      // 「消息历史」时机): the history is part of the prompt the model sees, and of what
-      // `processInput` observes. A run with no memory identity recalls nothing. Working memory is
-      // loaded at the same boundary — it is the other half of what a memory-enabled run injects.
-      const [history, workingMemory] = await Promise.all([
-        runMemory === undefined
-          ? []
-          : runMemory.memory.recall({ threadId: runMemory.threadId }),
-        runMemory === undefined
-          ? undefined
-          : loadRunWorkingMemory(runMemory.memory, runMemory.resource),
-      ]);
-      // Call options are built per run — they are part of the run, not of creating the object.
-      // The run's tool container carries what the subsystems attach to it (working memory), and it
-      // is the very same container the loop executes against — the model is never offered a tool
-      // the loop does not hold. The prompt is built here too: instructions, working memory, recalled
-      // history, then the run's own input.
-      const runTools = withRunTools(resolvedTools, workingMemory);
-      const prompt = toPrompt(
-        resolvedInstructions,
-        workingMemory?.message,
-        history,
-        inputMessages,
-      );
-      const callOptions = toCallOptions(runTools, options);
-      // The processors' input hook runs once per run, before the first model call: the prompt it
-      // returns is what the model sees (and the run's span records as input).
-      return yield* runAgentLoop({
-        models: resolvedModels,
-        agentName: name,
-        prompt: await runProcessInput(processors, prompt, requestContext),
-        callOptions,
-        tools: runTools ?? {},
-        maxSteps: toMaxSteps(options.maxSteps),
-        processors,
-        requestContext,
-        // The run's memory wiring: the loop saves once per step (the first save carries the run's
-        // input messages). `undefined` = no memory I/O.
-        memory: runMemory,
-        tracing: toTracing(tracer, options),
-        // The user's model call settings are recorded on the step span under this name.
-        parameters: options.modelSettings,
-        structuredOutput: options.structuredOutput,
-      });
+      // The run's root span is created before memory recall
+      // (`docs/architecture/observability.md`「自动埋点」): the recall span hangs under it, so the
+      // boundary has to exist first. The run owns the span's lifecycle from here — including the
+      // exit paths that never reach the loop (recall, working-memory load and the input processors
+      // all run below).
+      const tracing = toTracing(tracer, options, name, requestContext.runId);
+      const runSpan = tracing?.runSpan;
+      try {
+        // Message history is recalled once per run, before the input processors run (`memory.md`
+        // 「消息历史」时机): the history is part of the prompt the model sees, and of what
+        // `processInput` observes. A run with no memory identity recalls nothing. Working memory is
+        // loaded at the same boundary — it is the other half of what a memory-enabled run injects.
+        const [history, workingMemory] = await Promise.all([
+          runMemory === undefined ? [] : recallWithSpan(runMemory, tracing),
+          runMemory === undefined
+            ? undefined
+            : loadRunWorkingMemory(runMemory.memory, runMemory.resource),
+        ]);
+        // Call options are built per run — they are part of the run, not of creating the object.
+        // The run's tool container carries what the subsystems attach to it (working memory), and it
+        // is the very same container the loop executes against — the model is never offered a tool
+        // the loop does not hold. The prompt is built here too: instructions, working memory, recalled
+        // history, then the run's own input.
+        const runTools = withRunTools(resolvedTools, workingMemory);
+        const prompt = toPrompt(
+          resolvedInstructions,
+          workingMemory?.message,
+          history,
+          inputMessages,
+        );
+        const callOptions = toCallOptions(runTools, options);
+        // The processors' input hook runs once per run, before the first model call: the prompt it
+        // returns is what the model sees. The root span records that prompt as its input — the span
+        // existed before the recall, so the processed prompt lands as an update.
+        const processedPrompt = await runProcessInput(processors, prompt, requestContext);
+        runSpan?.update({ input: processedPrompt });
+        return yield* runAgentLoop({
+          models: resolvedModels,
+          prompt: processedPrompt,
+          callOptions,
+          tools: runTools ?? {},
+          maxSteps: toMaxSteps(options.maxSteps),
+          processors,
+          requestContext,
+          // The run's memory wiring: the loop saves once per step (the first save carries the run's
+          // input messages). `undefined` = no memory I/O.
+          memory: runMemory,
+          tracing,
+          // The user's model call settings are recorded on the step span under this name.
+          parameters: options.modelSettings,
+          structuredOutput: options.structuredOutput,
+        });
+      } catch (error) {
+        // A failed run leaves its root span carrying the error (a failed step also carries it on
+        // its own step span; a structured-output failure has no failing step — the run did not meet
+        // its output contract).
+        runSpan?.error(error);
+        throw error;
+      } finally {
+        // Ends the run span on every exit path — normal completion, a failed model call, a failed
+        // recall, or the consumer abandoning the generator.
+        runSpan?.end();
+      }
     });
   }
 
@@ -288,9 +308,15 @@ function toMaxSteps(maxSteps: number | undefined): number {
 }
 
 /**
- * The observability wiring of one run: `undefined` without a tracer, so the loop's only branch is
- * one presence check. The trace continuation and hiding options only mean something with a tracer,
- * hence the clump — they cannot travel alone.
+ * The run's observability wiring: `undefined` without a tracer, so the run's only zero-overhead
+ * branch is one presence check. Created before memory recall — the run's root span has to exist for
+ * the recall span to hang under it — and handed to the loop, which hangs its step / tool /
+ * memory-save spans under the root. The root's input is the processed prompt, which is only known
+ * after `processInput` has run: it lands on the span as an update, not at creation.
+ *
+ * The trace continuation and hiding options (`AgentRunOptions.traceId` / `parentSpanId` /
+ * `hideInput` / `hideOutput`) are consumed here, at root creation: only the tracer and the root span
+ * travel on to the loop.
  *
  * Empty-string continuation ids mean "no trace", not a parent with an empty id: the tool context
  * encodes an untraced call as `traceId: ''` / `spanId: ''` (`NoOpSpan` / no tracer), and an as-tool
@@ -299,17 +325,27 @@ function toMaxSteps(maxSteps: number | undefined): number {
  * whole pair (a parent outside a trace means nothing); an empty parent id only drops the parent.
  * A real parent id without any trace id is still left for the tracer to reject loudly.
  */
-function toTracing(tracer: Tracer | undefined, options: AgentRunOptions): AgentTracing | undefined {
+function toTracing(
+  tracer: Tracer | undefined,
+  options: AgentRunOptions,
+  agentName: string,
+  runId: string,
+): AgentTracing | undefined {
   if (tracer === undefined) return undefined;
   const traceId = options.traceId === '' ? undefined : options.traceId;
   const parentSpanId =
     options.traceId === '' || options.parentSpanId === '' ? undefined : options.parentSpanId;
   return {
     tracer,
-    ...(traceId === undefined ? {} : { traceId }),
-    ...(parentSpanId === undefined ? {} : { parentSpanId }),
-    ...(options.hideInput === undefined ? {} : { hideInput: options.hideInput }),
-    ...(options.hideOutput === undefined ? {} : { hideOutput: options.hideOutput }),
+    runSpan: tracer.startSpan({
+      name: agentName,
+      type: AGENT_RUN_SPAN,
+      attributes: { agentName, runId },
+      ...(traceId === undefined ? {} : { traceId }),
+      ...(parentSpanId === undefined ? {} : { parentSpanId }),
+      ...(options.hideInput === undefined ? {} : { hideInput: options.hideInput }),
+      ...(options.hideOutput === undefined ? {} : { hideOutput: options.hideOutput }),
+    }),
   };
 }
 
@@ -398,6 +434,39 @@ function toRunMemory(
     );
   }
   return { memory, threadId, thread: option.thread, resource: option.resource, inputMessages };
+}
+
+/**
+ * Recalls the run's message history, wrapped in its `memory-recall` span
+ * (`docs/architecture/observability.md`「自动埋点」): once per run, before the input processors. The
+ * span hangs under the run's root span — the explicit parent passed down the execution tree, no
+ * AsyncLocalStorage — carrying the query as input and the recalled messages as output (storage
+ * envelope included). A failed recall records the error on the span and propagates, so the run
+ * fails with it; without tracing the recall runs directly and no span object is created.
+ */
+async function recallWithSpan(
+  runMemory: AgentRunMemory,
+  tracing: AgentTracing | undefined,
+): Promise<StoredMessage[]> {
+  const recall = () => runMemory.memory.recall({ threadId: runMemory.threadId });
+  if (tracing === undefined) return recall();
+  const span = tracing.tracer.startSpan({
+    name: runMemory.threadId,
+    type: MEMORY_RECALL_SPAN,
+    parent: tracing.runSpan,
+    input: { threadId: runMemory.threadId },
+    attributes: { threadId: runMemory.threadId },
+  });
+  try {
+    const messages = await recall();
+    span.update({ output: messages });
+    return messages;
+  } catch (error) {
+    span.error(error);
+    throw error;
+  } finally {
+    span.end();
+  }
 }
 
 /** The thread id of a per-call memory identity — the string form, or the `id` of the ref object. */

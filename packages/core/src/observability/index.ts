@@ -1,7 +1,7 @@
 /**
  * `@balsa/core/observability` — observability kernel.
  *
- * The kernel's own minimal span model (input/output first-class, five framework type constants,
+ * The kernel's own minimal span model (input/output first-class, seven framework type constants,
  * open `type` string), the tracer with its three-event bus (`span_started` / `span_updated` /
  * `span_ended` carrying `ExportedSpan`), root-only sampling with `NoOpSpan` propagation, the
  * synchronous spanProcessors shaping seam, `hideInput` / `hideOutput`, and the two built-in
@@ -20,6 +20,8 @@ export type {
 export {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
+  MEMORY_RECALL_SPAN,
+  MEMORY_SAVE_SPAN,
   NoOpSpan,
   TOOL_CALL_SPAN,
   WORKFLOW_RUN_SPAN,
@@ -29,6 +31,8 @@ export type {
   AgentRunAttributes,
   AgentStepAttributes,
   ExportedSpan,
+  MemoryRecallAttributes,
+  MemorySaveAttributes,
   Span,
   SpanAttributes,
   SpanError,

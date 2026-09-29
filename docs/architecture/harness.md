@@ -85,8 +85,8 @@ interface ScheduleStore {
 ## Observability 锚点
 
 - **挂起**:`agent-run` span 以 attributes `status: 'suspended'` 正常 end;**resume = 同一 traceId 下的新 `agent-run` span**(traceId 随快照持久化,沿用 workflows 已钉模式)。一次 HITL 交互 = 同 trace 多 span。
-- **signals**:注入 = 当前 `agent-run` span 上的 `isEvent` 事件;唤醒/调度触发的新 run 自身一个 `agent-run` span。不新增 span 类型常量(框架 5 个常量不变)。
-- **tick 本身无 span**(进程内原语,非五边界之一)。
+- **signals**:注入 = 当前 `agent-run` span 上的 `isEvent` 事件;唤醒/调度触发的新 run 自身一个 `agent-run` span。不新增 span 类型常量。
+- **tick 本身无 span**(进程内原语,非自动埋点边界之一)。
 
 ## 裁单与承载缝
 

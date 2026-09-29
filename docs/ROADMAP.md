@@ -5,7 +5,7 @@
 ## 切分原则
 
 - **垂直切片(walking skeleton)**:每个里程碑都是一条可跑的细流,可独立验证、可提前叫停;不按子系统水平分层。
-- **Instrumentation-first**:观测内核(span 模型 / tracer / NoOpSpan)与五边界自动埋点随各子系统落地时就建进去;exporter 与 OTLP 能力包后置,永不对已完成子系统开膛回补。
+- **Instrumentation-first**:观测内核(span 模型 / tracer / NoOpSpan)与各边界自动埋点随各子系统落地时就建进去;exporter 与 OTLP 能力包后置,永不对已完成子系统开膛回补。
 - **可验证产出两件套**:每个里程碑 = 可运行 example(`examples/`)+ 覆盖该范围的测试套件。
 - **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/balsa/issues/6))。
 - **串行默认**:小团队单线推进;各里程碑「依赖」行标注可并行项,不排双轨。
@@ -19,7 +19,7 @@
 - 模型契约(vendor 自 AI SDK provider spec 子集 + `specificationVersion` 硬断言)+ chunk 协议
 - 工具:`createTool` 四字段普通对象、Record 容器、三线 error 回喂
 - Agent 核心:五字段最小表面、动态参数 / RequestContext、输出对象双消费、内建 loop(maxSteps 默认 5、工具错误回喂)、Processor 三钩、structuredOutput strict
-- 观测内核:span 模型(框架 5 个类型常量)、tracer(started/updated/ended 三事件 + exporter 最小面)、console/memory 两个内置 exporter、NoOpSpan
+- 观测内核:span 模型(框架类型常量,开放 string)、tracer(started/updated/ended 三事件 + exporter 最小面)、console/memory 两个内置 exporter、NoOpSpan
 - 可选组合根:薄组装点,子系统不挂也能独立完整使用
 
 **验证**:`examples/minimal-agent` 可跑;测试套件;**CI 字节预算上线**。

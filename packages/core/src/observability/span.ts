@@ -4,7 +4,7 @@ import type { FinishReason, Usage } from '../model/chunks.js';
  * The framework's span type constants — kebab-case, one vocabulary with the chunk protocol.
  *
  * `type` is an open string: users name their own spans freely. The framework writes exactly these
- * five; `workflow-run` / `workflow-step` are exported already, their automatic instrumentation
+ * seven; `workflow-run` / `workflow-step` are exported already, their automatic instrumentation
  * lands with the workflow engine (M3).
  */
 export const AGENT_RUN_SPAN = 'agent-run';
@@ -12,6 +12,8 @@ export const AGENT_STEP_SPAN = 'agent-step';
 export const TOOL_CALL_SPAN = 'tool-call';
 export const WORKFLOW_RUN_SPAN = 'workflow-run';
 export const WORKFLOW_STEP_SPAN = 'workflow-step';
+export const MEMORY_RECALL_SPAN = 'memory-recall';
+export const MEMORY_SAVE_SPAN = 'memory-save';
 
 /** A span type: an open string (`docs/architecture/observability.md`). */
 export type SpanType = string;
@@ -49,6 +51,23 @@ export type WorkflowRunAttributes = {
 };
 
 /**
+ * Attributes of a `memory-recall` span — one run's recall from message history. The span's
+ * `output` carries the messages the recall returned (storage envelope included).
+ */
+export type MemoryRecallAttributes = {
+  readonly threadId: string;
+};
+
+/**
+ * Attributes of a `memory-save` span — one step's save into a thread. The span's `input` carries
+ * the batch handed to `save`, its `output` the messages as persisted (storage envelope included).
+ */
+export type MemorySaveAttributes = {
+  readonly threadId: string;
+  readonly resourceId: string;
+};
+
+/**
  * Span attributes, narrowed by type at the type level (zero runtime cost — the OTLP mapping
  * capability package reads them with type safety). `Record<string, unknown>` keeps the bag open
  * for user spans and for `workflow-step` (`{}` — its name is the step id).
@@ -58,6 +77,8 @@ export type SpanAttributes =
   | AgentStepAttributes
   | ToolCallAttributes
   | WorkflowRunAttributes
+  | MemoryRecallAttributes
+  | MemorySaveAttributes
   | Record<string, unknown>;
 
 /** How a span failed. `details` carries the original error object when there was one. */
@@ -80,7 +101,7 @@ interface SpanFields {
   parentSpanId?: string;
   /** Human-readable operation name. */
   name: string;
-  /** Open span type; the framework writes the five constants above. */
+  /** Open span type; the framework's seven constants are exported by this entry. */
   type: SpanType;
   /** When the span started. */
   startTime: Date;
