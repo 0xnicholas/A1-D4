@@ -29,8 +29,18 @@ step requests no tool call or `maxSteps` (default 5) is reached. Failures never 
 invalid input, an `execute` throw and invalid output all come back to the model as an `isError`
 tool result, so it can recover or give up on its own.
 
-Expected output: a `[tool-call] …` line, the tool's result, then the model's text streamed as it
-arrives, followed by a `steps` / `finishReason` / `usage` summary.
+Expected output: the console exporter's `[balsa] span_started / …` lines for the agent run, each
+step and the tool call; a `[tool-call] …` line, the tool's result, then the model's text streamed
+as it arrives, followed by a `steps` / `finishReason` / `usage` summary.
+
+## Composition root and observability
+
+`createApp({ tracer })` is the optional thin assembly point (ADR-0002): the tracer is assembled
+once here and handed to every agent built through the app — `app.agent({ … })` — with no
+per-agent wiring. The example uses the built-in console exporter, which pretty-prints each span
+event (`agent-run` → `agent-step` → `tool-call`) as it happens; the memory exporter is its
+test-time counterpart (a ring buffer your tests assert against). A standalone `new Agent({ … })`
+stays a first-class usage: no app, no tracer, no span objects, zero overhead.
 
 ## Run
 
@@ -58,4 +68,5 @@ OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
 - Leaving the `for await` loop early does not cancel the run; pass a per-call `signal` to cancel.
 - `maxSteps` bounds the loop; when it is reached while the model still asks for tools, the
   terminal `finishReason` is `'tool-calls'` — the truncation signal.
-- Observability instrumentation lands with the remaining M1 tickets — see `docs/ROADMAP.md`.
+- Observability is wired through the composition root (see above): swapping in the memory
+  exporter, or dropping the tracer entirely, needs no change to the agent.

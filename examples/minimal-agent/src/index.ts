@@ -2,7 +2,8 @@
  * Balsa minimal example — a five-field agent with one tool, streamed to the terminal.
  *
  * The model instance comes straight from an AI SDK provider package; it satisfies the core's
- * model contract structurally, no adapter or registration (ADR-0004).
+ * model contract structurally, no adapter or registration (ADR-0004). The agent hangs on the
+ * optional composition root, which distributes one tracer to it — no per-agent wiring (ADR-0002).
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
@@ -14,7 +15,8 @@
  *     pnpm --filter @balsa/example-minimal-agent start
  */
 import { openai } from '@ai-sdk/openai';
-import { Agent } from '@balsa/core/agent';
+import { createApp } from '@balsa/core';
+import { consoleExporter, createTracer } from '@balsa/core/observability';
 import { createTool } from '@balsa/core/tools';
 import { z } from 'zod';
 
@@ -35,7 +37,16 @@ const weather = createTool({
   execute: ({ city }) => ({ city, celsius: 18 }),
 });
 
-const agent = new Agent({
+// The composition root is the optional thin assembly point (ADR-0002): one tracer is assembled
+// here and handed to every agent built through the app, so nothing is passed per agent. A
+// standalone `new Agent({ … })` without the app stays equally first-class. The console exporter
+// pretty-prints every span event as it happens — agent run → step → tool call; the memory
+// exporter is the test-time counterpart you assert against.
+const app = createApp({
+  tracer: createTracer({ exporters: [consoleExporter()] }),
+});
+
+const agent = app.agent({
   name: 'assistant',
   instructions:
     'You are concise. Answer in one short sentence. Use the weather tool for weather questions.',
