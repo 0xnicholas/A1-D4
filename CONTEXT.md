@@ -45,7 +45,7 @@ _Avoid_: mastra 式 Map 类、泛型上下文参数
 _Avoid_: session、conversation(那是 Memory 域的词)
 
 **Step**:
-两层含义,靠语境限定。agent 域:run 内的一轮"模型调用 + 工具执行"(mastra 的第三层 model step 不收);workflow 域:图中的一个节点(id + input/output schema + execute)。
+两层含义,靠语境限定。agent 域:run 内的一轮"模型调用 + 工具执行"(fallback 链的多次模型尝试同属这一轮,不另成 step;mastra 的第三层 model step 不收);workflow 域:图中的一个节点(id + input/output schema + execute)。
 _Avoid_: iteration、loop iteration(规范统一用 step)
 
 **输出对象 (Output object)**:

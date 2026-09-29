@@ -53,6 +53,8 @@ export type {
   ModelWarning,
 } from './contract.js';
 export { MODEL_SPECIFICATION_VERSION, ModelContractError, ModelSpecificationVersionError, assertModel } from './resolve.js';
+export { ModelFallbackError } from './fallback.js';
+export type { ModelFallbackFailure } from './fallback.js';
 export type {
   Chunk,
   FinishChunk,

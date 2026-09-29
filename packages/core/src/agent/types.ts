@@ -27,10 +27,11 @@ export interface AgentConfig {
   /** System instructions for every run — a plain string (no message-union passthrough). */
   readonly instructions: DynamicArgument<string>;
   /**
-   * The language model instance to run — or a resolver that picks one per request context. Any AI
-   * SDK provider package instance satisfies the contract structurally; a wrong specification
-   * version fails loudly when the field is resolved (at construction for a static model, at
-   * resolution time for a resolver's pick).
+   * The language model(s) to run — an instance, an array of instances forming a fallback chain
+   * (`ModelInput`), or a resolver that picks either per request context. Any AI SDK provider
+   * package instance satisfies the contract structurally; a wrong specification version fails
+   * loudly when the field is resolved (at construction for a static value, at resolution time for
+   * a resolver's pick).
    */
   readonly model: ModelInput;
   /** Tool container — the Record key is the tool name. Static, or resolved per request context. */
@@ -84,10 +85,16 @@ export type DynamicArgument<T> = T | ((ctx: RequestContext) => T | Promise<T>);
 
 /**
  * The `model` field's accepted shapes (`docs/architecture/model.md`「model 字段形状」): a model
- * instance satisfying the contract, or a resolver that picks one per request context. The
- * fallback-chain array shape lands with M1-11 (#32); widening the union is additive.
+ * instance satisfying the contract, an array of instances forming a fallback chain, or a resolver
+ * that picks either per request context.
+ *
+ * A chain is tried in array order on every model call (`agent/loop.ts`): the call moves on to the
+ * next candidate only while the current one has produced no chunk yet. A failure mid-stream
+ * propagates — partial output has already reached the caller, and switching would splice two
+ * models' answers together. When every candidate failed, the run fails with the original error if
+ * there was only one, or with `ModelFallbackError` carrying the whole chain.
  */
-export type ModelInput = Model | ((ctx: RequestContext) => Model | Promise<Model>);
+export type ModelInput = DynamicArgument<Model | readonly Model[]>;
 
 /**
  * Per-call execution options. The open bag below is the user's per-call request context

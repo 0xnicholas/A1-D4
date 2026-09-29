@@ -83,7 +83,7 @@ createTracer({
 tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 
 1. **agent run** — 一次 generate()/stream() 全程
-2. **agent step** — run 内每轮模型调用;`timeToFirstChunk` 落此 span(替代被裁的 chunk 级 span 的最高价值部分)
+2. **agent step** — run 内每轮模型调用(fallback 链的每次尝试各成一个 span,失败尝试落 error;服务该 step 的尝试携带 usage / finishReason);`timeToFirstChunk` 落此 span(替代被裁的 chunk 级 span 的最高价值部分)
 3. **tool call** — agent loop 内每次工具执行
 4. **workflow run** — start/resume 到终态
 5. **workflow step** — 每个 step 边界

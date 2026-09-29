@@ -9,13 +9,28 @@
  */
 export function expectAssignable<To>(_value: To): void {}
 
+/** 断言接缝共用的失败收敛:Error 原样交还,其余原样重抛(不吞非 Error 抛出)。 */
+function asError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  throw error;
+}
+
 /** 捕获 `run()` 抛出的 Error;未抛出、或抛出的不是 Error 时失败。 */
 export function captureError(run: () => unknown): Error {
   try {
     run();
   } catch (error) {
-    if (error instanceof Error) return error;
-    throw error;
+    return asError(error);
   }
   throw new Error('expected the call to throw an Error');
+}
+
+/** 捕获 `run()` 拒绝的 Error;未拒绝、或拒绝的不是 Error 时失败。 */
+export async function captureRejection(run: () => Promise<unknown>): Promise<Error> {
+  try {
+    await run();
+  } catch (error) {
+    return asError(error);
+  }
+  throw new Error('expected the call to reject with an Error');
 }

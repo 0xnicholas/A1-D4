@@ -10,6 +10,8 @@ import type {
   ModelToolResultOutput,
   ModelToolResultPart,
 } from '../model/contract.js';
+import { modelChainExhausted } from '../model/fallback.js';
+import type { ModelFallbackFailure } from '../model/fallback.js';
 import { normalizeStream } from '../model/normalize.js';
 import { AGENT_RUN_SPAN, AGENT_STEP_SPAN, TOOL_CALL_SPAN } from '../observability/index.js';
 import type { Span, Tracer } from '../observability/index.js';
@@ -23,8 +25,12 @@ export const DEFAULT_MAX_STEPS = 5;
 
 /** Everything the built-in loop needs for one run. */
 export interface AgentLoopOptions {
-  /** The model instance of this run (already asserted against the model contract). */
-  readonly model: Model;
+  /**
+   * The run's fallback chain, in array order — at least one candidate (a run with a single model is
+   * a one-element chain). Every model call walks it: a candidate is abandoned for the next one only
+   * when it fails before producing a chunk (`docs/architecture/model.md`「model 字段形状」).
+   */
+  readonly models: readonly Model[];
   /** The run's initial prompt (instructions + input); the loop extends it with each round trip. */
   readonly prompt: ModelPrompt;
   /** Model call options without `prompt` — the loop writes the prompt of every step. */
@@ -78,6 +84,14 @@ export interface AgentTracing {
  * `finish` chunk is reported as `'tool-calls'` — the terminal reason for a cap-truncated run
  * (`chunks.ts`).
  *
+ * **Fallback chain** (`docs/architecture/model.md`「model 字段形状」): a step's model call walks
+ * `models` in array order, and abandons a candidate for the next one only while it has produced no
+ * chunk yet. A mid-stream failure propagates instead — partial output has already reached the
+ * caller, and switching would splice two models' answers together — and so does the failure of a
+ * run whose signal is already aborted: cancellation is the run's outcome, not a chain failure. A
+ * step whose whole chain failed ends with the last attempt's error when there was only one, or with
+ * a `ModelFallbackError` carrying every candidate's own error otherwise.
+ *
  * Errors never abort a run (`docs/architecture/tools.md`「校验与错误语义」): input validation
  * failures, `execute` throws, output validation failures and calls to tools the container does not
  * hold all become an `isError` tool result fed back to the model, which decides whether to recover
@@ -87,7 +101,7 @@ export interface AgentTracing {
  * result in the step (the provider executed it) is skipped.
  */
 export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<Chunk> {
-  const { model, callOptions, tools, maxSteps, requestContext } = options;
+  const { models, callOptions, tools, maxSteps, requestContext } = options;
   const prompt: ModelMessage[] = [...options.prompt];
   // The run boundary: one root span per run, the parent every step span hangs under. Absent tracer
   // ⇒ `undefined`, and no span is ever created — the loop's only zero-overhead branch.
@@ -95,60 +109,101 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
 
   try {
     for (let step = 0; step < maxSteps; step += 1) {
-      // The step boundary: one span per model call, hanging under the run's root span. Tool calls
-      // of this step hang under it in turn, so the step span stays open until its tools are done.
-      const stepSpan = startStepSpan(options, runSpan, prompt);
       const stepStartedAt = Date.now();
       let timeToFirstChunk: number | undefined;
+      let finish: FinishChunk | undefined;
+      const stepText: string[] = [];
+      const toolCalls: ToolCallChunk[] = [];
+      /** Tool call ids that already have a result in this step (provider-executed). */
+      const answered = new Set<string>();
+      /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
+      const providerResults: ToolResultChunk[] = [];
+      /** The candidates that failed before producing a chunk, in chain order. */
+      const failures: ModelFallbackFailure[] = [];
+      /**
+       * The candidate that served this step, with its finish chunk. Set when a candidate completes
+       * (its stream ended with a finish part); its span stays open until the step's tools have run.
+       */
+      let served: { readonly span: Span | undefined; readonly finish: FinishChunk } | undefined;
+
+      // The step boundary: one span per model call, hanging under the run's root span — a fallback
+      // chain's failed attempts get their own spans, so a switch is visible in the trace, and the
+      // attempt that serves the step carries its usage / finishReason. Every attempt walks the
+      // chain in array order. Tool calls of the step hang under the serving attempt's span, so that
+      // span stays open until they are done too.
+      for (const candidate of models) {
+        const candidateSpan = startStepSpan(options, runSpan, prompt, candidate);
+        let producedChunk = false;
+
+        try {
+          const { stream } = await candidate.doStream({ ...callOptions, prompt });
+
+          for await (const chunk of normalizeStream(stream)) {
+            // Point of no return for this step: a chunk is on its way to the caller, so a later
+            // failure must propagate — the next candidate would continue someone else's answer.
+            producedChunk = true;
+            if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
+            switch (chunk.type) {
+              case 'text-delta':
+                stepText.push(chunk.textDelta);
+                yield chunk;
+                break;
+              case 'tool-call':
+                toolCalls.push(chunk);
+                yield chunk;
+                break;
+              case 'tool-result':
+                // A result already in the step's stream is provider-executed: it is echoed in the
+                // assistant message and never executed by the framework.
+                answered.add(chunk.toolCallId);
+                providerResults.push(chunk);
+                yield chunk;
+                break;
+              case 'finish':
+                // The step ends here, but the decision needs the whole step: yield it below.
+                finish = chunk;
+                break;
+            }
+          }
+
+          if (finish === undefined) {
+            // A step's model stream without a finish part is a contract violation; failing here also
+            // covers later steps, which must not settle the run on a previous step's finish chunk.
+            throw missingFinishError();
+          }
+
+          served = { span: candidateSpan, finish };
+          break;
+        } catch (error) {
+          candidateSpan?.error(error);
+          // Two failures never fall back: a mid-stream failure (output already reached the caller)
+          // and a cancelled run (the abort reason is the run's outcome, not a chain failure).
+          if (producedChunk || requestContext.signal.aborted) throw error;
+          failures.push({ model: candidate, error });
+        } finally {
+          // A candidate that did not serve the step is over here: its span carries the failure (or
+          // the abandoned attempt) and closes. The serving candidate's span stays open for its
+          // tools, which hang under it.
+          if (served === undefined) candidateSpan?.end();
+        }
+      }
+
+      if (served === undefined) {
+        // Every candidate failed before producing a chunk: the run ends here — with the original
+        // error when there was nothing to fall back to, with the chain's context when there was.
+        throw modelChainExhausted(failures);
+      }
+
+      const { span: stepSpan, finish: stepFinish } = served;
 
       try {
-        const { stream } = await model.doStream({ ...callOptions, prompt });
-        const stepText: string[] = [];
-        const toolCalls: ToolCallChunk[] = [];
-        /** Tool call ids that already have a result in this step (provider-executed). */
-        const answered = new Set<string>();
-        /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
-        const providerResults: ToolResultChunk[] = [];
-        let finish: FinishChunk | undefined;
-
-        for await (const chunk of normalizeStream(stream)) {
-          if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
-          switch (chunk.type) {
-            case 'text-delta':
-              stepText.push(chunk.textDelta);
-              yield chunk;
-              break;
-            case 'tool-call':
-              toolCalls.push(chunk);
-              yield chunk;
-              break;
-            case 'tool-result':
-              // A result already in the step's stream is provider-executed: it is echoed in the
-              // assistant message and never executed by the framework.
-              answered.add(chunk.toolCallId);
-              providerResults.push(chunk);
-              yield chunk;
-              break;
-            case 'finish':
-              // The step ends here, but the decision needs the whole step: yield it below.
-              finish = chunk;
-              break;
-          }
-        }
-
-        if (finish === undefined) {
-          // A step's model stream without a finish part is a contract violation; failing here also
-          // covers later steps, which must not settle the run on a previous step's finish chunk.
-          throw missingFinishError();
-        }
-
         // The step is complete: its text is the run's output so far (the last step's text settles
         // the run's output — `stream()`'s `text` reads the same rule).
         stepSpan?.update({
           output: stepText.join(''),
           attributes: {
-            usage: finish.usage,
-            finishReason: finish.finishReason,
+            usage: stepFinish.usage,
+            finishReason: stepFinish.finishReason,
             ...(timeToFirstChunk === undefined ? {} : { timeToFirstChunk }),
           },
         });
@@ -158,7 +213,9 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
         const lastStep = step + 1 >= maxSteps;
         // The step boundary comes before the framework-executed results: consumers see the model's
         // finish, then the results that answer the step's calls (results belong to that step).
-        yield pending.length > 0 && lastStep ? { ...finish, finishReason: 'tool-calls' } : finish;
+        yield pending.length > 0 && lastStep
+          ? { ...stepFinish, finishReason: 'tool-calls' }
+          : stepFinish;
 
         if (pending.length === 0) return;
 
@@ -216,25 +273,29 @@ function startRunSpan(options: AgentLoopOptions): Span | undefined {
 }
 
 /**
- * Starts one step's span (`docs/architecture/observability.md`「自动埋点」): one model call of the
- * run. The step's tool calls hang under it, so it stays open until they have run too. Its prompt
- * is copied — the loop appends to its own array, and a recorded span must not mutate after the fact.
+ * Starts one step span (`docs/architecture/observability.md`「自动埋点」): one model call of the
+ * run, hanging under the run's root span. Every attempt of a fallback chain gets its own span — a
+ * failed attempt carries the failure, the attempt that serves the step carries its usage /
+ * finishReason. The step's tool calls hang under the serving attempt's span, so that span stays
+ * open until they have run too. Its prompt is copied — the loop appends to its own array, and a
+ * recorded span must not mutate after the fact.
  */
 function startStepSpan(
   options: AgentLoopOptions,
   runSpan: Span | undefined,
   prompt: readonly ModelMessage[],
+  model: Model,
 ): Span | undefined {
   const tracing = options.tracing;
   if (tracing === undefined) return undefined;
   return tracing.tracer.startSpan({
-    name: options.model.modelId,
+    name: model.modelId,
     type: AGENT_STEP_SPAN,
     ...(runSpan === undefined ? {} : { parent: runSpan }),
     input: [...prompt],
     attributes: {
-      model: options.model.modelId,
-      provider: options.model.provider,
+      model: model.modelId,
+      provider: model.provider,
       ...(options.parameters === undefined ? {} : { parameters: options.parameters }),
     },
   });

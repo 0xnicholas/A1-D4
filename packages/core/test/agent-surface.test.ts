@@ -70,7 +70,7 @@ describe('Agent 五字段配置表面', () => {
     });
   });
 
-  it('DynamicArgument<T> = T | ((ctx) => T | Promise<T>);ModelInput 已落实例与解析函数两形状', () => {
+  it('DynamicArgument<T> = T | ((ctx) => T | Promise<T>);ModelInput 三形状:实例 / fallback 链 / 解析函数', () => {
     expectAssignable<DynamicArgument<string>>('You are concise.');
     expectAssignable<DynamicArgument<string>>((ctx: RequestContext) => `You serve ${ctx.runId}.`);
     expectAssignable<DynamicArgument<string>>(async (ctx: RequestContext) => ctx.runId);
@@ -78,10 +78,14 @@ describe('Agent 五字段配置表面', () => {
 
     const model = fakeModel([]);
     expectAssignable<ModelInput>(model);
+    expectAssignable<ModelInput>(() => model);
     expectAssignable<ModelInput>((ctx: RequestContext) => (ctx.tier === 'pro' ? model : model));
     expectAssignable<ModelInput>(async () => model);
-    // @ts-expect-error fallback 链数组随 M1-11(#32)落地,当前不是 ModelInput 的形状
+    // fallback 链(M1-11 #32):静态数组,或解析函数选出的数组
     expectAssignable<ModelInput>([model]);
+    expectAssignable<ModelInput>([model, model]);
+    expectAssignable<ModelInput>((ctx: RequestContext) => (ctx.tier === 'pro' ? [model] : []));
+    expectAssignable<ModelInput>(async () => [model, model]);
   });
 
   it('五字段之外无一物——多余字段被类型拒绝', () => {

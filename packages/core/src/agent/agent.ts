@@ -1,4 +1,5 @@
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
+import { assertModelChain } from '../model/fallback.js';
 import { assertModel } from '../model/resolve.js';
 import type { Tracer } from '../observability/index.js';
 import type { Tool } from '../tools/index.js';
@@ -27,7 +28,7 @@ export class Agent {
   readonly name: string;
   /** System instructions, static or resolved per request context. */
   readonly instructions: DynamicArgument<string>;
-  /** The model of every run — the instance itself, or a resolver that picks one per run. */
+  /** The model(s) of every run — an instance, a fallback chain, or a resolver that picks either per run. */
   readonly model: ModelInput;
   /** Tool container (key = tool name) — a static container, a per-run resolver, or `undefined`. */
   readonly tools: DynamicArgument<Record<string, Tool>> | undefined;
@@ -44,9 +45,10 @@ export class Agent {
     this.name = config.name;
     this.instructions = config.instructions;
     // Resolution-time hard assertion (ADR-0004): a static model of the wrong specification version
-    // — or not a language model at all — fails here, before any run. A resolver's pick is asserted
-    // when the run resolves it (`resolveModel`), so both paths fail before a model call.
-    this.model = typeof config.model === 'function' ? config.model : assertModel(config.model);
+    // — or not a language model at all — fails here, before any run, and so does a bad candidate
+    // of a static fallback chain. A resolver's pick is asserted when the run resolves it
+    // (`resolveModels`), so both paths fail before a model call.
+    this.model = typeof config.model === 'function' ? config.model : assertModelField(config.model);
     this.tools = config.tools;
     this.description = config.description;
     this.#tracer = config.tracer;
@@ -78,9 +80,9 @@ export class Agent {
       // The run's request context comes first: every dynamic field resolves against it, and the
       // tools of the run receive the very same object.
       const requestContext = toRequestContext(options);
-      const [resolvedInstructions, resolvedModel, resolvedTools] = await Promise.all([
+      const [resolvedInstructions, resolvedModels, resolvedTools] = await Promise.all([
         resolveDynamicArgument(instructions, requestContext),
-        resolveModel(model, requestContext),
+        resolveModels(model, requestContext),
         resolveDynamicArgument(tools, requestContext),
       ]);
       // Call options are built per run — they are part of the run, not of creating the object.
@@ -91,7 +93,7 @@ export class Agent {
         options,
       );
       yield* runAgentLoop({
-        model: resolvedModel,
+        models: resolvedModels,
         agentName: name,
         prompt,
         callOptions,
@@ -129,13 +131,26 @@ export class Agent {
 }
 
 /**
- * Resolves the run's model and asserts it against the model contract (ADR-0004): a model of the
- * wrong specification version — or not a language model at all — fails here, before the run's first
- * model call, whichever shape picked it. (A static model was already asserted when the agent was
- * built; asserting it again per run keeps both paths on one rule.)
+ * The `model` field's static shapes (`ModelInput`): a model instance, or a fallback chain (an array
+ * of instances). Asserted at construction time and returned unchanged — the agent holds the very
+ * value it was given.
  */
-async function resolveModel(model: ModelInput, ctx: RequestContext): Promise<Model> {
-  return assertModel(await resolveDynamicArgument(model, ctx));
+function assertModelField(value: unknown): Model | readonly Model[] {
+  return Array.isArray(value) ? assertModelChain(value) : assertModel(value);
+}
+
+/**
+ * Resolves the run's model fallback chain and asserts every candidate against the model contract
+ * (ADR-0004): a model of the wrong specification version — or not a language model at all — fails
+ * here, before the run's first model call, whichever shape picked it. (A static field was already
+ * asserted when the agent was built; asserting it again per run keeps both paths on one rule.)
+ *
+ * A single model is a one-element chain: the loop then walks a chain of one, which is the same
+ * behavior as not having a fallback at all.
+ */
+async function resolveModels(model: ModelInput, ctx: RequestContext): Promise<readonly Model[]> {
+  const resolved = await resolveDynamicArgument(model, ctx);
+  return Array.isArray(resolved) ? assertModelChain(resolved) : [assertModel(resolved)];
 }
 
 /**

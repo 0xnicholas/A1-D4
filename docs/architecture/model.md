@@ -23,10 +23,10 @@
 type ModelInput =
   | Model                                            // 满足模型契约的实例
   | Model[]                                          // fallback 链
-  | ((ctx: RequestContext) => Model | Promise<Model>) // 动态解析
+  | ((ctx: RequestContext) => Model | Model[] | Promise<Model | Model[]>) // 动态解析
 ```
 
-- **fallback 语义(初版保守)**:按数组顺序逐项尝试;仅在"尚未产出任何 chunk"的失败时切换下一项;流中途失败不切换、直接报错(部分输出已发给调用方,切换会产生拼接幻觉)。错误上下文沿链保留。
+- **fallback 语义(初版保守)**:每次模型调用按数组顺序逐项尝试;仅在"该次尝试尚未产出任何 chunk"的失败时切换下一项;流中途失败不切换、直接报错(部分输出已发给调用方,切换会产生拼接幻觉)。错误上下文沿链保留(链上全部失败时,错误含每个候选与各自错误;单候选链的失败原样浮出)。
 - **动态函数**:每次执行按请求上下文解析,一个 union 类型换来多租户、按 tier 选模型等表达力。
 
 此形状由 [决策:Agent 核心抽象](https://github.com/0xnicholas/balsa/issues/10) 继承。
