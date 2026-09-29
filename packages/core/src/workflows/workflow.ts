@@ -34,8 +34,8 @@ export interface WorkflowConfig<
    */
   readonly tracer?: Tracer | undefined;
   /**
-   * Snapshot store for suspend/resume; absent = the run is purely in memory (the in-memory default
-   * lands with #51). The slot is reserved here, wiring included.
+   * Snapshot store for suspend/resume; absent = the run is purely in memory (the core's in-memory
+   * default keeps the snapshots for this process only).
    */
   readonly storage?: WorkflowSnapshotStore | undefined;
 }
@@ -57,7 +57,7 @@ export interface Workflow<
   readonly outputSchema: TOutputSchema;
   /** The distributed tracer; `undefined` when none was attached. */
   readonly tracer: Tracer | undefined;
-  /** The snapshot store; `undefined` when none was attached. */
+  /** The snapshot store; `undefined` when none was attached (the run then defaults to in-memory). */
   readonly storage: WorkflowSnapshotStore | undefined;
   /** The frozen, flat entry list the walker interprets. */
   readonly entries: readonly WorkflowEntry[];

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createStep, createWorkflow } from '@balsa/core/workflows';
 import { WorkflowValidationError } from '@balsa/core/workflows';
 import type { StepContext } from '@balsa/core/workflows';
-import { captureError, captureRejection } from './helpers/assertions.js';
+import { captureError, captureRejection, expectSuccess } from './helpers/assertions.js';
 
 /**
  * 控制流算子同步点(M3 #49,`docs/architecture/workflows.md`「控制流算子」):parallel / branch /
@@ -108,7 +108,7 @@ describe('parallel:Promise.all 全并发 + keyed 输出', () => {
     expect(seenInputs).toEqual([{ topic: 'ts' }, { topic: 'ts' }]);
 
     gate.resolve();
-    const outcome = await result;
+    const outcome = expectSuccess(await result);
 
     expect(finished).toHaveLength(3);
     expect(finished.at(-1)).toBe('merge');
@@ -161,7 +161,7 @@ describe('parallel:Promise.all 全并发 + keyed 输出', () => {
     expect(finished).toEqual([]);
 
     gate.resolve();
-    const outcome = await result;
+    const outcome = expectSuccess(await result);
 
     expect(finished).toHaveLength(3);
     // keyed 对象按定义序;每个 step 的输出挂在它自己的 id 下
@@ -256,7 +256,7 @@ describe('parallel:Promise.all 全并发 + keyed 输出', () => {
       .then(merge)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { topic: 'ts' } }).result);
 
     expect(seenInside).toEqual([{ seed: 'ts' }, { seed: 'ts' }]);
     // 块内查自己(尚未有记录)一律 undefined
@@ -313,7 +313,7 @@ describe('branch:按定义序求值,第一个真分支执行', () => {
       .commit();
 
     const run = branched.createRun({ runId: 'run-1' });
-    const outcome = await run.start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuccess(await run.start({ inputData: { topic: 'ts' } }).result);
 
     expect(firstCond).toHaveBeenCalledTimes(1);
     expect(secondCond).toHaveBeenCalledTimes(1);
@@ -375,7 +375,7 @@ describe('branch:按定义序求值,第一个真分支执行', () => {
       .branch([[() => false, fast]])
       .commit();
 
-    const outcome = await none.createRun().start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuccess(await none.createRun().start({ inputData: { topic: 'ts' } }).result);
 
     expect(outcome.output).toEqual({});
     expect(execute).not.toHaveBeenCalled();
@@ -481,7 +481,7 @@ describe('foreach:数组输入 + 自写并发闸 + 保序收集', () => {
       .then(join)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { drafts: ['a', 'b', 'c'] } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { drafts: ['a', 'b', 'c'] } }).result);
 
     // concurrency=1:上一元素做完才开下一元素
     expect(events).toEqual(['start:a', 'end:a', 'start:b', 'end:b', 'start:c', 'end:c']);
@@ -537,7 +537,7 @@ describe('foreach:数组输入 + 自写并发闸 + 保序收集', () => {
     await vi.waitFor(() => expect(completed).toEqual(['b', 'c']));
     releases.get('a')!();
 
-    const outcome = await result;
+    const outcome = expectSuccess(await result);
 
     expect(completed).toEqual(['b', 'c', 'a']);
     // 完成序与输入序不同,收集仍按输入下标保序
@@ -557,7 +557,7 @@ describe('foreach:数组输入 + 自写并发闸 + 保序收集', () => {
       .foreach(empty)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { drafts: [] } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { drafts: [] } }).result);
 
     expect(execute).not.toHaveBeenCalled();
     expect(outcome.output).toEqual([]);

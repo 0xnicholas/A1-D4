@@ -1,3 +1,5 @@
+import type { WorkflowRunOutcome, WorkflowRunSuccessOutcome } from '@balsa/core/workflows';
+
 /**
  * 测试共享断言工具:编译期断言与错误捕获。各测试文件从同一份实现取用,不各自复制。
  */
@@ -33,4 +35,17 @@ export async function captureRejection(run: () => Promise<unknown>): Promise<Err
     return asError(error);
   }
   throw new Error('expected the call to reject with an Error');
+}
+
+/**
+ * 收窄 run 的终态信封并断言 success:suspend 臂加入联合后(#51),`output` 只在 success 分支上。
+ * 测试里把「断言 success + 取 output」收成一步;挂起臂按语义抛出可读错误。
+ */
+export function expectSuccess<TOutput>(
+  outcome: WorkflowRunOutcome<TOutput>,
+): WorkflowRunSuccessOutcome<TOutput> {
+  if (outcome.status !== 'success') {
+    throw new Error(`expected a successful run outcome, got "${outcome.status}"`);
+  }
+  return outcome;
 }

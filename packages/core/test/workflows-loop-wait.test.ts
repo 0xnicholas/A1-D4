@@ -4,7 +4,7 @@ import { createStep, createWorkflow } from '@balsa/core/workflows';
 import { WorkflowValidationError } from '@balsa/core/workflows';
 import type { RequestContext } from '@balsa/core/agent';
 import type { StepContext } from '@balsa/core/workflows';
-import { captureError, captureRejection } from './helpers/assertions.js';
+import { captureError, captureRejection, expectSuccess } from './helpers/assertions.js';
 
 /** 一次性闸门 / 信号:测试自行控制时机,不靠计时器(沿 workflows-control-flow 的 idiom)。 */
 function deferred() {
@@ -81,10 +81,9 @@ describe('dowhile:每次迭代前求值条件', () => {
       .then(tail)
       .commit();
 
-    const outcome = await workflow
-      .createRun({ runId: 'run-1' })
-      .start({ inputData: { count: 0 } })
-      .result;
+    const outcome = expectSuccess(
+      await workflow.createRun({ runId: 'run-1' }).start({ inputData: { count: 0 } }).result,
+    );
 
     // 迭代前求值:0 / 1 / 2 放行 → 三次迭代;第 4 次求值(3)停
     expect(seen.map((call) => call.iterationCount)).toEqual([0, 1, 2, 3]);
@@ -114,7 +113,7 @@ describe('dowhile:每次迭代前求值条件', () => {
       .dowhile(bump, () => false)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { count: 0 } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { count: 0 } }).result);
 
     expect(execute).not.toHaveBeenCalled();
     expect(outcome.output).toEqual({ count: 0 });
@@ -138,7 +137,7 @@ describe('dountil:每次迭代后求值条件', () => {
       })
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { count: 0 } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { count: 0 } }).result);
 
     // 迭代后求值:1 / 2,第 2 次即停
     expect(seen).toEqual([
@@ -156,7 +155,7 @@ describe('dountil:每次迭代后求值条件', () => {
       .dountil(bump, () => true)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { count: 0 } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { count: 0 } }).result);
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(outcome.output).toEqual({ count: 1 });
@@ -266,7 +265,7 @@ describe('sleep:进程内等待,tip 原样透传', () => {
       .commit();
 
     const startedAt = Date.now();
-    const outcome = await workflow.createRun().start({ inputData: { count: 1 } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { count: 1 } }).result);
     const elapsed = Date.now() - startedAt;
 
     expect(elapsed).toBeGreaterThanOrEqual(20);
@@ -323,7 +322,7 @@ describe('sleep:进程内等待,tip 原样透传', () => {
       .sleep(() => -5)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { count: 0 } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { count: 0 } }).result);
 
     expect(outcome.output).toEqual({ count: 0 });
   });
@@ -368,7 +367,7 @@ describe('retries:step 级固定间隔重试', () => {
       .commit();
 
     const startedAt = Date.now();
-    const outcome = await workflow.createRun().start({ inputData: { count: 0 } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { count: 0 } }).result);
     const elapsed = Date.now() - startedAt;
 
     expect(attempts).toBe(2);

@@ -4,6 +4,7 @@
 > 决策记录见 `docs/adr/0006-workflow-engine-semantics.md`;术语见 `CONTEXT.md`。
 > 修订(#49):控制流算子表补钉两处实施期裁决——branch 无真分支输出空 keyed 对象 `{}`(tip 值不穿透);foreach concurrency 须为正整数,迭代失败后不再开新迭代。
 > 修订(#50):循环与等待补钉实施期裁决——dowhile 条件在**迭代前**求值(条件在 tip 上为假即可 0 次迭代,块输出 = tip 原样透传)、dountil 在**迭代后**求值(至少一次);两者 `iterationCount` = 已完成迭代数(条件里抛错即最大迭代闸),块按 step id 记一条(记录 = 最后一次迭代的输出)。sleep 的动态时长 fn 收 `RequestContext`(动态参数约定,非 step 参数包;非有限数报错,负值当 0);`retries` = **额外**尝试数(最多 `retries + 1` 次),固定间隔 1000ms、可被中止打断,step 边界校验只做一次不重试,定义期须为非负整数。
+> 修订(#51):suspend/resume 落地时补钉实施期裁决——v1 的 suspend 只成立在**顶层 then 条目**的 step 内,块内(parallel / branch 臂 / foreach / 循环)调用 suspend 显式报错(块内迭代现场不在快照形状内,升级为新 ticket);`position` = 重进下标(suspend 时 = 挂起条目,running 时 = 下一条目,终态 success = 条目数);resume 把前序条目**按记录回放**重建 tip(不重执行、不重估条件),`input` 用快照里已校验的值;无 storage 时只写 suspend 与终态(step 边界写只随真实 storage)。
 
 ## 定位
 
@@ -76,11 +77,19 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 
 **收 suspend/resume,形态 = suspend 控制信号 + step 边界 JSON 快照 + storage port**(ADR-0006)。
 
-- `suspend(payload)` 在 execute 内调用:当前 step 标记 suspended → 快照写 port → 引擎展开退出;run 状态 = `suspended`。
+- `suspend(payload)` 在 execute 内调用:当前 step 标记 suspended → 快照写 port → 引擎展开退出;run 状态 = `suspended`。suspend 是控制信号不是失败:不经过 step 重试,也不落 failed 记录。
 - 快照 = JSON 可序列化的 `{ runId, status, input, stepResults, position }`(stepResults 记录每步 status / output / 起止时间 / suspendPayload;position 即 mastra 的 startIdx 等价物)。**JSON-only 约束**:大数据只存引用。
 - 恢复 = `run.resume({ step, resumeData? })`:load 快照 → resumeData 过 resumeSchema → 从 position 重进同一个 for 循环。time-travel / restart / restartAllActiveWorkflowRuns 是同一机制的变种,**全部裁出 v1**;引擎只暴露「load → 重进」原语,durable 重启归 Harness(#18)。
 - 持久化时机:有 storage 时**每个 step 完成后** + suspend + 终态,固定写;无 shouldPersistSnapshot / prune 钩子。
 - resume 并发去重:进程内锁;跨进程 CAS = adapter 可选扩展(`compareAndSave`,见 `docs/architecture/storage.md`)。
+
+### 实施钉死(#51)
+
+- **v1 的 suspend 只在顶层 `then` 条目**:`parallel` / `branch` 臂 / `foreach` / `dowhile` / `dountil` 体内调用 suspend → 显式报错(点名块类型与 step id),run 落 failed。迭代现场(第几次迭代、已收集多少、多少在飞)不在 `stepResults + position` 形状内;块内 suspend 语义是新 ticket 的事。条件里调用 suspend 同样显式报错(条件是只读的)。
+- **position = 重进下标**:suspend 快照 = 挂起条目;`running` 快照 = 已完成条目的下一条;终态 `success` = 条目数。只写 `running` 快照当 `createWorkflow` 附了真实 storage;无 storage 时只写 suspend 与终态(内存默认实现,进程内可恢复)。
+- **resume 的回放**:从快照 `input`(start 边界已校验过的值)起,按记录重建前序条目的输出得到 tip——前序 step 不重执行、条件不重估;`getStepResult` 由快照记录种子恢复。`resumeData` 过挂起 step 的 `resumeSchema` 是第三处固定 IO 校验,校验值替换原数据;声眀无 `resumeSchema` 的 step 不接受 resumeData(显式报错)。`step`(step 对象或 id)必须与快照里挂起的 step 一致,否则显式报错。resume 选项可再传 `signal` / `requestContext`(跨进程恢复时;缺省用 start 的)。
+- **信封与去重**:挂起终态 = `{ status: 'suspended', stepId, stepResults }`(payload 在 `stepResults[stepId].suspendPayload`);resume 与 start 返回同一终态信封。进程内锁按 runId 去重:同一 run 的并发 resume 合并为一次调用(后到者拿到同一 promise),锁在 settle 后释放(再次挂起可再次 resume)。
+- **写失败语义**:快照写失败随 run 失败(除 failed 终态那一写为 best-effort——run 自身的错误永远原样上抛)。
 
 ### storage port(#15 已定)
 
@@ -121,6 +130,7 @@ interface WorkflowSnapshotStore {
 | bail | branch 建模;后加 minor |
 | validateInputs 开关 | 永远校验 |
 | time-travel / restart / restartAll | 引擎 load→重进原语;durable 归 Harness(#18) |
+| 块内(parallel / branch 臂 / foreach / 循环)的 suspend | 显式报错 + 迭代现场快照机制归后续 ticket(快照形状需先演化) |
 | shouldPersistSnapshot / prune 钩子 | 固定 step 边界写 |
 | resume CAS / serializedStepGraph / 多引擎适配 | adapter 可选扩展(`docs/architecture/storage.md`)/ 外部 runner 能力包方向 |
 | chunk 级流式透传 | step 内自行消费;后加 minor |

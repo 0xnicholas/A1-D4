@@ -1,4 +1,5 @@
 import { abortableSleep } from './abort.js';
+import { isSuspendSignal } from './suspend.js';
 
 /**
  * The fixed interval between a step's retry attempts (`docs/architecture/workflows.md`
@@ -14,7 +15,9 @@ export const STEP_RETRY_INTERVAL_MS = 1000;
  * (`docs/architecture/workflows.md`「错误、重试与状态机」).
  *
  * Retrying wraps `execute` only: the step boundary's IO validation happens once, before this is
- * called, because an input its schema rejects will not start passing on a second look.
+ * called, because an input its schema rejects will not start passing on a second look. A suspend is
+ * not a failure attempt at all: the signal passes straight through, so `retries` never re-runs a
+ * suspended step (`suspend.ts`).
  */
 export async function executeWithRetries<T>(
   attempt: () => Promise<T>,
@@ -25,6 +28,7 @@ export async function executeWithRetries<T>(
     try {
       return await attempt();
     } catch (error) {
+      if (isSuspendSignal(error)) throw error;
       // Counting the failures also closes the door on an untrusted count (`createStep` validates
       // `retries`, but a hand-written step literal bypasses the factory): `NaN` compares false
       // here, so it spends no retry at all instead of retrying forever.

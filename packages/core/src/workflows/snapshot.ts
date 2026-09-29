@@ -3,8 +3,9 @@
  * 「suspend/resume 与快照」、「storage port」;ADR-0010). Shapes are spec-pinned and JSON-only: the
  * store receives serializable values — large data is referenced, never embedded.
  *
- * The port is the wiring slot `createWorkflow({ storage })` reserves here; the in-memory default
- * implementation and the actual snapshot writing at step boundaries land with #51.
+ * The port is the wiring slot `createWorkflow({ storage })` reserves: attach an adapter, or attach
+ * nothing and the core's in-memory default (`in-memory-snapshot-store.ts`) keeps the run's
+ * snapshots for this process only.
  */
 
 /** The run status a snapshot carries. Terminal runs are the three-state machine; `running` only appears mid-run. */
@@ -46,9 +47,9 @@ export interface WorkflowRunSnapshot {
 
 /**
  * The workflow snapshot storage port (`docs/architecture/workflows.md`「storage port」): two
- * methods, JSON-only snapshots. Core ships an in-memory default (#51) — a workflow without storage
- * runs purely in memory. Evolution is additive-only (ADR-0010): new capabilities arrive as
- * optional methods plus capability flags, never by changing these signatures.
+ * methods, JSON-only snapshots. Core ships an in-memory default — a workflow without storage runs
+ * purely in memory. Evolution is additive-only (ADR-0010): new capabilities arrive as optional
+ * methods plus capability flags, never by changing these signatures.
  */
 export interface WorkflowSnapshotStore {
   /** Fetch the latest snapshot of a run; `null` when the store has none. */

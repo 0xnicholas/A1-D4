@@ -9,7 +9,7 @@ import type {
   WorkflowRunOutcome,
   WorkflowStepResultSnapshot,
 } from '@balsa/core/workflows';
-import { captureError, captureRejection, expectAssignable } from './helpers/assertions.js';
+import { captureError, captureRejection, expectAssignable, expectSuccess } from './helpers/assertions.js';
 
 /**
  * walker 语义内核(M3 #48,`docs/architecture/workflows.md`「Run」「IO 校验」「错误、重试与状态
@@ -55,7 +55,7 @@ describe('run.start:then 主轴 for 循环解释执行', () => {
 
     const run = workflow.createRun();
     const out = run.start({ inputData: { topic: 'ts' } });
-    const outcome = await out.result;
+    const outcome = expectSuccess(await out.result);
 
     expect(outcome.status).toBe('success');
     expect(outcome.output).toEqual({ polished: '«TS»' });
@@ -97,7 +97,7 @@ describe('run.start:then 主轴 for 循环解释执行', () => {
       outputSchema: topicInput,
     }).commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { topic: 'ts' } }).result);
 
     expect(outcome.status).toBe('success');
     expect(outcome.output).toEqual({ topic: 'ts' });
@@ -279,7 +279,7 @@ describe('IO 校验:start 输入与 step 边界(固定三处中的前两处)', (
       .then(polish)
       .commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { topic: 'ts' } }).result);
 
     expect(received).toBe('TS');
     expect(outcome.output).toEqual({ polished: 'TS' });
@@ -546,6 +546,7 @@ describe('createRun / start 约束', () => {
     const forged = {
       id: 'article',
       inputSchema: topicInput,
+      storage: undefined,
       entries: [{ type: 'then', step: draft }, { type: 'map' }] as unknown as readonly WorkflowEntry[],
     };
 
@@ -608,7 +609,7 @@ describe('run 面类型(编译期)', () => {
       outputSchema: articleOutput,
     }).commit();
 
-    const outcome = await workflow.createRun().start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuccess(await workflow.createRun().start({ inputData: { topic: 'ts' } }).result);
     expectAssignable<'success'>(outcome.status);
     expectAssignable<{ polished: string }>(outcome.output);
     expectAssignable<Readonly<Record<string, WorkflowStepResultSnapshot>>>(outcome.stepResults);
