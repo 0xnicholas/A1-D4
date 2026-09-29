@@ -13,8 +13,9 @@ import { captureError, captureRejection, expectAssignable, expectSuccess } from 
 
 /**
  * walker 语义内核(M3 #48,`docs/architecture/workflows.md`「Run」「IO 校验」「错误、重试与状态
- * 机」):`createRun` / `start` 输出对象骨架、then 主轴 for 循环解释执行、两处 IO 校验(start 输入、
- * step 边界)、状态机 success / failed(挂起归 #51)、`getStepResult`、AbortSignal 沿 execute 传播。
+ * 机」):`createRun` / `start` 输出对象骨架、then 主轴 for 循环解释执行、前两处 IO 校验(start 输入、
+ * step 边界)、状态机 success / failed(suspend / resume 与第三处 resumeData 校验归
+ * workflows-suspend-resume)、`getStepResult`、AbortSignal 沿 execute 传播。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径:定义 → `createRun` → `run.start` → `out.result`,
  * 以及 step `execute` / 动态函数收到的 ctx;不触内部模块。
@@ -195,7 +196,7 @@ describe('step ctx:框架参数包', () => {
   });
 });
 
-describe('IO 校验:start 输入与 step 边界(固定三处中的前两处)', () => {
+describe('IO 校验:start 输入与 step 边界(固定三处中的前两处;第三处 resumeData 归 suspend/resume 套件)', () => {
   it('start 校验失败:抛错不启动,任何 step 都不执行', async () => {
     const execute = vi.fn(() => ({ draft: 'x' }));
     const draft = createStep({

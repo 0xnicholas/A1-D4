@@ -192,3 +192,13 @@ mastra 有三个引擎,边界划在 `ExecutionEngine` 抽象类 + DefaultExecuti
 - **循环求值点**:`handlers/control-flow.ts` 的 loop 就是一条 `do { 跑 step(iterationCount: iteration + 1) } while (loopType === 'dowhile' ? isTrue : !isTrue)`——**dowhile 与 dountil 都是迭代后求值**(do-while / repeat-until,各至少一次),条件收 `result.output`(上一次输出),迭代之间检查取消。本框架裁的是 while / until(dowhile 迭代前求值、可 0 次迭代,由 #47 的 cond 类型面钉死):差异见 `docs/architecture/workflows.md` 修订(#50)。
 - **重试**:`executeStepWithRetry` 是 `for (i = 0; i < retries + 1; i++)`——`retries` = **额外尝试数**、最多 `retries + 1` 次尝试;`retryConfig` 缺省 `{ attempts: 0, delay: 0 }`,即**间隔缺省 0(立即重试)**,且等待是裸 `setTimeout`、**不可被打断**。本框架:固定间隔 1000ms、等待可被 AbortSignal 打断(见修订(#50))。
 - **sleep**:`abortableSleep`(utils.ts:230)在 abort 时 **resolve**(不 reject),负时长 `Math.max(0, …)` 钳到 0;动态时长的 fn 收**完整 step 参数包**(含 `inputData: prevOutput`,即 tip 可见),引擎把 sleep 期记为 `waiting` 状态。本框架:sleep fn 收 `RequestContext`(tip 不可见)、abort 直接以 AbortError 失败、无 waiting 状态(见修订(#50))。
+
+## 附:补记(实施期对照,#51,2026-09-29)
+
+实施 M3 suspend/resume 票([实施:suspend/resume——WorkflowSnapshotStore port + 快照 + load→重进](https://github.com/0xnicholas/balsa/issues/51))时,沿本文 §4 的事实对照了本框架 v1 的落地差异(本次未再核对上游新源码,行号仍以本文快照版本为准):
+
+- **恢复粒度**:本文记录的 mastra 快照带 `suspendedPaths` / `activePaths` / `stepExecutionPath`(按 step 的挂起路径)并配 `serializedStepGraph`;本框架的 `position` 是**单个条目下标**(startIdx 等价物),且 v1 只接受顶层 `then` 条目的挂起——块内(parallel / branch 臂 / foreach / 循环)调用 `suspend()` 显式报错,迭代现场快照归新 ticket(#54)。差异来自已冻结的快照形状(ADR-0010:`{ runId, status, input, stepResults, position }`)。
+- **持久化粒度**:mastra 的 `persistStepUpdate` 是**每个 step 完成后**写一次;本框架按**条目完成**写(#49/#50 已钉块只按 step id 记一条、子 step 随块记录),`running` 写只随真实 storage,无 storage 时只写 suspend 与终态(见修订(#51))。
+- **resume 去重**:mastra 以 CAS(`expectedStatus: 'suspended'`)做并发 resume 去重、store 不支持时降级为警告;本框架核心只带**进程内锁**(同一 run 的并发 resume 合并为一次调用),跨进程 CAS 是 adapter 的可选扩展(`compareAndSave`),且不退化为静默警告——被中止或校验失败的 resume 不消费挂起快照。
+- **校验点**:mastra 还校验 suspendData / state / requestContext;本框架按 spec 只固定三处(start 输入 / step 边界 / resumeData),`suspendSchema` 只做类型面、不做运行期校验(`suspend(payload)` 原样进 `suspendPayload`)。
+- **重进的 tip**:mastra 恢复 = 重建 `stepResults` 后从 startIdx 重进(本文 §4.2);本框架在重进前把前序条目**按记录回放**重建 tip——不重执行、不重估条件,`resumeData` 只交给挂起的那一个 step,后续条目拿到 `undefined`。
