@@ -129,6 +129,7 @@ interface WorkflowSnapshotStore {
 - **块内 step = 每次执行一对**:`foreach` / 循环的每次迭代、`parallel` 的每个臂各自一对(并发下按发生序交错),而 `stepResults` 仍按块聚合一条(#49/#50);事件与 span 是执行视角,记录是块视角。
 - **失败**:失败 step 的 `step-end` 以 `status: 'failed'` 落地,随后**迭代器以 run 的错误 reject**(与 agent 流同一惯例,不设 failed 的 `run-end`);`result` 与迭代器同错、同一次执行。
 - **挂起**:挂起 step 的 `step-end` 为 `suspended`,`run-end` 为 `suspended`;恢复段走 `resume` 的 promise,不是同一条流的续写。
+- **事件与 span 各记一边**:`step-start` 的 `input` 是**到达边界的原值**(校验前),`workflow-step` span 的 input 是**边界校验后的值**(`execute` 实际收到的)——校验失败时 span 无 input、error 落它。**块内 step 的 suspend 读 `failed`**:该边界不能挂起 run(#51:v1 只接受顶层 `then`),run 随块内挂起错误失败,记录同样不落 `suspended`——事件与记录同读法。
 - 消费者提前 break:停止事件缓冲,run 照跑完(`result` 仍落定);懒启动不变(首个 `next()` 或首次读 `result` 才开始执行)。
 
 ## 错误、重试与状态机

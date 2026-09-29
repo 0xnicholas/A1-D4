@@ -10,11 +10,7 @@
  * error is the run's terminal fact.
  */
 
-/**
- * A step's status as a boundary event reports it — the same three readings a step's record
- * carries: it completed, it failed, or it suspended the run.
- */
-export type StepStatus = 'success' | 'failed' | 'suspended';
+import type { StepStatus } from './snapshot.js';
 
 /**
  * The run began: the start boundary accepted the input (a rejected start never emits this — the
@@ -46,7 +42,12 @@ export interface WorkflowStepStartEvent {
   readonly input: unknown;
 }
 
-/** A step's boundary was left: how it ended, and what it produced when it succeeded. */
+/**
+ * A step's boundary was left: how it ended, and what it produced when it succeeded. `suspended`
+ * means the step suspended the run; a suspend raised where the run cannot act on it (a block's
+ * iteration site, #51) leaves the run failed and reads `failed` here — the record and the stream
+ * agree about it (neither claims a suspended step on a failed run).
+ */
 export interface WorkflowStepEndEvent {
   readonly type: 'step-end';
   /** The step's id. */

@@ -15,6 +15,7 @@ import type {
 } from './entry.js';
 import type { WorkflowEvent } from './events.js';
 import type {
+  StepStatus,
   WorkflowRunSnapshot,
   WorkflowRunStatus,
   WorkflowSnapshotStore,
@@ -50,13 +51,16 @@ import { executeWithRetries } from './retry.js';
  */
 
 /**
- * What a run reads of its workflow: the identity, the start input schema, the storage slot, the
- * tracer slot and the frozen entries.
+ * What a run reads of its workflow: the identity, the start input schema, the tracer slot and the
+ * frozen entries. `tracer` / `storage` are the definition's wiring slots — optional here, so a
+ * hand-built definition (a test, a storeless run) only spells the definition surface itself.
  */
 export type WorkflowDefinition<TInputSchema extends StandardSchema = StandardSchema> = Pick<
   Workflow<TInputSchema>,
-  'id' | 'inputSchema' | 'entries' | 'tracer'
+  'id' | 'inputSchema' | 'entries'
 > & {
+  /** Tracer the run's and its steps' spans hang under; absent = no span object is ever created. */
+  readonly tracer?: Tracer | undefined;
   /** Snapshot store attached to the definition; absent = the run keeps its snapshots in memory. */
   readonly storage?: WorkflowSnapshotStore | undefined;
 };
@@ -505,26 +509,27 @@ function getStepResult(state: WalkState, stepId: string): unknown {
 
 /**
  * Runs one step and records it: status, output and boundary timestamps, keyed by step id.
- * `recordsSuspend` says whether a suspend signal becomes this step's recorded result — true only for
- * a step in a top-level `then` entry, the one shape `resume` can re-enter. A step that suspends
- * inside a block leaves no record: the run cannot suspend there (the walker fails it loudly), and
- * no snapshot may claim a `suspended` step on a failed run.
+ * `suspendsRun` says whether a suspend raised at this boundary can suspend the run — true only for
+ * a step in a top-level `then` entry, the one shape `resume` can re-enter. It decides both the
+ * step's recorded result and the status its boundary events report: a step that suspends inside a
+ * block leaves no record and reads `failed`, because the run cannot suspend there (the walker fails
+ * it loudly) and no snapshot may claim a `suspended` step on a failed run.
  */
 async function runAndRecordStep(
   state: WalkState,
   step: Step,
   inputData: unknown,
-  recordsSuspend: boolean,
+  suspendsRun: boolean,
 ): Promise<unknown> {
   const startedAt = Date.now();
   let output: unknown;
   try {
-    output = await executeStep(state, step, inputData);
+    output = await executeStep(state, step, inputData, suspendsRun);
   } catch (error) {
     // A suspend is not a failure: the step is recorded `suspended` with its payload (never
     // `failed`) where the run can suspend, and the signal keeps travelling to the entry loop.
     if (isSuspendSignal(error)) {
-      if (recordsSuspend) {
+      if (suspendsRun) {
         recordStep(state, step.id, startedAt, {
           status: 'suspended',
           suspendPayload: error.payload,
@@ -559,7 +564,12 @@ function recordStep(
  * `retry.ts`). `foreach` and the loops call this per iteration, so N runs of one step id become one
  * aggregate record instead of N overwrites.
  */
-async function executeStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
+async function executeStep(
+  state: WalkState,
+  step: Step,
+  inputData: unknown,
+  suspendsRun: boolean,
+): Promise<unknown> {
   // The step boundary's events frame the whole crossing — the arriving value, the validation, the
   // attempts — and one pair is emitted per execution: a `foreach` iteration is its own crossing,
   // even though the run's records aggregate the block under one step id. The step's span opens at
@@ -577,16 +587,18 @@ async function executeStep(state: WalkState, step: Step, inputData: unknown): Pr
     );
     state.emit({ type: 'step-end', stepId: step.id, status: 'success', output });
     span?.update({ output });
-    span?.end();
     return output;
   } catch (error) {
-    // A suspend is not a failure: the step's boundary closes `suspended` and the signal keeps
-    // travelling; the failing execution's status is `failed` and its span carries the error.
-    const suspended = isSuspendSignal(error);
-    state.emit({ type: 'step-end', stepId: step.id, status: suspended ? 'suspended' : 'failed' });
-    if (!suspended) span?.error(error);
-    span?.end();
+    // A suspend is not a step failure where the run can act on it: the boundary closes `suspended`
+    // and the signal keeps travelling. Where the run cannot act on it (a block's iteration site),
+    // the run fails there, so the boundary reads `failed` — the record says the same thing.
+    const suspend = isSuspendSignal(error);
+    const status: StepStatus = suspend && suspendsRun ? 'suspended' : 'failed';
+    state.emit({ type: 'step-end', stepId: step.id, status });
+    if (!suspend) span?.error(error);
     throw error;
+  } finally {
+    span?.end();
   }
 }
 
@@ -714,7 +726,7 @@ async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unkn
     while (!failed && nextIndex < inputData.length) {
       const index = nextIndex++;
       try {
-        outputs[index] = await executeStep(state, entry.step, inputData[index]);
+        outputs[index] = await executeStep(state, entry.step, inputData[index], false);
       } catch (error) {
         // Flag the failure here, before it travels through `Promise.all`: sibling slots see it and
         // stop pulling new indices right away (a suspend unwinds the block the same way).
@@ -772,7 +784,7 @@ async function runLoop(
       ) {
         break;
       }
-      value = await executeStep(state, entry.step, value);
+      value = await executeStep(state, entry.step, value, false);
       iterationCount += 1;
       if (
         entry.type === 'dountil' &&

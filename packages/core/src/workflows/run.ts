@@ -182,10 +182,8 @@ export function createWorkflowRun<TInputSchema extends StandardSchema, TOutput =
       started = true;
       startOptions = options;
       return createRunOutput<TOutput>(workflow, runId, options, persistence(), {
-        ...(createOptions.traceId === undefined ? {} : { traceId: createOptions.traceId }),
-        ...(createOptions.parentSpanId === undefined
-          ? {}
-          : { parentSpanId: createOptions.parentSpanId }),
+        traceId: createOptions.traceId,
+        parentSpanId: createOptions.parentSpanId,
       });
     },
     resume(resumeOptions) {

@@ -38,7 +38,7 @@ interface Span {
 | `agent-step` | `{ model, provider, parameters?, usage?, finishReason?, timeToFirstChunk? }` | prompt 消息 / 模型响应 |
 | `tool-call` | `{ toolCallId }` | 参数 / 结果;失败落 `error` |
 | `workflow-run` | `{ workflowId }` | 触发输入 / 终态结果 |
-| `workflow-step` | `{ }`(name 即 step id) | step 输入 / 输出 |
+| `workflow-step` | `{ }`(name 即 step id) | step 输入(边界校验后的值)/ 输出;校验失败落 `error` |
 | `memory-recall` | `{ threadId }`(name 即 thread id) | recall 查询 / 召回的消息(含存储信封) |
 | `memory-save` | `{ threadId, resourceId }`(name 即 thread id) | 落库批次 / 持久化后的消息(含存储信封) |
 

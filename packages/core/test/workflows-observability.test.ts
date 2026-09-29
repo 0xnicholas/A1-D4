@@ -205,7 +205,8 @@ describe('workflow run span:终态与失败落法', () => {
   });
 });
 
-describe('tracer 缺席:零开销', () => {  it('不挂 tracer:不创建任何 span 对象,事件流照常', async () => {
+describe('tracer 缺席:零开销', () => {
+  it('不挂 tracer:不创建任何 span 对象,事件流照常', async () => {
     const step = createStep({
       id: 'echo',
       inputSchema: topicInput,

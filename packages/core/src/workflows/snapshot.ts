@@ -12,11 +12,17 @@
 export type WorkflowRunStatus = 'running' | 'success' | 'failed' | 'suspended';
 
 /**
+ * A step result's status in a snapshot: it completed, it failed, or it suspended the run. The same
+ * three readings the boundary events report, so the record and the stream never disagree.
+ */
+export type StepStatus = 'success' | 'failed' | 'suspended';
+
+/**
  * One step's recorded result inside a snapshot: status, output, boundary timestamps and the
  * suspend payload when the step suspended.
  */
 export interface WorkflowStepResultSnapshot {
-  readonly status: 'success' | 'failed' | 'suspended';
+  readonly status: StepStatus;
   /** The step's validated output; absent when it suspended or failed. */
   readonly output?: unknown;
   /** When the step started, milliseconds since epoch. */

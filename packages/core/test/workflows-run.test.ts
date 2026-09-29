@@ -549,7 +549,6 @@ describe('createRun / start 约束', () => {
     const forged = {
       id: 'article',
       inputSchema: topicInput,
-      tracer: undefined,
       entries: [{ type: 'then', step: draft }, { type: 'map' }] as unknown as readonly WorkflowEntry[],
     };
 

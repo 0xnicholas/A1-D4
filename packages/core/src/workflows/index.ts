@@ -68,7 +68,6 @@ export type {
   WorkflowEntry,
 } from './entry.js';
 export type {
-  StepStatus,
   WorkflowEvent,
   WorkflowRunEndEvent,
   WorkflowRunStartEvent,
@@ -76,6 +75,7 @@ export type {
   WorkflowStepStartEvent,
 } from './events.js';
 export type {
+  StepStatus,
   WorkflowRunSnapshot,
   WorkflowRunStatus,
   WorkflowSnapshotStore,
