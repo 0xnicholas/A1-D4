@@ -20,6 +20,7 @@ export type {
 export type {
   AgentConfig,
   AgentGenerateResult,
+  AgentMemoryOptions,
   AgentRunOptions,
   AgentStep,
   AgentStreamResult,

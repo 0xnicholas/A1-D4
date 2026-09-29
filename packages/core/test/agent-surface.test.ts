@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { Agent } from '@balsa/core/agent';
 import type {
   AgentConfig,
+  AgentMemoryOptions,
   AgentRunOptions,
   DynamicArgument,
   ModelInput,
   Processor,
   RequestContext,
 } from '@balsa/core/agent';
+import { Memory } from '@balsa/core/memory';
 import { ModelContractError, ModelSpecificationVersionError } from '@balsa/core/model';
 import type { Model } from '@balsa/core/model';
 import { createTracer } from '@balsa/core/observability';
@@ -94,9 +96,45 @@ describe('Agent 五字段配置表面', () => {
       name: 'a',
       instructions: 'You are concise.',
       model: fakeModel([]),
-      // @ts-expect-error 六号字段不存在(memory 归 M2)
-      memory: {},
+      // @ts-expect-error 定义表面之外无一物
+      scorers: {},
     });
+  });
+
+  it('memory 是一等可选字段(未配 = 无记忆):静态实例或逐 run 解析', () => {
+    const memory = new Memory();
+
+    expectAssignable<AgentConfig>({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      memory,
+    });
+    expectAssignable<AgentConfig>({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      memory: (ctx) => (ctx.tenant === 'acme' ? memory : memory),
+    });
+    expectAssignable<AgentConfig>({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      memory: async () => memory,
+    });
+  });
+
+  it('per-call memory 是 run option:thread(string 或 { id, title?, metadata? })+ resource,两者必填', () => {
+    expectAssignable<AgentMemoryOptions>({ thread: 'thread-1', resource: 'user-1' });
+    expectAssignable<AgentMemoryOptions>({
+      thread: { id: 'thread-1', title: 'first chat', metadata: { source: 'test' } },
+      resource: 'user-1',
+    });
+    expectAssignable<AgentRunOptions>({ memory: { thread: 'thread-1', resource: 'user-1' } });
+    // @ts-expect-error resource 必填,缺一即不是合法的 per-call identity
+    expectAssignable<AgentMemoryOptions>({ thread: 'thread-1' });
+    // @ts-expect-error thread 必填
+    expectAssignable<AgentMemoryOptions>({ resource: 'user-1' });
   });
 
   it('tracer 注入缝:横切依赖经配置传入(组合根分发或独立 new 显式传入),不进实例表面', () => {
@@ -159,12 +197,14 @@ describe('Agent 五字段配置表面', () => {
   it('构造后的实例原样持有配置字段(动态形状亦然——解析发生在每次 run 里)', () => {
     const model = fakeModel([{ text: 'hi' }]);
     const tools = { search: { description: 'Searches the web.', execute: () => 'ok' } };
+    const memory = new Memory();
     const dynamic = {
       name: 'assistant',
       instructions: (ctx: RequestContext) => `You serve ${String(ctx.tenant)}.`,
       model: (ctx: RequestContext) => (ctx.tier === 'pro' ? model : model),
       tools: (ctx: RequestContext) => (ctx.canSearch === true ? tools : {}),
       description: (ctx: RequestContext) => `Answers questions for ${String(ctx.tenant)}.`,
+      memory: (ctx: RequestContext) => (ctx.tenant === 'acme' ? memory : memory),
     };
     expectAssignable<AgentConfig>(dynamic);
 
@@ -175,11 +215,13 @@ describe('Agent 五字段配置表面', () => {
     expect(agent.model).toBe(dynamic.model);
     expect(agent.tools).toBe(dynamic.tools);
     expect(agent.description).toBe(dynamic.description);
+    expect(agent.memory).toBe(dynamic.memory);
   });
 
   it('静态配置原样持有(解析不重建对象)', () => {
     const model = fakeModel([{ text: 'hi' }]);
     const tools = { search: { description: 'Searches the web.', execute: () => 'ok' } };
+    const memory = new Memory();
 
     const agent = new Agent({
       name: 'assistant',
@@ -187,6 +229,7 @@ describe('Agent 五字段配置表面', () => {
       model,
       tools,
       description: 'Answers questions.',
+      memory,
     });
 
     expect(agent.name).toBe('assistant');
@@ -194,6 +237,7 @@ describe('Agent 五字段配置表面', () => {
     expect(agent.model).toBe(model);
     expect(agent.tools).toBe(tools);
     expect(agent.description).toBe('Answers questions.');
+    expect(agent.memory).toBe(memory);
   });
 
   it('缺省 tools / description 时两者为 undefined', () => {

@@ -1,13 +1,14 @@
 import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../model/contract.js';
 import { assertModelChain } from '../model/fallback.js';
 import { assertModel } from '../model/resolve.js';
+import type { Memory, MemoryThreadRef } from '../memory/index.js';
 import type { Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
 import { toModelTools } from '../tools/to-model-tools.js';
 import { resolveDynamicArgument } from './dynamic.js';
 import { DEFAULT_MAX_STEPS, runAgentLoop } from './loop.js';
-import type { AgentTracing } from './loop.js';
+import type { AgentRunMemory, AgentTracing } from './loop.js';
 import { runProcessInput } from './processors.js';
 import type { Processor } from './processors.js';
 import { createAgentStream } from './stream.js';
@@ -15,6 +16,7 @@ import { toStructuredResponseFormat } from './structured-output.js';
 import type {
   AgentConfig,
   AgentGenerateResult,
+  AgentMemoryOptions,
   AgentRunOptions,
   AgentStreamResult,
   DynamicArgument,
@@ -24,7 +26,7 @@ import type {
 } from './types.js';
 
 /**
- * The framework's execution unit: five config fields wrapped into an object that can `generate()`
+ * The framework's execution unit: the config surface wrapped into an object that can `generate()`
  * and `stream()`. Independent `new Agent(...)` is first-class; nothing else has to be instantiated
  * (ADR-0002 / ADR-0005).
  */
@@ -40,8 +42,14 @@ export class Agent {
   /** Description shown to an upstream model when composed as a tool (static or per-context). */
   readonly description: DynamicArgument<string> | undefined;
   /**
+   * The memory subsystem instance of the agent's runs — static, or resolved per run like every
+   * other field. The per-call `memory` option names the thread/resource; without one the run does
+   * no memory I/O (`AgentConfig.memory`).
+   */
+  readonly memory: DynamicArgument<Memory> | undefined;
+  /**
    * The observability seam, kept off the instance surface: a cross-cutting dependency the
-   * composition root (or an explicit `new`) hands in, not part of the five config fields. `undefined`
+   * composition root (or an explicit `new`) hands in, not a config field. `undefined`
    * = no span object is ever created for this agent's runs.
    */
   #tracer: Tracer | undefined;
@@ -61,6 +69,7 @@ export class Agent {
     this.model = typeof config.model === 'function' ? config.model : assertModelField(config.model);
     this.tools = config.tools;
     this.description = config.description;
+    this.memory = config.memory;
     this.#tracer = config.tracer;
     this.#processors = config.processors ?? [];
   }
@@ -95,21 +104,34 @@ export class Agent {
     const name = this.name;
     const instructions = this.instructions;
     const tools = this.tools;
+    const memory = this.memory;
     const tracer = this.#tracer;
     const processors = this.#processors;
     return createAgentStream(async function* () {
       // The run's request context comes first: every dynamic field resolves against it, and the
       // tools of the run receive the very same object.
       const requestContext = toRequestContext(options);
-      const [resolvedInstructions, resolvedModels, resolvedTools] = await Promise.all([
-        resolveDynamicArgument(instructions, requestContext),
-        resolveModels(model, requestContext),
-        resolveDynamicArgument(tools, requestContext),
-      ]);
+      const [resolvedInstructions, resolvedModels, resolvedTools, resolvedMemory] =
+        await Promise.all([
+          resolveDynamicArgument(instructions, requestContext),
+          resolveModels(model, requestContext),
+          resolveDynamicArgument(tools, requestContext),
+          resolveDynamicArgument(memory, requestContext),
+        ]);
+      const inputMessages = toInputMessages(input);
+      const runMemory = toRunMemory(resolvedMemory, options.memory, inputMessages);
+      // Message history is recalled once per run, before the input processors run (`memory.md`
+      // 「消息历史」时机): the history is part of the prompt the model sees, and of what
+      // `processInput` observes. A run with no memory identity recalls nothing.
+      const history =
+        runMemory === undefined
+          ? []
+          : await runMemory.memory.recall({ threadId: runMemory.threadId });
       // Call options are built per run — they are part of the run, not of creating the object.
       const { prompt, callOptions } = toCallOptions(
         resolvedInstructions,
-        input,
+        history,
+        inputMessages,
         resolvedTools,
         options,
       );
@@ -124,6 +146,9 @@ export class Agent {
         maxSteps: toMaxSteps(options.maxSteps),
         processors,
         requestContext,
+        // The run's memory wiring: the loop saves once per step (the first save carries the run's
+        // input messages). `undefined` = no memory I/O.
+        memory: runMemory,
         tracing: toTracing(tracer, options),
         // The user's model call settings are recorded on the step span under this name.
         parameters: options.modelSettings,
@@ -193,7 +218,8 @@ async function resolveModels(model: ModelInput, ctx: RequestContext): Promise<re
  */
 function toCallOptions(
   instructions: string,
-  input: string | ModelMessage[],
+  history: readonly ModelMessage[],
+  inputMessages: readonly ModelMessage[],
   tools: Record<string, Tool> | undefined,
   options: AgentRunOptions,
 ): { prompt: ModelPrompt; callOptions: Omit<ModelCallOptions, 'prompt'> } {
@@ -209,7 +235,7 @@ function toCallOptions(
   }
   if (options.signal !== undefined) callOptions.abortSignal = options.signal;
   if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
-  return { prompt: toPrompt(instructions, input), callOptions };
+  return { prompt: toPrompt(instructions, history, inputMessages), callOptions };
 }
 
 /**
@@ -233,6 +259,7 @@ function toRequestContext(options: AgentRunOptions): RequestContext {
     hideInput: _hideInput,
     hideOutput: _hideOutput,
     structuredOutput: _structuredOutput,
+    memory: _memory,
     signal,
     ...bag
   } = options;
@@ -282,15 +309,67 @@ function toTracing(tracer: Tracer | undefined, options: AgentRunOptions): AgentT
 const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
- * Builds the model prompt: the agent's instructions as a system message, then the input — either
- * a single user text message (string form) or the caller's messages passed through untouched.
+ * Builds the run's prompt (`docs/architecture/agent.md`「执行语义」): the resolved instructions as
+ * the system message, the recalled message history (empty without memory), then the run's own
+ * input — the order the model sees and the input processors may rewrite.
  */
-function toPrompt(instructions: string, input: string | ModelMessage[]): ModelPrompt {
-  const messages: ModelPrompt = [{ role: 'system', content: instructions }];
-  if (typeof input === 'string') {
-    messages.push({ role: 'user', content: [{ type: 'text', text: input }] });
-  } else {
-    messages.push(...input);
+function toPrompt(
+  instructions: string,
+  history: readonly ModelMessage[],
+  inputMessages: readonly ModelMessage[],
+): ModelPrompt {
+  return [{ role: 'system', content: instructions }, ...history, ...inputMessages];
+}
+
+/**
+ * Normalizes the run's input to prompt messages: a string becomes one user text message (the exact
+ * shape the prompt carries), an array is kept as given. These are also the messages the first
+ * memory save persists alongside the first step's record — `memory.md`「消息历史」时机:首轮含用户
+ * 输入消息。
+ */
+function toInputMessages(input: string | ModelMessage[]): ModelMessage[] {
+  return typeof input === 'string'
+    ? [{ role: 'user', content: [{ type: 'text', text: input }] }]
+    : [...input];
+}
+
+/**
+ * Resolves the run's memory wiring (`AgentConfig.memory` × the per-call `memory` option,
+ * `docs/architecture/memory.md`「身份模型」): no instance and no option = a stateless run, no
+ * instance but an option = a call-time error, instance plus option = the run's memory identity.
+ * A `memory` option with either field missing is rejected the same way — the identity is explicit,
+ * never defaulted.
+ */
+function toRunMemory(
+  memory: Memory | undefined,
+  option: AgentMemoryOptions | undefined,
+  inputMessages: readonly ModelMessage[],
+): AgentRunMemory | undefined {
+  if (memory === undefined) {
+    if (option !== undefined) {
+      throw new Error(
+        'The run passed a memory option, but the agent has no memory configured (AgentConfig.memory).',
+      );
+    }
+    return undefined;
   }
-  return messages;
+  if (option === undefined) return undefined;
+  const threadId = threadIdOf(option.thread);
+  if (typeof option.resource !== 'string' || option.resource === '') {
+    throw new Error(
+      'The run memory option is missing its resource: pass memory: { thread, resource } with both fields.',
+    );
+  }
+  return { memory, threadId, thread: option.thread, resource: option.resource, inputMessages };
+}
+
+/** The thread id of a per-call memory identity — the string form, or the `id` of the ref object. */
+function threadIdOf(thread: MemoryThreadRef | undefined): string {
+  const id = typeof thread === 'string' ? thread : thread?.id;
+  if (typeof id !== 'string' || id === '') {
+    throw new Error(
+      'The run memory option is missing its thread: pass memory: { thread, resource } with both fields.',
+    );
+  }
+  return id;
 }

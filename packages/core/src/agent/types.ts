@@ -6,14 +6,17 @@ import type {
   Usage,
 } from '../model/chunks.js';
 import type { Model, ModelCallOptions, ModelProviderOptions } from '../model/contract.js';
+import type { Memory, MemoryThreadRef } from '../memory/index.js';
 import type { Tracer } from '../observability/index.js';
 import type { StandardSchema } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
 import type { Processor } from './processors.js';
 
 /**
- * The five-field Agent surface (`docs/architecture/agent.md`): `name`, `instructions`, `model`,
- * optional `tools`, optional `description` — nothing beyond it.
+ * The Agent surface (`docs/architecture/agent.md`): the five definition fields — `name`,
+ * `instructions`, `model`, optional `tools`, optional `description` — plus the optional `memory`
+ * subsystem (a first-class optional field of the same surface, `docs/architecture/memory.md`), and
+ * the `tracer` / `processors` seams. Nothing beyond them.
  *
  * `tracer` is not a sixth definition field: it is the observability injection seam of
  * `docs/architecture/observability.md`「组合根分发」— a cross-cutting dependency the composition
@@ -21,7 +24,7 @@ import type { Processor } from './processors.js';
  * explicitly. Not attaching it leaves the whole observability subsystem at zero overhead.
  *
  * Every config field accepts a static value or a resolver (`DynamicArgument`), resolved again for
- * each run. The `memory` field lands with M2; widening a field is additive.
+ * each run. Widening a field is additive.
  */
 export interface AgentConfig {
   /** Unique identity of the agent. */
@@ -40,6 +43,15 @@ export interface AgentConfig {
   readonly tools?: DynamicArgument<Record<string, Tool>>;
   /** Shown to an upstream model when the agent is composed as a tool (`resolveDynamicArgument`). */
   readonly description?: DynamicArgument<string>;
+  /**
+   * The memory subsystem instance this agent's runs read and write through (`docs/architecture/memory.md`
+   * 「配置表面」): message history lands in the thread/resource named by the per-call `memory`
+   * option — recalled once per run before `processInput`, saved once per step after
+   * `processOutputStep`. A run that passes no per-call `memory` performs no memory I/O, so a
+   * memory-configured agent keeps stateless runs available; the same instance may be shared by
+   * several agents.
+   */
+  readonly memory?: DynamicArgument<Memory>;
   /**
    * The tracer this agent reports to, when one is attached (the composition root distributes it;
    * a standalone `new` may pass it explicitly). Absent = no span is ever created for its runs.
@@ -156,8 +168,33 @@ export interface AgentRunOptions {
    * `undefined`.
    */
   readonly structuredOutput?: StructuredOutputConfig | undefined;
+  /**
+   * The run's memory identity (`docs/architecture/memory.md`「身份模型」): present = the run recalls
+   * from and saves into the agent's `memory` for the named thread/resource; absent = the run does
+   * no memory I/O. Passing the option to an agent that has no configured `memory` is an error, as
+   * is omitting either field — the identity is explicit, never defaulted.
+   */
+  readonly memory?: AgentMemoryOptions | undefined;
   /** User per-call request context properties. */
   readonly [key: string]: unknown;
+}
+
+/**
+ * The per-call memory identity of a run (`docs/architecture/memory.md`「身份模型」): the thread the
+ * run reads history from and appends to, plus the resource that owns it. Both fields are required —
+ * an identity missing one fails at call time, before any model call.
+ */
+export interface AgentMemoryOptions {
+  /**
+   * The thread of this run's history: an id, or an id plus the `title` / `metadata` a missing
+   * thread is created with on the run's first save.
+   */
+  readonly thread: MemoryThreadRef;
+  /**
+   * The thread's owner (`resourceId`) — stamped on every message the run saves. Memory does no
+   * access control: the application authorizes the caller against this resource itself.
+   */
+  readonly resource: string;
 }
 
 /**

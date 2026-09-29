@@ -16,6 +16,7 @@ import { normalizeStream } from '../model/normalize.js';
 import { AGENT_RUN_SPAN, AGENT_STEP_SPAN, TOOL_CALL_SPAN } from '../observability/index.js';
 import type { Span, Tracer } from '../observability/index.js';
 import { formatIssues, messageOf, validateSchema } from '../standard-schema-runtime.js';
+import type { Memory, MemoryThreadRef } from '../memory/index.js';
 import type { Tool, ToolContext } from '../tools/index.js';
 import { missingFinishError } from './stream.js';
 import { runProcessError, runProcessOutputStep } from './processors.js';
@@ -46,6 +47,11 @@ export interface AgentLoopOptions {
   readonly processors: readonly Processor[];
   /** The agent's name — the name of the run's span and its `agentName` attribute. */
   readonly agentName: string;
+  /**
+   * The run's memory wiring — present only when the run reads and writes memory (`AgentConfig.memory`
+   * resolved plus the per-call identity). `undefined` = the loop does no memory I/O at all.
+   */
+  readonly memory?: AgentRunMemory | undefined;
   /** The run's request context — framework-written `signal` / `runId` plus the user's bag. */
   readonly requestContext: RequestContext;
   /**
@@ -64,6 +70,25 @@ export interface AgentLoopOptions {
   readonly tracing?: AgentTracing | undefined;
   /** The user's `modelSettings` passthrough, recorded on the step span as `parameters`. */
   readonly parameters?: Record<string, unknown> | undefined;
+}
+
+/**
+ * The run's memory wiring (`docs/architecture/memory.md`「身份模型」+「消息历史」): the instance,
+ * the thread/resource identity of the run, and the run's own input messages — persisted with the
+ * first step's record, so a recall never loses what the user said. Assembled by the agent from
+ * `AgentConfig.memory` and the per-call `memory` option; absent = no memory I/O.
+ */
+export interface AgentRunMemory {
+  /** The memory instance this run recalls from and saves into. */
+  readonly memory: Memory;
+  /** The thread id of the run — recalled once, before the first input processor runs. */
+  readonly threadId: string;
+  /** The thread reference — `save` applies its `title` / `metadata` when creating the thread. */
+  readonly thread: MemoryThreadRef;
+  /** The thread's owner, stamped on every saved message. */
+  readonly resource: string;
+  /** The run's own input messages — saved with the first step's record. */
+  readonly inputMessages: readonly ModelMessage[];
 }
 
 /**
@@ -122,8 +147,16 @@ export interface AgentTracing {
 export async function* runAgentLoop(
   options: AgentLoopOptions,
 ): AsyncGenerator<Chunk, AgentGenerateResult, void> {
-  const { models, callOptions, tools, maxSteps, requestContext, processors, structuredOutput } =
-    options;
+  const {
+    models,
+    callOptions,
+    tools,
+    maxSteps,
+    requestContext,
+    processors,
+    structuredOutput,
+    memory: loopMemory,
+  } = options;
   const prompt: ModelMessage[] = [...options.prompt];
   /** The run's authoritative step records — the processors' rewrites included. */
   const steps: AgentStep[] = [];
@@ -296,7 +329,7 @@ export async function* runAgentLoop(
 
         // The step is over: its full record (text / tool calls / tool results / usage) goes through
         // the processors, and the record they return is the run's authoritative one — it settles
-        // the run's terminal values and is what the next prompt (and, from M2, memory) is built from.
+        // the run's terminal values and is what the next prompt (and memory) is built from.
         const record = await runProcessOutputStep(
           processors,
           {
@@ -313,6 +346,20 @@ export async function* runAgentLoop(
         // object's `text` (`observability.md`「自动埋点」; the step span keeps the model's response).
         runSpan?.update({ output: record.text });
 
+        // Memory save (`memory.md`「消息历史」时机): once per completed step, after
+        // `processOutputStep` — a processor's rewrite (redaction) is what lands in storage — with
+        // the run's own input messages carried by the first step's save. A run with no memory
+        // wiring does no I/O here at all.
+        if (loopMemory !== undefined) {
+          const stepMessages = toStepMessages(record, answered);
+          await loopMemory.memory.save({
+            thread: loopMemory.thread,
+            resource: loopMemory.resource,
+            messages:
+              stepIndex === 0 ? [...loopMemory.inputMessages, ...stepMessages] : stepMessages,
+          });
+        }
+
         if (pending.length === 0 || lastStep) {
           settled = terminalFinish.finishReason;
           break;
@@ -321,10 +368,7 @@ export async function* runAgentLoop(
         // Provider-executed results stay paired with their calls inside the assistant message;
         // framework-executed ones follow in the `tool` message (the vendor-shaped split, from the
         // processed record — a processor's rewrite is what the next model call sees).
-        const echoes = record.toolResults.filter((entry) => answered.has(entry.toolCallId));
-        const feedback = record.toolResults.filter((entry) => !answered.has(entry.toolCallId));
-        prompt.push(toAssistantMessage(record.text, record.toolCalls, echoes));
-        prompt.push({ role: 'tool', content: feedback.map(toModelToolResultPart) });
+        prompt.push(...toStepMessages(record, answered));
       } catch (error) {
         stepSpan?.error(error);
         throw error;
@@ -536,6 +580,26 @@ function toolResult(call: ToolCallChunk, output: unknown, isError: boolean): Too
     output,
     isError,
   };
+}
+
+/**
+ * The messages one completed step contributes to history: the assistant message (its text, its
+ * tool calls, and any provider-executed results — those stay paired with their calls) and, when
+ * the framework executed tools, the `tool` message carrying their results — the vendor-shaped
+ * split of the processed record. The same messages extend the next prompt and are persisted by a
+ * memory save. A step that contributed nothing (no text, no calls, no results) contributes no
+ * messages.
+ */
+function toStepMessages(record: AgentStep, answered: ReadonlySet<string>): ModelMessage[] {
+  const echoes = record.toolResults.filter((entry) => answered.has(entry.toolCallId));
+  const feedback = record.toolResults.filter((entry) => !answered.has(entry.toolCallId));
+  const messages: ModelMessage[] = [];
+  const assistant = toAssistantMessage(record.text, record.toolCalls, echoes);
+  if (assistant.content.length > 0) messages.push(assistant);
+  if (feedback.length > 0) {
+    messages.push({ role: 'tool', content: feedback.map(toModelToolResultPart) });
+  }
+  return messages;
 }
 
 /**

@@ -16,7 +16,7 @@ import type { AgentStep, RequestContext } from './types.js';
  * - `processOutputStep` — once per completed step, after that step's tools have run: `{ step }`
  *   replaces the step record. The replacement is the run's authoritative record — it lands in the
  *   output object's `steps` / `text` / `usage`, in the run span's output, and is what the next
- *   prompt (and, from M2, memory) is built from. The chunk stream and the step span stay the
+ *   prompt (and memory) is built from. The chunk stream and the step span stay the
  *   model's own output: chunk-level rewriting is cut from v1 (`processOutputStream`-style hooks
  *   keep their seat).
  * - `processError` — when a provider call or a tool's `execute` fails: `{ error }` replaces the
