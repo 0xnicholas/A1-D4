@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createInMemoryStore, supportsWorkingMemory } from '@balsa/core/memory';
+import { z } from 'zod';
+import { Memory, createInMemoryStore, supportsWorkingMemory } from '@balsa/core/memory';
 import type {
   ListMessagesQuery,
   ListThreadsQuery,
+  MemoryConfig,
   MemoryStore,
+  MemoryThreadRef,
+  RecallQuery,
+  SaveInput,
+  SaveMessage,
   StoredMessage,
   StoredResource,
   StoredThread,
@@ -134,5 +140,69 @@ describe('MemoryStore port 类型表面', () => {
     ] as const) {
       expect(typeof store[method]).toBe('function');
     }
+  });
+});
+/**
+ * `Memory` 类的公开面(#39):配置表面(docs/architecture/memory.md 配置表面节)与两个实例方法
+ * recall / save 的签名逐字钉死;saved messages 与 recall 返回值同形(StoredMessage),可直接喂模型;
+ * workingMemory 是留位参数(语义归后续 ticket),接受但惰性。
+ */
+describe('Memory 类类型表面', () => {
+  it('配置表面:storage / lastMessages / workingMemory 全可缺席', () => {
+    expectAssignable<MemoryConfig>({});
+    expectAssignable<MemoryConfig>({ lastMessages: 20 });
+    expectAssignable<MemoryConfig>({ storage: createInMemoryStore() });
+    expectAssignable<MemoryConfig>({
+      lastMessages: 5,
+      workingMemory: { schema: z.object({ tone: z.string() }) },
+    });
+
+    const memory = new Memory();
+    expect(memory.lastMessages).toBe(10);
+    expect(memory.workingMemory).toBeUndefined();
+  });
+
+  it('workingMemory 是留位参数:接受、保留在实例上,不改变消息历史行为', async () => {
+    const schema = z.object({ tone: z.string() });
+    const memory = new Memory({ workingMemory: { schema } });
+
+    expect(memory.workingMemory?.schema).toBe(schema);
+
+    const saved = await memory.save({
+      thread: 'thread-1',
+      resource: 'user-1',
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    });
+    await expect(memory.recall({ threadId: 'thread-1' })).resolves.toEqual(saved);
+  });
+
+  it('recall 查询形状与返回值:limit / before / order 可缺席,返回 StoredMessage 数组', async () => {
+    expectAssignable<RecallQuery>({ threadId: 'thread-1' });
+    expectAssignable<RecallQuery>({ threadId: 'thread-1', limit: 20 });
+    expectAssignable<RecallQuery>({ threadId: 'thread-1', before: 'msg-9', order: 'desc' });
+
+    const memory = new Memory();
+    const recalled = await memory.recall({ threadId: 'thread-1' });
+    expectAssignable<StoredMessage[]>(recalled);
+    expectAssignable<readonly StoredMessage[]>(recalled);
+  });
+
+  it('save 入参:thread 两种形态(裸 id / 带 title+metadata);messages 的信封可给可不给', () => {
+    expectAssignable<MemoryThreadRef>('thread-1');
+    expectAssignable<MemoryThreadRef>({ id: 'thread-1' });
+    expectAssignable<MemoryThreadRef>({
+      id: 'thread-1',
+      title: '会话',
+      metadata: { source: 'test' },
+    });
+
+    const bare: ModelMessage = { role: 'user', content: [{ type: 'text', text: 'hi' }] };
+    // 裸 ModelMessage 可直接当 SaveMessage 用(信封由 Memory 补)
+    expectAssignable<SaveMessage>(bare);
+    expectAssignable<SaveMessage>({ ...bare, id: 'm-1', createdAt: new Date() });
+    expectAssignable<SaveInput>({ thread: 'thread-1', resource: 'user-1', messages: [bare] });
+
+    const batch: readonly SaveMessage[] = [bare, { ...bare, id: 'm-2' }];
+    expectAssignable<SaveInput>({ thread: { id: 'thread-1' }, resource: 'user-1', messages: batch });
   });
 });
