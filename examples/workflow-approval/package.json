@@ -1,0 +1,20 @@
+{
+  "name": "@balsa/example-workflow-approval",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Balsa workflow example: an expense report walks an approval gate (suspend → snapshot → resume).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.78",
+    "@balsa/core": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}
