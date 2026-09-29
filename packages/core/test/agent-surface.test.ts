@@ -5,6 +5,7 @@ import type {
   AgentRunOptions,
   DynamicArgument,
   ModelInput,
+  Processor,
   RequestContext,
 } from '@balsa/core/agent';
 import { ModelContractError, ModelSpecificationVersionError } from '@balsa/core/model';
@@ -116,6 +117,34 @@ describe('Agent 五字段配置表面', () => {
     });
     // 注入缝不占实例表面(五字段之外无一物);挂上后自动埋点的断言在 agent-observability.test.ts
     expect(agent).not.toHaveProperty('tracer');
+  });
+
+  it('processors 是扩展点而非定义字段:可挂载(三钩皆可选),不进实例表面', () => {
+    expectAssignable<Processor>({
+      processInput: ({ messages }) => ({ messages }),
+      processOutputStep: ({ step }) => ({ step }),
+      processError: ({ error }) => ({ error }),
+    });
+    // 钩子全部可选:只实现关心的一两个
+    expectAssignable<Processor>({ processOutputStep: ({ step }) => ({ step }) });
+    expectAssignable<Processor>({});
+
+    const processor: Processor = { processError: () => ({ error: new Error('masked') }) };
+    expectAssignable<AgentConfig>({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      processors: [processor],
+    });
+
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: 'You are concise.',
+      model: fakeModel([]),
+      processors: [processor],
+    });
+    // 扩展点接线不进实例表面(与 tracer 同为注入缝;五字段之外无一物)
+    expect(agent).not.toHaveProperty('processors');
   });
 
   it('trace 续接与 hide 覆盖是 run option 的一部分', () => {

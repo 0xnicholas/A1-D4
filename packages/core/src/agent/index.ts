@@ -8,6 +8,15 @@
 export { Agent } from './agent.js';
 export { resolveDynamicArgument } from './dynamic.js';
 export type {
+  ProcessErrorArgs,
+  ProcessErrorResult,
+  ProcessInputArgs,
+  ProcessInputResult,
+  ProcessOutputStepArgs,
+  ProcessOutputStepResult,
+  Processor,
+} from './processors.js';
+export type {
   AgentConfig,
   AgentGenerateResult,
   AgentRunOptions,

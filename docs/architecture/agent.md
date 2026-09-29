@@ -17,6 +17,7 @@ interface AgentConfig {
   tools?: DynamicArgument<Record<string, Tool>>  // 可选
   description?: DynamicArgument<string>          // 可选,as-tool 组合时给上游模型看
   tracer?: Tracer                                // 非定义字段:观测注入缝(M1-09,见下)
+  processors?: readonly Processor[]              // 非定义字段:横切扩展点挂载位(M1-12,见下)
 }
 ```
 
@@ -58,13 +59,13 @@ interface AgentConfig {
 
 ## 扩展点:Processor
 
-Processor 是 Agent 的**唯一横切扩展点**(ADR-0005):guardrails、evals、脱敏、限流等不得以字段形式焊进 Agent 类。v1 三钩,有序执行:
+Processor 是 Agent 的**唯一横切扩展点**(ADR-0005):guardrails、evals、脱敏、限流等不得以字段形式焊进 Agent 类。挂载位 = `AgentConfig.processors?: readonly Processor[]`——与 `tracer` 同为接线注入缝,不占定义表面。每个钩子按声明顺序**串行执行**,前一个处理器的返回是后一个的输入;钩子可同步或异步,返回 `void` / 不返回即保持原值。v1 三钩:
 
-- `processInput` — run 开始一次,可改写输入消息
-- `processOutputStep` — 每个 step 完成后,可见可改 step 记录
-- `processError` — provider / 工具错误时,观察并可替换错误;不做 abort/retry 机制
+- `processInput({ messages, requestContext })` → `{ messages }` — run 开始一次(动态参数解析之后、首次模型调用之前),可改写本次 run 的初始 prompt(instructions 系统消息 + 输入消息);返回值即模型实际看到的 prompt。
+- `processOutputStep({ step, stepIndex, requestContext })` → `{ step }` — 每个 step 完成后一次(该步模型流结束、工具执行完、错误结果就位之后),可见可改 step 记录。**改写后的记录是 run 的权威记录**:终值 `steps` / `text` / `usage` 与 agent-run span 的 output 读它,下一轮 prompt(assistant 消息与 tool 消息)由它构造,processOutputStep 先于 save 的顺序语义也落在它上(M2);chunk 流与 agent-step span 仍是模型原始产出(chunk 级改写裁出 v1)。
+- `processError({ error, source, stepIndex, toolCall?, requestContext })` → `{ error }` — provider / 工具错误时,观察并可替换错误,不做 abort/retry。`source: 'model'` 替换 run 终错(链耗尽 / 流中途失败 / 流契约违背;已取消的 run 不触发);`source: 'tool'` 替换进入 error 工具结果的错误(execute 抛错、input/output 校验失败、未知工具——execute 抛错保留框架的 `Tool 'x' failed:` 框,替换只填细节)。替换后的错误即该边界终错(run 终错 / 回喂模型的错误),span 随之记录。
 
-chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展位。Observability 的 tracer 挂钩是内部缝(见 `docs/architecture/observability.md`),不占 Processor 名额。
+Processor 钩子自身抛错即 run 失败,不再交给 `processError`(处理器不互相处理)。chunk 级流式 processor(processOutputStream 类)裁出 v1,保留向后扩展位。Observability 的 tracer 挂钩是内部缝(见 `docs/architecture/observability.md`),不占 Processor 名额。
 
 ## 多 agent 组合
 

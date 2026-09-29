@@ -1,4 +1,4 @@
-import type { Chunk, FinishChunk, ToolCallChunk, ToolResultChunk } from '../model/chunks.js';
+import type { Chunk, FinishChunk, FinishReason, ToolCallChunk, ToolResultChunk, Usage } from '../model/chunks.js';
 import type {
   JsonValue,
   Model,
@@ -18,7 +18,9 @@ import type { Span, Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool, ToolContext } from '../tools/index.js';
 import { missingFinishError } from './stream.js';
-import type { RequestContext } from './types.js';
+import { runProcessError, runProcessOutputStep } from './processors.js';
+import type { Processor } from './processors.js';
+import type { AgentGenerateResult, AgentStep, RequestContext } from './types.js';
 
 /** How many model calls one run may make when the caller pins no `maxSteps` (`agent.md`「执行语义」). */
 export const DEFAULT_MAX_STEPS = 5;
@@ -39,6 +41,8 @@ export interface AgentLoopOptions {
   readonly tools: Record<string, Tool>;
   /** The step cap (≥ 1). */
   readonly maxSteps: number;
+  /** The run's processors, in declaration order (`AgentConfig.processors`); empty = none. */
+  readonly processors: readonly Processor[];
   /** The agent's name — the name of the run's span and its `agentName` attribute. */
   readonly agentName: string;
   /** The run's request context — framework-written `signal` / `runId` plus the user's bag. */
@@ -99,16 +103,26 @@ export interface AgentTracing {
  *
  * Provider-executed tool calls are not executed again: a call whose `toolCallId` already has a
  * result in the step (the provider executed it) is skipped.
+ *
+ * **Processors** (`docs/architecture/agent.md`「扩展点:Processor」): `processOutputStep` runs once per
+ * completed step, after its tools, and the record it returns is the run's authoritative one — it is
+ * what the next prompt is built from and what the generator's return value reports. `processError`
+ * runs where an error would surface: a model-call failure that ends the step (never a cancelled run)
+ * and every tool-line failure. Both chains run in declaration order; a replacement is threaded on.
  */
-export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<Chunk> {
-  const { models, callOptions, tools, maxSteps, requestContext } = options;
+export async function* runAgentLoop(
+  options: AgentLoopOptions,
+): AsyncGenerator<Chunk, AgentGenerateResult, void> {
+  const { models, callOptions, tools, maxSteps, requestContext, processors } = options;
   const prompt: ModelMessage[] = [...options.prompt];
+  /** The run's authoritative step records — the processors' rewrites included. */
+  const steps: AgentStep[] = [];
   // The run boundary: one root span per run, the parent every step span hangs under. Absent tracer
   // ⇒ `undefined`, and no span is ever created — the loop's only zero-overhead branch.
   const runSpan = startRunSpan(options);
 
   try {
-    for (let step = 0; step < maxSteps; step += 1) {
+    for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
       const stepStartedAt = Date.now();
       let timeToFirstChunk: number | undefined;
       let finish: FinishChunk | undefined;
@@ -175,10 +189,25 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
           served = { span: candidateSpan, finish };
           break;
         } catch (error) {
+          // Cancellation is the run's outcome, not a chain failure and not a processor's business:
+          // an aborted run surfaces its own reason untouched (`processError` is for provider errors).
+          if (requestContext.signal.aborted) {
+            candidateSpan?.error(error);
+            throw error;
+          }
+          // A mid-stream failure cannot fall back — partial output has already reached the caller:
+          // it surfaces through `processError`, which may replace the error the run ends with.
+          if (producedChunk) {
+            const surfaced = await runProcessError(
+              processors,
+              error,
+              { source: 'model', stepIndex },
+              requestContext,
+            );
+            candidateSpan?.error(surfaced);
+            throw surfaced;
+          }
           candidateSpan?.error(error);
-          // Two failures never fall back: a mid-stream failure (output already reached the caller)
-          // and a cancelled run (the abort reason is the run's outcome, not a chain failure).
-          if (producedChunk || requestContext.signal.aborted) throw error;
           failures.push({ model: candidate, error });
         } finally {
           // A candidate that did not serve the step is over here: its span carries the failure (or
@@ -191,7 +220,13 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
       if (served === undefined) {
         // Every candidate failed before producing a chunk: the run ends here — with the original
         // error when there was nothing to fall back to, with the chain's context when there was.
-        throw modelChainExhausted(failures);
+        // The surfaced error walks the processors' error chain before it becomes the run's error.
+        throw await runProcessError(
+          processors,
+          modelChainExhausted(failures),
+          { source: 'model', stepIndex },
+          requestContext,
+        );
       }
 
       const { span: stepSpan, finish: stepFinish } = served;
@@ -207,33 +242,68 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
             ...(timeToFirstChunk === undefined ? {} : { timeToFirstChunk }),
           },
         });
-        runSpan?.update({ output: stepText.join('') });
 
         const pending = toolCalls.filter((call) => !answered.has(call.toolCallId));
-        const lastStep = step + 1 >= maxSteps;
+        const lastStep = stepIndex + 1 >= maxSteps;
         // The step boundary comes before the framework-executed results: consumers see the model's
         // finish, then the results that answer the step's calls (results belong to that step).
-        yield pending.length > 0 && lastStep
-          ? { ...stepFinish, finishReason: 'tool-calls' }
-          : stepFinish;
-
-        if (pending.length === 0) return;
+        const terminalFinish: FinishChunk =
+          pending.length > 0 && lastStep ? { ...stepFinish, finishReason: 'tool-calls' } : stepFinish;
+        yield terminalFinish;
 
         const results: ToolResultChunk[] = [];
         for (const call of pending) {
           const toolSpan = startToolCallSpan(options, stepSpan, call);
-          const { result, failure } = await executeToolCall(tools, call, requestContext, toolSpan);
-          if (failure !== undefined) toolSpan?.error(failure);
+          const outcome = await executeToolCall(tools, call, requestContext, toolSpan);
+          let result: ToolResultChunk;
+          if ('result' in outcome) {
+            result = outcome.result;
+          } else {
+            // The failure walks the processors' error chain before the error tool result is built;
+            // the replacement is the error the model sees (and the span records).
+            const failure = await runProcessError(
+              processors,
+              outcome.failure.error,
+              { source: 'tool', stepIndex, toolCall: call },
+              requestContext,
+            );
+            result = toolResult(call, outcome.failure.toMessage(failure), true);
+            toolSpan?.error(failure);
+          }
           toolSpan?.update({ output: result.output });
           toolSpan?.end();
           results.push(result);
           yield result;
         }
 
-        if (lastStep) return;
+        // The step is over: its full record (text / tool calls / tool results / usage) goes through
+        // the processors, and the record they return is the run's authoritative one — it settles
+        // the run's terminal values and is what the next prompt (and, from M2, memory) is built from.
+        const record = await runProcessOutputStep(
+          processors,
+          {
+            text: stepText.join(''),
+            toolCalls,
+            toolResults: [...providerResults, ...results],
+            usage: stepFinish.usage,
+          },
+          stepIndex,
+          requestContext,
+        );
+        steps.push(record);
+        // The run span carries the run's terminal text — the processed record, same as the output
+        // object's `text` (`observability.md`「自动埋点」; the step span keeps the model's response).
+        runSpan?.update({ output: record.text });
 
-        prompt.push(toAssistantMessage(stepText.join(''), toolCalls, providerResults));
-        prompt.push({ role: 'tool', content: results.map(toModelToolResultPart) });
+        if (pending.length === 0 || lastStep) return runOutcome(steps, terminalFinish.finishReason);
+
+        // Provider-executed results stay paired with their calls inside the assistant message;
+        // framework-executed ones follow in the `tool` message (the vendor-shaped split, from the
+        // processed record — a processor's rewrite is what the next model call sees).
+        const echoes = record.toolResults.filter((entry) => answered.has(entry.toolCallId));
+        const feedback = record.toolResults.filter((entry) => !answered.has(entry.toolCallId));
+        prompt.push(toAssistantMessage(record.text, record.toolCalls, echoes));
+        prompt.push({ role: 'tool', content: feedback.map(toModelToolResultPart) });
       } catch (error) {
         stepSpan?.error(error);
         throw error;
@@ -250,6 +320,10 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<C
     // abandoning the generator.
     runSpan?.end();
   }
+
+  // Unreachable: `maxSteps` is at least 1, so the last iteration always takes one of the terminal
+  // branches (its step returned the outcome, or its tools ran and then it did).
+  throw new Error('The agent loop ended without settling its run.');
 }
 
 /**
@@ -324,16 +398,14 @@ function startToolCallSpan(
 
 /**
  * Runs one tool call under the normalized error semantics of `docs/architecture/tools.md`「校验与错误语义」:
- * never throws, always answers the call.
+ * never throws, always answers the call — with the tool's result, or with the failure an error tool
+ * result will answer. The failure is not formatted here: the loop hands its error through
+ * `processError` first, then builds the model-facing message with the failure's own recipe.
  *
  * Input validation runs before `execute` (the validated value is what the tool receives); output
  * validation runs after it (side effects already happened — repeat protection is the tool's
  * idempotency job, keyed by `toolCallId`). A tool without `inputSchema` is argument-less and gets
  * `undefined`; a tool without `outputSchema` returns whatever it returns.
- *
- * The `failure` beside an `isError` result is what the tool-call span records: the original thrown
- * error for `execute` throws (its message already rides on the result), a fresh error for the
- * validation and unknown-tool lines.
  */
 async function executeToolCall(
   tools: Record<string, Tool>,
@@ -344,7 +416,7 @@ async function executeToolCall(
   const tool = tools[call.toolName];
   if (tool === undefined) {
     const message = `Unknown tool '${call.toolName}': it is not in the agent's tool container.`;
-    return { result: errorResult(call, message), failure: new Error(message) };
+    return { failure: { error: new Error(message), toMessage: messageOf } };
   }
 
   let input: unknown;
@@ -352,7 +424,7 @@ async function executeToolCall(
     const validation = await validate(tool.inputSchema, call.input);
     if ('message' in validation) {
       const message = `Invalid input for tool '${call.toolName}': ${validation.message}`;
-      return { result: errorResult(call, message), failure: new Error(message) };
+      return { failure: { error: new Error(message), toMessage: messageOf } };
     }
     input = validation.value;
   }
@@ -361,15 +433,21 @@ async function executeToolCall(
   try {
     output = await tool.execute(input, toolContext(call, requestContext, toolSpan));
   } catch (error) {
-    const message = `Tool '${call.toolName}' failed: ${messageOf(error)}`;
-    return { result: errorResult(call, message), failure: error };
+    // The thrown error keeps its identity for `processError` / the span; the framework framing is
+    // what turns it into the model-facing message (`Tool 'x' failed: <detail>`).
+    return {
+      failure: {
+        error,
+        toMessage: (replacement) => `Tool '${call.toolName}' failed: ${messageOf(replacement)}`,
+      },
+    };
   }
 
   if (tool.outputSchema !== undefined) {
     const validation = await validate(tool.outputSchema, output);
     if ('message' in validation) {
       const message = `Tool '${call.toolName}' returned an invalid output: ${validation.message}`;
-      return { result: errorResult(call, message), failure: new Error(message) };
+      return { failure: { error: new Error(message), toMessage: messageOf } };
     }
     output = validation.value;
   }
@@ -377,10 +455,25 @@ async function executeToolCall(
   return { result: toolResult(call, output, false) };
 }
 
-/** What one tool call produced: always a result, plus the failure an `isError` result answers. */
-interface ToolCallOutcome {
-  readonly result: ToolResultChunk;
-  readonly failure?: unknown;
+/** What one tool call produced: its result, or the failure an `isError` result will answer. */
+type ToolCallOutcome =
+  | { readonly result: ToolResultChunk }
+  | { readonly failure: ToolFailure };
+
+/**
+ * A tool-line failure: the error handed to `processError`, plus the recipe for the model-facing
+ * message of a (possibly replaced) error.
+ *
+ * Framework-generated lines (unknown tool, failed validation) carry their full message as the
+ * error's message: the model sees that message whether or not a processor replaced the error. An
+ * `execute` throw keeps the framework's `Tool 'x' failed:` framing, with the replacement supplying
+ * the detail after it.
+ */
+interface ToolFailure {
+  /** The error `processError` observes — the original object, untouched. */
+  readonly error: unknown;
+  /** Builds the model-facing message of the (possibly replaced) error. */
+  readonly toMessage: (error: unknown) => string;
 }
 
 /**
@@ -402,10 +495,6 @@ function toolContext(
     traceId: toolSpan?.traceId ?? '',
     spanId: toolSpan?.id ?? '',
   };
-}
-
-function errorResult(call: ToolCallChunk, message: string): ToolResultChunk {
-  return toolResult(call, message, true);
 }
 
 function toolResult(call: ToolCallChunk, output: unknown, isError: boolean): ToolResultChunk {
@@ -498,4 +587,53 @@ function toJsonValue(value: unknown): JsonValue {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The run's terminal values, built from its authoritative step records (processors' rewrites
+ * included): the last step's text settles `text`, the records flatten into run-wide tool calls /
+ * results, and usage accumulates across steps.
+ */
+function runOutcome(steps: readonly AgentStep[], finishReason: FinishReason): AgentGenerateResult {
+  return {
+    text: steps.at(-1)?.text ?? '',
+    toolCalls: steps.flatMap((step) => step.toolCalls),
+    toolResults: steps.flatMap((step) => step.toolResults),
+    usage: steps.reduce<Usage>((total, step) => addUsage(total, step.usage), UNKNOWN_USAGE),
+    finishReason,
+    steps,
+  };
+}
+
+/** Usage before any step reported one: every field unknown. */
+const UNKNOWN_USAGE: Usage = {
+  inputTokens: undefined,
+  outputTokens: undefined,
+  totalTokens: undefined,
+};
+
+/**
+ * Adds one step's usage onto the run total.
+ *
+ * Unknown stays unknown: a field no step reported stays `undefined` rather than collapsing to 0.
+ * `totalTokens` is derived exactly like the normalization layer derives it per model part
+ * (`normalize.ts` `toUsage`): input + output when both are known, unknown otherwise.
+ */
+function addUsage(total: Usage, stepUsage: Usage): Usage {
+  const inputTokens = addTokens(total.inputTokens, stepUsage.inputTokens);
+  const outputTokens = addTokens(total.outputTokens, stepUsage.outputTokens);
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens:
+      inputTokens === undefined || outputTokens === undefined
+        ? undefined
+        : inputTokens + outputTokens,
+  };
+}
+
+function addTokens(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return a + b;
 }

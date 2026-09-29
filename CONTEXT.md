@@ -53,7 +53,7 @@ stream() 的返回对象:既可 for-await 消费 chunk 协议流,又可 await �
 _Avoid_: generate/stream 分离的双实现
 
 **Processor**:
-Agent 的唯一横切扩展点:挂在 run/step 边界钩子(processInput / processOutputStep / processError)上的有序处理器;guardrails、evals、脱敏、限流等横切能力的唯一合法承载点。
+Agent 的唯一横切扩展点:挂在 `AgentConfig.processors` 上、按声明顺序串行执行的三钩处理器(processInput / processOutputStep / processError),前一个的返回是后一个的输入;guardrails、evals、脱敏、限流等横切能力的唯一合法承载点。
 _Avoid_: 中间件、plugin、以字段形式焊进 Agent 类
 
 **工具 (Tool)**:

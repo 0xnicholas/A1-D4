@@ -7,6 +7,8 @@ import { toModelTools } from '../tools/to-model-tools.js';
 import { resolveDynamicArgument } from './dynamic.js';
 import { DEFAULT_MAX_STEPS, runAgentLoop } from './loop.js';
 import type { AgentTracing } from './loop.js';
+import { runProcessInput } from './processors.js';
+import type { Processor } from './processors.js';
 import { createAgentStream } from './stream.js';
 import type {
   AgentConfig,
@@ -40,6 +42,11 @@ export class Agent {
    * = no span object is ever created for this agent's runs.
    */
   #tracer: Tracer | undefined;
+  /**
+   * The run's processors, in declaration order — the cross-cutting extension point, kept off the
+   * instance surface like `tracer` (`AgentConfig.processors`). Empty = no processor runs.
+   */
+  #processors: readonly Processor[];
 
   constructor(config: AgentConfig) {
     this.name = config.name;
@@ -52,6 +59,7 @@ export class Agent {
     this.tools = config.tools;
     this.description = config.description;
     this.#tracer = config.tracer;
+    this.#processors = config.processors ?? [];
   }
 
   /**
@@ -76,6 +84,7 @@ export class Agent {
     const instructions = this.instructions;
     const tools = this.tools;
     const tracer = this.#tracer;
+    const processors = this.#processors;
     return createAgentStream(async function* () {
       // The run's request context comes first: every dynamic field resolves against it, and the
       // tools of the run receive the very same object.
@@ -92,13 +101,16 @@ export class Agent {
         resolvedTools,
         options,
       );
-      yield* runAgentLoop({
+      // The processors' input hook runs once per run, before the first model call: the prompt it
+      // returns is what the model sees (and the run's span records as input).
+      return yield* runAgentLoop({
         models: resolvedModels,
         agentName: name,
-        prompt,
+        prompt: await runProcessInput(processors, prompt, requestContext),
         callOptions,
         tools: resolvedTools ?? {},
         maxSteps: toMaxSteps(options.maxSteps),
+        processors,
         requestContext,
         tracing: toTracing(tracer, options),
         // The user's model call settings are recorded on the step span under this name.

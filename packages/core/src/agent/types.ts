@@ -8,6 +8,7 @@ import type {
 import type { Model, ModelCallOptions, ModelProviderOptions } from '../model/contract.js';
 import type { Tracer } from '../observability/index.js';
 import type { Tool } from '../tools/index.js';
+import type { Processor } from './processors.js';
 
 /**
  * The five-field Agent surface (`docs/architecture/agent.md`): `name`, `instructions`, `model`,
@@ -43,6 +44,16 @@ export interface AgentConfig {
    * a standalone `new` may pass it explicitly). Absent = no span is ever created for its runs.
    */
   readonly tracer?: Tracer | undefined;
+  /**
+   * The processors of this agent's runs — the cross-cutting extension point of
+   * `docs/architecture/agent.md`「扩展点:Processor」(ADR-0005). Guardrails, evals, redaction and
+   * rate limiting live here, never in Agent fields. Hooks run in declaration order, each seeing the
+   * previous one's rewrite; absent = no processor runs.
+   *
+   * Not a definition field: like `tracer`, this is cross-cutting wiring the composition root (or an
+   * explicit `new`) hands in — the attachment point of the extension point itself.
+   */
+  readonly processors?: readonly Processor[] | undefined;
 }
 
 /**
@@ -148,7 +159,7 @@ export interface AgentStep {
   readonly text: string;
   /** Tool calls the model requested in this step, with their inputs parsed to JSON. */
   readonly toolCalls: readonly ToolCallChunk[];
-  /** Tool results reported for this step (provider-executed ones so far). */
+  /** Tool results reported for this step — provider-executed ones plus the framework-executed ones. */
   readonly toolResults: readonly ToolResultChunk[];
   /** Token usage the model reported for this step. */
   readonly usage: Usage;
