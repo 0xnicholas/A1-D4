@@ -17,9 +17,10 @@ import { captureRejection, expectAssignable, expectSuccess, expectSuspended } fr
  * (有 storage 时每个条目完成 + suspend + 终态)、`run.resume({ step, resumeData? })` 的 load →
  * resumeSchema 校验 → 从 position 重进、resume 进程内锁去重。
  *
- * 本票裁决(v1):suspend 只在**顶层 then 条目**的 step 内成立;parallel / branch / foreach /
- * dowhile / dountil 体内调用 suspend 显式报错(该边界的 `step-end` 读 `failed`、记录不落
- * `suspended`,归一 workflows-events;迭代现场语义按地图升级为新 ticket)。
+ * 本票裁决(#54):块内挂起补上承载缝——parallel 臂 / branch 臂 / foreach / dowhile / dountil
+ * 体内 `suspend()` 真挂起:迭代现场进快照的可选 `iterationSite` 字段(additive,旧快照无此字段走顶层
+ * 路径),resume 按 site 重进块内(完成部分按记录回放,洞与挂起点重跑)。事件/记录/快照三处读法
+ * 对齐「块内挂起 = 真挂起」:块内 step 的 `step-end` 读 `suspended`。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径:定义 → `createRun` → `run.start` / `run.resume`,
  * 以及 step `execute` 收到的 ctx 与注入的 store 观察到的快照。
@@ -742,18 +743,96 @@ describe('run.resume:load 快照 → resumeData 校验 → 从 position 重进',
   });
 });
 
-describe('块内 suspend:v1 只放 then 主轴,其余条目显式报错', () => {
-  function suspendingStep(id: string): ReturnType<typeof createStep> {
-    return createStep({
-      id,
+describe('块内 suspend:branch 臂挂起 → 条件不重估,所选臂重进', () => {
+  it('臂挂起:run 落 suspended,快照带 { kind: branch };resume 不重估条件,直接重进所选臂', async () => {
+    const cond = vi.fn((ctx: StepContext<string>) => ctx.inputData === 'x');
+    const armExecute = vi.fn(
+      (ctx: StepContext<string, string, { question: string }>) => {
+        if (ctx.resumeData === undefined) ctx.suspend({ question: 'which lane?' });
+        return `lane:${ctx.resumeData}`;
+      },
+    );
+    const arm = createStep({
+      id: 'review',
       inputSchema: z.string(),
       outputSchema: z.string(),
-      execute: (ctx: StepContext<string, undefined, { question: string }>) =>
-        ctx.suspend({ question: `${id}?` }),
+      resumeSchema: z.string(),
+      execute: armExecute,
     });
+    const otherExecute = vi.fn(() => 'other');
+    const other = createStep({
+      id: 'auto',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      execute: otherExecute,
+    });
+    const afterExecute = vi.fn((ctx: StepContext<{ review?: string }>) => ({
+      done: ctx.inputData.review ?? 'none',
+    }));
+    const after = createStep({
+      id: 'after',
+      inputSchema: z.object({ review: z.string().optional() }),
+      outputSchema: z.object({ done: z.string() }),
+      execute: afterExecute,
+    });
+    const { store, saves } = recordingStore();
+    const workflow = createWorkflow({
+      id: 'lane',
+      inputSchema: z.string(),
+      outputSchema: z.object({ done: z.string() }),
+      storage: store,
+    })
+      .branch([
+        [cond, arm],
+        [() => true, other],
+      ])
+      .then(after)
+      .commit();
+    const run = workflow.createRun({ runId: 'branch-gate' });
+    const suspended = expectSuspended(await run.start({ inputData: 'x' }).result);
+
+    expect(suspended.stepId).toBe('review');
+    expect(suspended.stepResults['review']?.status).toBe('suspended');
+    expect(saves.at(-1)).toMatchObject({
+      status: 'suspended',
+      position: 0,
+      iterationSite: { kind: 'branch' },
+    });
+
+    const outcome = expectSuccess(await run.resume({ step: 'review', resumeData: 'fast' }));
+
+    // 条件只在首段求值一次(挂起前);resume 重进不重估——所选臂由挂起记录钉死
+    expect(cond).toHaveBeenCalledTimes(1);
+    expect(otherExecute).not.toHaveBeenCalled();
+    expect(armExecute).toHaveBeenCalledTimes(2);
+    expect(armExecute).toHaveBeenLastCalledWith(expect.objectContaining({ resumeData: 'fast' }));
+    expect(outcome.output).toEqual({ done: 'lane:fast' });
+  });
+});
+
+describe('块内 suspend:foreach 迭代挂起 → 已收集前缀 + 挂起索引,洞重跑', () => {
+  /** gate:对指定元素挂起一次(问一句),拿到结论后放行;其余元素直通。 */
+  function foreachGate(gateOn: (element: string) => boolean) {
+    const seenResume: (unknown | undefined)[] = [];
+    const execute = vi.fn((ctx: StepContext<string, string, { question: string }>) => {
+      seenResume.push(ctx.resumeData);
+      if (gateOn(ctx.inputData) && ctx.resumeData === undefined) {
+        ctx.suspend({ question: `ok to use ${ctx.inputData}?` });
+      }
+      return `done:${ctx.inputData}:${String(ctx.resumeData ?? '-')}`;
+    });
+    const step = createStep({
+      id: 'item',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      resumeSchema: z.string(),
+      execute,
+    });
+    return { step, execute, seenResume };
   }
 
-  it('foreach 体内 suspend:点名 foreach 与 step id,且该块不落 failed 记录', async () => {
+  it('c=1:迭代挂起 → site 带已收集前缀与挂起索引;resume 前缀回放、挂起迭代收 resumeData、后续迭代照跑', async () => {
+    const gate = foreachGate((element) => element === 'b');
     const { store, saves } = recordingStore();
     const workflow = createWorkflow({
       id: 'batch',
@@ -761,23 +840,249 @@ describe('块内 suspend:v1 只放 then 主轴,其余条目显式报错', () => 
       outputSchema: z.array(z.string()),
       storage: store,
     })
-      .foreach(suspendingStep('item'))
+      .foreach(gate.step)
       .commit();
+    const run = workflow.createRun({ runId: 'foreach-gate' });
+    const suspended = expectSuspended(await run.start({ inputData: ['a', 'b', 'c'] }).result);
 
-    const error = await captureRejection(() =>
-      workflow.createRun({ runId: 'foreach-suspend' }).start({ inputData: ['a'] }).result,
-    );
+    // 挂起:块记录落 suspended(块聚合,payload = 挂起迭代的);site 带前缀与索引
+    expect(suspended.stepId).toBe('item');
+    expect(suspended.stepResults['item']).toMatchObject({
+      status: 'suspended',
+      suspendPayload: { question: 'ok to use b?' },
+    });
+    expect(saves.at(-1)).toMatchObject({
+      status: 'suspended',
+      position: 0,
+      iterationSite: {
+        kind: 'foreach',
+        suspendedIndex: 1,
+        collected: { '0': 'done:a:-' },
+      },
+    });
 
-    expect(error.message).toMatch(/foreach/);
-    expect(error.message).toMatch(/item/);
-    expect(error.message).toMatch(/then/);
-    // 挂起信号不是 step 失败:块没有落记录,run 仍以 failed 终态落库
-    expect(saves.at(-1)?.status).toBe('failed');
-    expect(saves.at(-1)?.stepResults['item']).toBeUndefined();
+    const outcome = expectSuccess(await run.resume({ step: 'item', resumeData: 'yes' }));
+
+    // 前缀 a 不重跑(回放);挂起迭代 b 收 resumeData;后续 c 照跑(无 resumeData);保序数组
+    expect(outcome.output).toEqual(['done:a:-', 'done:b:yes', 'done:c:-']);
+    expect(gate.seenResume).toEqual([undefined, undefined, 'yes', undefined]);
+    expect(saves.at(-1)).toMatchObject({
+      status: 'success',
+      position: 1,
+      stepResults: { item: { status: 'success' } },
+    });
   });
 
-  it('parallel 内 suspend:点名 parallel 与 step id,且挂起 step 不落记录(挂在失败 run 的快照上)', async () => {
+  it('c>1:挂起后闸门停拉新索引,在飞迭代落定后进 site;resume 洞重跑、挂起索引收 resumeData', async () => {
+    let release!: (value: void) => void;
+    const inFlight = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls: number[] = [];
+    const seenResume: (unknown | undefined)[] = [];
+    const step = createStep({
+      id: 'item',
+      inputSchema: z.number(),
+      outputSchema: z.string(),
+      resumeSchema: z.string(),
+      execute: async (ctx: StepContext<number, string, { question: string }>) => {
+        calls.push(ctx.inputData);
+        seenResume.push(ctx.resumeData);
+        if (ctx.inputData === 2 && ctx.resumeData === undefined) {
+          ctx.suspend({ question: 'ok to use 2?' });
+        }
+        if (ctx.inputData === 1) {
+          // 元素 1 真正驻留在飞:挂起落在它身上时,它的输出只能靠“等落定”进 site
+          await inFlight;
+        }
+        return `done:${ctx.inputData}:${String(ctx.resumeData ?? '-')}`;
+      },
+    });
+    const workflow = createWorkflow({
+      id: 'fanout',
+      inputSchema: z.array(z.number()),
+      outputSchema: z.array(z.string()),
+    })
+      .foreach(step, { concurrency: 2 })
+      .commit();
+    const run = workflow.createRun();
+    const started = run.start({ inputData: [1, 2, 3, 4] });
+    const settled = started.result;
+    // 让闸门拉起 0、1(0 在飞、1 挂起),3、4 不再拉;挂起快照等 0 落定
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    const suspended = expectSuspended(await settled);
+
+    // 在飞落定后的现场:挂起索引 1,已收集只有前一个索引;3、4 从未起跑
+    expect(suspended.stepResults['item']).toMatchObject({ status: 'suspended' });
+    expect(calls).toEqual([1, 2]);
+
+    const outcome = expectSuccess(await run.resume({ step: 'item', resumeData: 'yes' }));
+
+    // 保序输出;resumeData 只落在挂起迭代(索引 1),洞与后续迭代拿 undefined
+    expect(outcome.output).toEqual([
+      'done:1:-',
+      'done:2:yes',
+      'done:3:-',
+      'done:4:-',
+    ]);
+    expect(seenResume.slice(0, 2)).toEqual([undefined, undefined]);
+    expect(seenResume[2]).toBe('yes');
+    expect(seenResume.slice(3)).toEqual([undefined, undefined]);
+  });
+});
+
+describe('块内 suspend:循环体内挂起 → iterationCount + 现值重进', () => {
+  it('dountil:体内挂起 → site 带已完成迭代数与挂起迭代输入;resume 重进收 resumeData,条件计数连续', async () => {
+    const condCalls: number[] = [];
+    const cond = vi.fn((ctx: { iterationCount: number }) => {
+      condCalls.push(ctx.iterationCount);
+      return ctx.iterationCount >= 3;
+    });
+    const execute = vi.fn(
+      (ctx: StepContext<number, number, { question: string }>) => {
+        if (ctx.inputData === 2 && ctx.resumeData === undefined) {
+          ctx.suspend({ question: `enough at ${ctx.inputData}?` });
+        }
+        return ctx.resumeData !== undefined ? ctx.resumeData : ctx.inputData + 1;
+      },
+    );
+    const body = createStep({
+      id: 'grow',
+      inputSchema: z.number(),
+      outputSchema: z.number(),
+      resumeSchema: z.number(),
+      execute,
+    });
     const { store, saves } = recordingStore();
+    const workflow = createWorkflow({
+      id: 'until-grow',
+      inputSchema: z.number(),
+      outputSchema: z.number(),
+      storage: store,
+    })
+      .dountil(body, cond)
+      .commit();
+    const run = workflow.createRun({ runId: 'loop-gate' });
+    const suspended = expectSuspended(await run.start({ inputData: 1 }).result);
+
+    // 第 1 次迭代完成(1→2),第 2 次体内挂起:site 记已完成迭代数与挂起迭代的输入
+    expect(suspended.stepResults['grow']).toMatchObject({
+      status: 'suspended',
+      suspendPayload: { question: 'enough at 2?' },
+    });
+    expect(saves.at(-1)).toMatchObject({
+      status: 'suspended',
+      position: 0,
+      iterationSite: { kind: 'loop', iterationCount: 1, value: 2 },
+    });
+
+    const outcome = expectSuccess(await run.resume({ step: 'grow', resumeData: 5 }));
+
+    // 挂起迭代重进:input 2 + resumeData 5 → 输出 5;再一迭代 5→6 后条件退出;计数连续
+    expect(outcome.output).toBe(6);
+    expect(condCalls).toEqual([1, 2, 3]);
+    expect(execute).toHaveBeenCalledTimes(4);
+    expect(saves.at(-1)).toMatchObject({
+      status: 'success',
+      position: 1,
+      stepResults: { grow: { status: 'success', output: 6 } },
+    });
+  });
+
+  it('dowhile:挂起迭代已获准进入,resume 跳过首次前置检查;后续迭代照常检查', async () => {
+    const condCalls: number[] = [];
+    const execute = vi.fn(
+      (ctx: StepContext<number, number, { question: string }>) => {
+        if (execute.mock.calls.length === 1) ctx.suspend({ question: 'go on?' });
+        return ctx.resumeData !== undefined ? ctx.resumeData : ctx.inputData;
+      },
+    );
+    const body = createStep({
+      id: 'body',
+      inputSchema: z.number(),
+      outputSchema: z.number(),
+      resumeSchema: z.number(),
+      execute,
+    });
+    const workflow = createWorkflow({
+      id: 'while-gate',
+      inputSchema: z.number(),
+      outputSchema: z.number(),
+    })
+      .dowhile(body, (ctx) => {
+        condCalls.push(ctx.iterationCount);
+        return ctx.iterationCount < 2;
+      })
+      .commit();
+    const run = workflow.createRun();
+    const suspended = expectSuspended(await run.start({ inputData: 1 }).result);
+
+    // 首段:前置检查通过(0 < 2)后体内挂起——该迭代已获准进入
+    expect(suspended.stepId).toBe('body');
+    expect(condCalls).toEqual([0]);
+
+    const outcome = expectSuccess(await run.resume({ step: 'body', resumeData: 7 }));
+
+    // resume 重进:不重估首次前置条件(仍只 1 次);挂起迭代完成(count=1)后下一次前置检查照常(1 < 2 过),
+    // 第二次迭代(resumeData 缺席 → 再挂起……不:resumeData 缺席时返回 inputData 7)→ count=2 → 检查退出
+    expect(outcome.output).toBe(7);
+    expect(condCalls).toEqual([0, 1, 2]);
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it('循环块挂起时记录 suspended,完成时替换为终值;再挂起可二次 resume', async () => {
+    const execute = vi.fn(
+      (ctx: StepContext<number, string, { round: number }>) => {
+        const round = execute.mock.calls.length;
+        if (round <= 2) ctx.suspend({ round });
+        return 100 + round;
+      },
+    );
+    const body = createStep({
+      id: 'body',
+      inputSchema: z.number(),
+      outputSchema: z.number(),
+      resumeSchema: z.string(),
+      execute,
+    });
+    const { store, saves } = recordingStore();
+    const workflow = createWorkflow({
+      id: 'rounds',
+      inputSchema: z.number(),
+      outputSchema: z.number(),
+      storage: store,
+    })
+      .dountil(body, (ctx) => ctx.iterationCount >= 3)
+      .commit();
+    const run = workflow.createRun({ runId: 'rounds-run' });
+
+    const first = expectSuspended(await run.start({ inputData: 0 }).result);
+    expect(first.stepResults['body']?.suspendPayload).toEqual({ round: 1 });
+    expect(saves.at(-1)?.iterationSite).toMatchObject({ kind: 'loop', iterationCount: 0, value: 0 });
+
+    const second = expectSuspended(await run.resume({ step: 'body', resumeData: 'again' }));
+    expect(second.stepResults['body']?.suspendPayload).toEqual({ round: 2 });
+    expect(saves.at(-1)?.iterationSite).toMatchObject({ kind: 'loop', iterationCount: 0, value: 0 });
+
+    // 第三次执行不挂起(103),后续迭代直近条件闸(计数连续),终值 = 最后一次迭代输出
+    const outcome = expectSuccess(await run.resume({ step: 'body', resumeData: 'final' }));
+    expect(execute).toHaveBeenCalledTimes(5);
+    expect(outcome.output).toBe(105);
+    expect(saves.at(-1)).toMatchObject({ status: 'success' });
+    expect('iterationSite' in (saves.at(-1) ?? {})).toBe(false);
+  });
+});
+
+describe('块内 resume 的目标校验:site 与定义不匹配 → 显式报错', () => {
+  function forgedStore(snapshot: Record<string, unknown>): WorkflowSnapshotStore {
+    return {
+      load: async () => snapshot as unknown as WorkflowRunSnapshot,
+      save: async () => {},
+    };
+  }
+
+  it('site 的 kind 与 position 处的条目类型不一致 → 显式报错(快照不被消费)', async () => {
     const ok = createStep({
       id: 'ok',
       inputSchema: z.string(),
@@ -785,84 +1090,306 @@ describe('块内 suspend:v1 只放 then 主轴,其余条目显式报错', () => 
       execute: () => 'ok',
     });
     const workflow = createWorkflow({
-      id: 'fanout',
+      id: 'mismatch',
       inputSchema: z.string(),
       outputSchema: z.string(),
-      storage: store,
+      storage: forgedStore({
+        runId: 'forged',
+        status: 'suspended',
+        input: 'x',
+        stepResults: { ok: { status: 'suspended', suspendPayload: {} } },
+        position: 0,
+        iterationSite: { kind: 'foreach', suspendedIndex: 0, collected: {} },
+      }),
     })
-      .parallel([ok, suspendingStep('needs-human')])
+      .parallel([ok])
       .commit();
 
     const error = await captureRejection(() =>
-      workflow.createRun({ runId: 'parallel-suspend' }).start({ inputData: 'x' }).result,
+      workflow.createRun({ runId: 'forged' }).resume({ step: 'ok' }),
     );
 
+    expect(error.message).toMatch(/foreach/);
     expect(error.message).toMatch(/parallel/);
-    expect(error.message).toMatch(/needs-human/);
-    // 挂起只在可恢复条目(then)落 suspended 记录:失败 run 的快照里没有 suspended 记录
-    const failed = saves.at(-1);
-    expect(failed?.status).toBe('failed');
-    expect(failed?.stepResults['needs-human']).toBeUndefined();
-    expect(failed?.stepResults['ok']).toMatchObject({ status: 'success' });
+    expect(error.message).toMatch(/do not match/);
   });
 
-  it('dowhile 体内 suspend:点名 dowhile 与 step id;branch 臂同样报错', async () => {
-    const loop = createWorkflow({
-      id: 'loop',
-      inputSchema: z.string(),
-      outputSchema: z.string(),
-    })
-      .dowhile(suspendingStep('body'), () => true)
-      .commit();
-
-    const loopError = await captureRejection(() =>
-      loop.createRun().start({ inputData: 'x' }).result,
-    );
-    expect(loopError.message).toMatch(/dowhile/);
-    expect(loopError.message).toMatch(/body/);
-
-    const branch = createWorkflow({
-      id: 'branch',
-      inputSchema: z.string(),
-      outputSchema: z.string(),
-    })
-      .branch([[(ctx) => ctx.inputData === 'x', suspendingStep('arm')]])
-      .commit();
-
-    const branchError = await captureRejection(() =>
-      branch.createRun().start({ inputData: 'x' }).result,
-    );
-    expect(branchError.message).toMatch(/branch/);
-    expect(branchError.message).toMatch(/arm/);
-  });
-
-  it('条件里调用 suspend:显式报错(不是可恢复的挂起)', async () => {
-    const arm = createStep({
-      id: 'arm',
+  it('命名的 step 不在 site 指向的块内 → 显式报错', async () => {
+    const item = createStep({
+      id: 'item',
       inputSchema: z.string(),
       outputSchema: z.string(),
       execute: () => 'x',
     });
     const workflow = createWorkflow({
-      id: 'cond',
-      inputSchema: z.string(),
-      outputSchema: z.string(),
+      id: 'outside',
+      inputSchema: z.array(z.string()),
+      outputSchema: z.array(z.string()),
+      storage: forgedStore({
+        runId: 'forged-2',
+        status: 'suspended',
+        input: ['x'],
+        stepResults: { stranger: { status: 'suspended', suspendPayload: {} } },
+        position: 0,
+        iterationSite: { kind: 'foreach', suspendedIndex: 0, collected: {} },
+      }),
     })
-      .branch([
-        [
-          (ctx) => {
-            ctx.suspend({ question: 'never' });
-            return true;
-          },
-          arm,
-        ],
-      ])
+      .foreach(item)
       .commit();
 
     const error = await captureRejection(() =>
-      workflow.createRun().start({ inputData: 'x' }).result,
+      workflow.createRun({ runId: 'forged-2' }).resume({ step: 'stranger' }),
     );
-    expect(error.message).toMatch(/condition/);
+
+    expect(error.message).toMatch(/stranger/);
+    expect(error.message).toMatch(/foreach/);
+    expect(error.message).toMatch(/not a step of/);
+  });
+
+  it('旧形状快照(无 site):position 处不是挂起 step 的顶层 then 条目 → 显式报错', async () => {
+    const item = createStep({
+      id: 'item',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      execute: () => 'x',
+    });
+    const workflow = createWorkflow({
+      id: 'legacy',
+      inputSchema: z.array(z.string()),
+      outputSchema: z.array(z.string()),
+      storage: forgedStore({
+        runId: 'forged-3',
+        status: 'suspended',
+        input: ['x'],
+        stepResults: { item: { status: 'suspended', suspendPayload: {} } },
+        position: 0,
+      }),
+    })
+      .foreach(item)
+      .commit();
+
+    const error = await captureRejection(() =>
+      workflow.createRun({ runId: 'forged-3' }).resume({ step: 'item' }),
+    );
+
+    expect(error.message).toMatch(/iteration site/);
+    expect(error.message).toMatch(/then/);
+  });
+});
+
+describe('块内 suspend:parallel 臂挂起 → 迭代现场快照 + resume 重进', () => {
+  /** gate:resumeData 缺席即挂起(问一句),拿到结论后放行。 */
+  function gateStep<TId extends string>(id: TId, opts: { readonly resumeSchema?: z.ZodType } = {}) {
+    const execute = vi.fn(
+      (ctx: StepContext<string, string, { question: string }>) => {
+        if (ctx.resumeData === undefined) ctx.suspend({ question: `${id}?` });
+        return `${id}:${ctx.resumeData}`;
+      },
+    );
+    const step = createStep({
+      id,
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      ...(opts.resumeSchema === undefined ? {} : { resumeSchema: opts.resumeSchema }),
+      execute,
+    });
+    return { step, execute };
+  }
+
+  it('臂挂起:run 落 suspended,挂起臂记录 suspended + payload,完成臂保留 success;快照带 iterationSite', async () => {
+    const okExecute = vi.fn((ctx: StepContext<string>) => `ok:${ctx.inputData}`);
+    const ok = createStep({
+      id: 'ok',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      execute: okExecute,
+    });
+    const gate = gateStep('needs-human', { resumeSchema: z.string() });
+    const { store, saves } = recordingStore();
+    const workflow = createWorkflow({
+      id: 'fanout',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      storage: store,
+    })
+      .parallel([ok, gate.step])
+      .commit();
+
+    const outcome = expectSuspended(
+      await workflow.createRun({ runId: 'parallel-gate' }).start({ inputData: 'x' }).result,
+    );
+
+    // 挂起目标 = 挂起臂;各臂记录各落(完成臂 success、挂起臂 suspended + payload)
+    expect(outcome.stepId).toBe('needs-human');
+    expect(outcome.stepResults['ok']).toMatchObject({ status: 'success', output: 'ok:x' });
+    expect(outcome.stepResults['needs-human']).toMatchObject({
+      status: 'suspended',
+      suspendPayload: { question: 'needs-human?' },
+    });
+    // 快照:position = 块条目下标,iterationSite = { kind: 'parallel' }(记录即现场,无额外数据)
+    expect(saves.at(-1)).toMatchObject({
+      runId: 'parallel-gate',
+      status: 'suspended',
+      position: 0,
+      iterationSite: { kind: 'parallel' },
+    });
+  });
+
+  it('resume:完成臂按记录回放不重跑,挂起臂收 resumeData,后续条目继续,keyed 输出按定义序', async () => {
+    const okExecute = vi.fn((ctx: StepContext<string>) => `ok:${ctx.inputData}`);
+    const ok = createStep({
+      id: 'ok',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      execute: okExecute,
+    });
+    const gate = gateStep('needs-human', { resumeSchema: z.string() });
+    const afterExecute = vi.fn((ctx: StepContext<{ ok: string; 'needs-human': string }>) => ({
+      done: `${ctx.inputData.ok}+${ctx.inputData['needs-human']}`,
+    }));
+    const after = createStep({
+      id: 'after',
+      inputSchema: z.object({ ok: z.string(), 'needs-human': z.string() }),
+      outputSchema: z.object({ done: z.string() }),
+      execute: afterExecute,
+    });
+    const { store, saves } = recordingStore();
+    const workflow = createWorkflow({
+      id: 'fanout',
+      inputSchema: z.string(),
+      outputSchema: z.object({ done: z.string() }),
+      storage: store,
+    })
+      .parallel([ok, gate.step])
+      .then(after)
+      .commit();
+    const run = workflow.createRun({ runId: 'parallel-resume' });
+    await run.start({ inputData: 'x' }).result;
+
+    const outcome = expectSuccess(
+      await run.resume({ step: 'needs-human', resumeData: 'yes' }),
+    );
+
+    // 完成臂只执行一次(记录回放);挂起臂两次(挂起 + 恢复);后续条目恢复后继续
+    expect(okExecute).toHaveBeenCalledTimes(1);
+    expect(gate.execute).toHaveBeenCalledTimes(2);
+    expect(gate.execute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resumeData: 'yes' }),
+    );
+    expect(outcome.output).toEqual({ done: 'ok:x+needs-human:yes' });
+    // 恢复后的 keyed 输出按定义序,块完成后快照走正常 running(position = 下一条目,无 site)
+    expect(saves.at(-1)).toMatchObject({
+      status: 'success',
+      position: 2,
+      stepResults: {
+        ok: { status: 'success', output: 'ok:x' },
+        'needs-human': { status: 'success', output: 'needs-human:yes' },
+        after: { status: 'success' },
+      },
+    });
+    expect('iterationSite' in (saves.at(-1) ?? {})).toBe(false);
+  });
+
+  it('多臂同时挂起:各落 suspended 记录;resume 命名谁谁收 resumeData,其余臂重跑(无 resumeData)再收敛', async () => {
+    const first = gateStep('gate-a', { resumeSchema: z.string() });
+    const second = gateStep('gate-b', { resumeSchema: z.string() });
+    const workflow = createWorkflow({
+      id: 'two-gates',
+      inputSchema: z.string(),
+      outputSchema: z.object({ 'gate-a': z.string(), 'gate-b': z.string() }),
+    })
+      .parallel([first.step, second.step])
+      .commit();
+    const run = workflow.createRun();
+    const suspended = expectSuspended(await run.start({ inputData: 'x' }).result);
+
+    // 两个臂都挂起:信封点名先落定的臂,两条 suspended 记录都在(各自真相)
+    expect(suspended.stepId).toBe('gate-a');
+    expect(suspended.stepResults['gate-a']?.status).toBe('suspended');
+    expect(suspended.stepResults['gate-b']?.status).toBe('suspended');
+
+    // resume 命名 gate-b:它收 resumeData;gate-a 无 success 记录 → 重跑(无 resumeData)→ 再挂起
+    const again = expectSuspended(await run.resume({ step: 'gate-b', resumeData: 'go' }));
+    expect(again.stepId).toBe('gate-a');
+    expect(second.execute).toHaveBeenLastCalledWith(expect.objectContaining({ resumeData: 'go' }));
+    expect(first.execute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resumeData: undefined }),
+    );
+
+    const outcome = expectSuccess(await run.resume({ step: 'gate-a', resumeData: 'fine' }));
+    expect(outcome.output).toEqual({ 'gate-a': 'gate-a:fine', 'gate-b': 'gate-b:go' });
+  });
+
+  it('挂起优先于兄弟失败:失败臂落 failed 记录,run 仍挂起;resume 时失败臂随重跑规则再跑', async () => {
+    const boom = new Error('sibling boom');
+    const failingExecute = vi.fn((_ctx: StepContext<string>) => {
+      if (failingExecute.mock.calls.length === 1) throw boom;
+      return 'recovered';
+    });
+    const failing = createStep({
+      id: 'failing',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      execute: failingExecute,
+    });
+    const gate = gateStep('gate', { resumeSchema: z.string() });
+    const workflow = createWorkflow({
+      id: 'suspend-vs-fail',
+      inputSchema: z.string(),
+      outputSchema: z.object({ failing: z.string(), gate: z.string() }),
+    })
+      .parallel([failing, gate.step])
+      .commit();
+    const run = workflow.createRun();
+    const suspended = expectSuspended(await run.start({ inputData: 'x' }).result);
+
+    // 挂起信号赢了同窗的兄弟失败:run 挂起(失败臂记录 failed,不吞)
+    expect(suspended.stepId).toBe('gate');
+    expect(suspended.stepResults['failing']?.status).toBe('failed');
+
+    // resume:failed 臂无 success 记录 → 重跑(这里换一次成功);挂起臂收 resumeData
+    const outcome = expectSuccess(await run.resume({ step: 'gate', resumeData: 'ok' }));
+    expect(outcome.output).toEqual({ failing: 'recovered', gate: 'gate:ok' });
+  });
+
+  it('挂起时等在飞臂落定:后完成的臂输出进记录与快照(resume 不重跑它)', async () => {
+    let release!: (value: void) => void;
+    const inFlight = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slowExecute = vi.fn(async (ctx: StepContext<string>) => {
+      await inFlight;
+      return `slow:${ctx.inputData}`;
+    });
+    const slow = createStep({
+      id: 'slow',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      execute: slowExecute,
+    });
+    const gate = gateStep('gate', { resumeSchema: z.string() });
+    const { store, saves } = recordingStore();
+    const workflow = createWorkflow({
+      id: 'settle',
+      inputSchema: z.string(),
+      outputSchema: z.object({ slow: z.string(), gate: z.string() }),
+      storage: store,
+    })
+      .parallel([slow, gate.step])
+      .commit();
+    const run = workflow.createRun({ runId: 'settle-run' });
+    const settled = run.start({ inputData: 'x' }).result;
+    // 让 microtask 走到 gate 挂起、slow 仍在飞:挂起快照必须等 slow 落定才写
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    const suspended = expectSuspended(await settled);
+
+    expect(suspended.stepResults['slow']).toMatchObject({ status: 'success', output: 'slow:x' });
+    expect(saves.at(-1)?.stepResults['slow']).toMatchObject({ status: 'success' });
+
+    const outcome = expectSuccess(await run.resume({ step: 'gate', resumeData: 'go' }));
+    expect(slowExecute).toHaveBeenCalledTimes(1);
+    expect(outcome.output).toEqual({ slow: 'slow:x', gate: 'gate:go' });
   });
 });
 

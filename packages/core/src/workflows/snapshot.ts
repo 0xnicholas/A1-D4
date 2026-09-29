@@ -34,6 +34,32 @@ export interface WorkflowStepResultSnapshot {
 }
 
 /**
+ * Where inside a block a run suspended (#54): the iteration-site facts the flat `position` cannot
+ * express — `position` names the block's entry, the site names the execution inside it. A snapshot
+ * carries it only while `suspended` inside a block; a top-level `then` suspension and every
+ * running / terminal snapshot have none. The records carry the rest of the site: a completed arm /
+ * iteration is a `success` record, a suspending parallel arm a `suspended` record, so the kinds
+ * below carry only what records cannot.
+ */
+export type WorkflowIterationSite =
+  | { readonly kind: 'parallel' }
+  | { readonly kind: 'branch' }
+  | {
+      /** The index of the suspended iteration; the one `resumeData` belongs to. */
+      readonly kind: 'foreach';
+      readonly suspendedIndex: number;
+      /** Outputs already collected, keyed by index as a string (JSON-only, holes absent). */
+      readonly collected: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'loop';
+      /** Iterations completed before the suspended one (the condition's counting basis). */
+      readonly iterationCount: number;
+      /** The value the suspended iteration consumed — a mid-block tip no record holds. */
+      readonly value: unknown;
+    };
+
+/**
  * One run's JSON-serializable state (`docs/architecture/workflows.md`「suspend/resume 与快照」):
  * the run identity, its status, the input it started with, the per-step results and the flat entry
  * position to re-enter from — the `startIdx` equivalent — plus the trace the run's spans belong to,
@@ -50,6 +76,13 @@ export interface WorkflowRunSnapshot {
   readonly stepResults: Readonly<Record<string, WorkflowStepResultSnapshot>>;
   /** Position in the flat entry list to re-enter from on resume. */
   readonly position: number;
+  /**
+   * Where inside the block at `position` the run suspended (#54, additive — like `traceId`, a
+   * snapshot written before the field existed simply lacks it). Present only while the run is
+   * suspended inside a block; `resume` re-enters the block from it. A missing site on a suspended
+   * snapshot means the top-level `then` suspension of the earlier shape.
+   */
+  readonly iterationSite?: WorkflowIterationSite;
   /**
    * The trace the run's spans were exported under (32-hex), written whenever a real span exists —
    * an untraced run, or one whose trace the sampler rejected, carries no id. A resume starts a new

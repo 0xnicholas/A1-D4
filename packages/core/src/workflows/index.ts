@@ -22,16 +22,19 @@
  * step's input + a resume's resumeData) is always on, with the schema's value replacing the raw
  * data.
  *
- * Suspend/resume: a step's `suspend(payload)` unwinds the run at a top-level `then` entry — the
- * step is recorded `suspended`, the run's JSON snapshot is written to the `WorkflowSnapshotStore`
- * (2 methods, JSON-only; the in-memory default ships with the core) and the outcome envelope reads
- * `suspended`. `resume` loads the snapshot, validates `resumeData` against the step's
- * `resumeSchema` and re-enters the walk from the snapshot's position, replaying the completed
- * entries from the records instead of re-running them; concurrent resumes of one run are
- * deduplicated in process. Snapshots are written at fixed points — every completed entry with
- * attached storage, plus suspend and the terminal state — never through hooks; a run with a tracer
- * writes the trace it was exported under into the snapshot, so a resumed segment continues the same
- * trace. A tracer attached to the definition opens `workflow-run` / `workflow-step` spans at the same
+ * Suspend/resume: a step's `suspend(payload)` unwinds the run and suspends it — at a top-level
+ * `then` entry or inside a block (a `parallel` arm, a `branch` arm, a `foreach` iteration, a loop
+ * body, #54). The step is recorded `suspended`, the run's JSON snapshot goes to the
+ * `WorkflowSnapshotStore` (2 methods, JSON-only; the in-memory default ships with the core) —
+ * carrying the block's iteration site when the suspension happened inside one — and the outcome
+ * envelope reads `suspended`. `resume` loads the snapshot, validates `resumeData` against the
+ * step's `resumeSchema` and re-enters the walk from the snapshot's position (inside its block,
+ * from the site), replaying the completed executions from the records instead of re-running
+ * them; concurrent resumes of one run are deduplicated in process. Snapshots are written at fixed
+ * points — every completed entry with attached storage, plus suspend and the terminal state —
+ * never through hooks; a run with a tracer writes the trace it was exported under into the
+ * snapshot, so a resumed segment continues the same trace. A tracer attached to the definition
+ * opens `workflow-run` / `workflow-step` spans at the same
  * boundaries (run span: input = the validated trigger input, output = the outcome envelope; step
  * span: name = step id, one per execution), and an absent tracer means no span object is ever
  * created. Spec: `docs/architecture/workflows.md`.
@@ -76,6 +79,7 @@ export type {
 } from './events.js';
 export type {
   StepStatus,
+  WorkflowIterationSite,
   WorkflowRunSnapshot,
   WorkflowRunStatus,
   WorkflowSnapshotStore,

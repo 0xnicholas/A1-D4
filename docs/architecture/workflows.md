@@ -6,6 +6,7 @@
 > 修订(#50):循环与等待补钉实施期裁决——dowhile 条件在**迭代前**求值(条件在 tip 上为假即可 0 次迭代,块输出 = tip 原样透传)、dountil 在**迭代后**求值(至少一次);两者 `iterationCount` = 已完成迭代数(条件里抛错即最大迭代闸),块按 step id 记一条(记录 = 最后一次迭代的输出)。sleep 的动态时长 fn 收 `RequestContext`(动态参数约定,非 step 参数包;非有限数报错,负值当 0);`retries` = **额外**尝试数(最多 `retries + 1` 次),固定间隔 1000ms、可被中止打断,step 边界校验只做一次不重试,定义期须为非负整数。
 > 修订(#51):suspend/resume 落地时补钉实施期裁决——v1 的 suspend 只成立在**顶层 then 条目**的 step 内,块内(parallel / branch 臂 / foreach / 循环)调用 suspend 显式报错(块内迭代现场不在快照形状内,升级为新 ticket);`position` = 重进下标(suspend 时 = 挂起条目,running 时 = 下一条目,终态 success = 条目数);resume 把前序条目**按记录回放**重建 tip(不重执行、不重估条件),`input` 用快照里已校验的值;持久化粒度 = **条目完成**(块的子 step 随块一起记录,见 #49/#50;sleep 不是 step 但条目完成也写),step 边界写只随真实 storage,无 storage 时只写 suspend 与终态。
 > 修订(#52):事件流与 span 埋点落地时补钉实施期裁决——事件词汇表与载荷(下表「流式事件」)、块内 step 的**每次执行**一对事件 / 一个 `workflow-step` span(stepResults 仍按块聚合)、run span 的 input = 校验后的触发输入(start 的 input / resume 的 resumeData)、output = 终态信封;`createRun` 收 `{ traceId?, parentSpanId? }`(外部 trace 续接,空串语义沿 agent 的 run option),`traceId` 作为**可选字段**进快照(additive),resume 以快照 traceId 开同一 trace 下的新 run span。
+> 修订(#54):块内挂起落地——四类块体内 `suspend()` 真挂起,迭代现场以可选 `iterationSite?` 字段进快照(additive,旧快照无此字段 = 顶层挂起的旧形状);resume 按 site 重进块内:parallel / branch 按**记录回放**完成臂(无 success 记录的臂重跑,挂起臂各落 suspended 记录,resume 命名谁谁收 resumeData)、foreach 记已收集前缀与挂起索引(洞重跑)、循环记已完成迭代数与挂起迭代的输入(dowhile 重进跳过首次前置检查);块是**满同步点**——挂起或失败前等在飞执行落定,挂起优先于同窗兄弟失败;事件/记录/快照同读「块内挂起 = suspended」。实施期补钉:foreach/parallel 的失败也等在飞落定(旧 Promise.all 的“失败即离场、在飞脱缰”废止)。
 
 ## 定位
 
@@ -69,9 +70,9 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 | 算子 | 语义 | 输出形状 |
 | --- | --- | --- |
 | `.then(step)` | 顺序执行;上一步 output(校验后)作为下一步 input | 透传 |
-| `.parallel([a,b])` | `Promise.all` 全并发,无并发上限;任一步失败整块失败;同步点 | `{ [step.id]: output }` |
+| `.parallel([a,b])` | 全并发,无并发上限;满同步点(离场前等全部臂落定);任一步失败且无挂起则整块失败;挂起优先于同窗兄弟失败 | `{ [step.id]: output }` |
 | `.branch([[cond,step]...])` | 按定义序求值,第一个真分支执行;各分支 IO schema 一致;无真分支时输出空 keyed 对象 `{}`(tip 值不穿透) | keyed 对象,只有一个 key 有值 |
-| `.foreach(step, {concurrency})` | 输入必须是数组;默认 concurrency=1(须为正整数);>1 用并发闸,保序收集;同步点;任一次迭代失败整块失败,失败后不再开新迭代(在飞迭代完成) | 输出数组 |
+| `.foreach(step, {concurrency})` | 输入必须是数组;默认 concurrency=1(须为正整数);>1 用并发闸,保序收集;满同步点(失败或挂起后不再开新迭代,在飞迭代落定后离场);任一次迭代失败且无挂起则整块失败 | 输出数组 |
 | `.dowhile` / `.dountil(step, cond)` | 循环至条件不满足/满足;dowhile 迭代**前**求值(可 0 次迭代)、dountil 迭代**后**求值(至少 1 次);输出 = 最后一次迭代的输出 | 透传 |
 | `.sleep(ms\|fn)` | 进程内 setTimeout + AbortSignal,**非 durable**(进程死即丢);fn 动态算时长(收 `RequestContext`) | — |
 
@@ -85,13 +86,21 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 - 持久化时机:有 storage 时**每个条目完成后** + suspend + 终态,固定写;无 shouldPersistSnapshot / prune 钩子。"每个条目"而非字面的"每个 step":块的子 step 随块一起记录(#49/#50 已钉块只按 step id 记一条),条目完成才是记录表变化的时刻;sleep 不产生记录但条目完成照写。
 - resume 并发去重:进程内锁;跨进程 CAS = adapter 可选扩展(`compareAndSave`,见 `docs/architecture/storage.md`)。
 
-### 实施钉死(#51)
+### 实施钉死(#51,块内部分由 #54 修订)
 
-- **v1 的 suspend 只在顶层 `then` 条目**:`parallel` / `branch` 臂 / `foreach` / `dowhile` / `dountil` 体内调用 suspend → 显式报错(点名块类型与 step id),run 落 failed。迭代现场(第几次迭代、已收集多少、多少在飞)不在 `stepResults + position` 形状内;块内 suspend 语义是新 ticket 的事。条件里调用 suspend 同样显式报错(条件是只读的)。
+- **suspend 在任何条目类型内都成立(#54 修订)**:顶层 `then` 的 step、parallel / branch 臂、foreach / 循环体内调用 `suspend(payload)` 都真挂起 run;条件里调用 suspend 仍显式报错(条件是只读的)。#51 的「v1 只在顶层 then」由 #54 补上承载缝。
 - **position = 重进下标**:suspend 快照 = 挂起条目;`running` 快照 = 已完成条目的下一条;终态 `success` = 条目数。只写 `running` 快照当 `createWorkflow` 附了真实 storage;无 storage 时只写 suspend 与终态——快照只落在 run 对象的内存默认实现里(同一 run 对象可恢复;新 run 对象要接真实 storage,进程内默认 store 不跨对象)。
 - **resume 的回放**:从快照 `input`(start 边界已校验过的值)起,按记录重建前序条目的输出得到 tip——前序 step 不重执行、条件不重估;`getStepResult` 由快照记录种子恢复。`resumeData` 过挂起 step 的 `resumeSchema` 是第三处固定 IO 校验,校验值替换原数据;声眀无 `resumeSchema` 的 step 不接受 resumeData(显式报错)。`step`(step 对象或 id)必须与快照里挂起的 step 一致,否则显式报错。resume 选项可再传 `signal` / `requestContext`(跨进程恢复时;缺省用 start 的)。
 - **信封与去重**:挂起终态 = `{ status: 'suspended', stepId, stepResults }`(payload 在 `stepResults[stepId].suspendPayload`);resume 与 start 返回同一终态信封。进程内锁按 runId 去重:同一 run 的并发 resume 合并为一次调用(后到者拿到同一 promise),锁在 settle 后释放(再次挂起可再次 resume)。
-- **写失败语义**:快照写失败随 run 失败(除 failed 终态那一写为 best-effort——run 自身的错误永远原样上抛)。挂起信号只在可恢复条目(top-level then)落 `suspended` 记录:块内 suspend 的 step 不留记录,failed run 的快照里不会出现 `suspended` 记录。
+- **写失败语义**:快照写失败随 run 失败(除 failed 终态那一写为 best-effort——run 自身的错误永远原样上抛)。挂起的 step 落 `suspended` 记录(记录与挂起信封同源):顶层 then 与 parallel / branch 臂按各自 step id 落记录(多个同时挂起的臂各落各的,谁都可以是下一个 resume 目标);foreach / 循环按块的聚合 step id 落一条(mid-block 挂起,块完成时替换为 success)。
+
+### 块内挂起与迭代现场(#54)
+
+- **块是满同步点**:挂起信号出现后,块停止拉新迭代/不再开新臂,**等在飞执行落定**后才写挂起快照——快照必须说得清哪些执行已完成(旧 Promise.all 语义下“失败即离场、在飞脱缰”废止;失败同样等落定)。挂起信号**优先于**同窗兄弟失败(失败臂落 failed 记录,重进时随重跑规则再跑)。
+- **resume 按 site 重进块内,records-first**:parallel / branch 臂带 `success` 记录的按记录回放不重跑,无 success 记录的臂(失败 / 未跑 / 未被命名的挂起臂)重跑(无 resumeData,再挂起则再挂);branch 重进**不重估条件**(所选臂由记录钉死);foreach 已收集前缀回放,洞与挂起索引重跑;循环从 site 的 value 与 iterationCount 重进。
+- **resumeData 归属挂起的那一次执行**:foreach 同一 step id 多次执行,按 site 的 suspendedIndex 门控;循环的重进首次体执行即挂起迭代。后续迭代 / 兄弟臂拿 `undefined`。
+- **多挂起收敛**:并发执行中多个 suspend,首个落定者为信封点名的挂起目标;其余(臂)各落 suspended 记录可作下一个 resume 目标,(foreach 迭代)为洞重跑——再次 suspend 就再次挂起,逐次收敛。
+- **目标校验**:site 的 kind 必须与 position 处条目类型一致(loop 对应 dowhile / dountil 两型),命名 step 必须是该块的 step 且记录为 suspended;不一致显式报错(快照与定义不匹配)。
 
 ### storage port(#15 已定)
 
@@ -104,7 +113,7 @@ interface WorkflowSnapshotStore {
 
 核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。基础形状冻结;adapter 家族与 delete / list / CAS 可选扩展见 `docs/architecture/storage.md`。
 
-快照形状在 #51 钉的五字段外,由 #52 additive 加一个可选 `traceId?`(32-hex,`docs/architecture/observability.md`「suspend/resume」):有真实 span 时才写,未挂 tracer 或采样不通过的 run 没有它;resume 用它续同一 trace,故同一次挂起的两段 run span 在一条 trace 里。
+快照形状在 #51 钉的五字段外,由 #52 additive 加一个可选 `traceId?`(32-hex,`docs/architecture/observability.md`「suspend/resume」):有真实 span 时才写,未挂 tracer 或采样不通过的 run 没有它;resume 用它续同一 trace,故同一次挂起的两段 run span 在一条 trace 里。#54 再 additive 一个可选 `iterationSite?`(只随块内挂起的 suspended 快照出现,running / 终态快照无):判别联合 `{kind: 'parallel' | 'branch'}`(记录即现场,无额外数据)/ `{kind: 'foreach', suspendedIndex, collected}`(键 = index-as-string,避免稀疏数组的 null 歧义)/ `{kind: 'loop', iterationCount, value}`(value = 挂起迭代的输入——中途 tip 不在任何记录里);旧快照缺此字段 = 顶层挂起的旧形状,走既有路径。
 
 ## IO 校验
 
@@ -129,7 +138,7 @@ interface WorkflowSnapshotStore {
 - **块内 step = 每次执行一对**:`foreach` / 循环的每次迭代、`parallel` 的每个臂各自一对(并发下按发生序交错),而 `stepResults` 仍按块聚合一条(#49/#50);事件与 span 是执行视角,记录是块视角。
 - **失败**:失败 step 的 `step-end` 以 `status: 'failed'` 落地,随后**迭代器以 run 的错误 reject**(与 agent 流同一惯例,不设 failed 的 `run-end`);`result` 与迭代器同错、同一次执行。
 - **挂起**:挂起 step 的 `step-end` 为 `suspended`,`run-end` 为 `suspended`;恢复段走 `resume` 的 promise,不是同一条流的续写。
-- **事件与 span 各记一边**:`step-start` 的 `input` 是**到达边界的原值**(校验前),`workflow-step` span 的 input 是**边界校验后的值**(`execute` 实际收到的)——校验失败时 span 无 input、error 落它。**块内 step 的 suspend 读 `failed`**:该边界不能挂起 run(#51:v1 只接受顶层 `then`),run 随块内挂起错误失败,记录同样不落 `suspended`——事件与记录同读法。
+- **事件与 span 各记一边**:`step-start` 的 `input` 是**到达边界的原值**(校验前),`workflow-step` span 的 input 是**边界校验后的值**(`execute` 实际收到的)——校验失败时 span 无 input、error 落它。**块内 step 的 suspend 读 `suspended`**(#54 修订 #52 的“读 failed”):该边界真能挂起 run,事件、记录、快照同读法;未被信封点名的挂起迭代(如 foreach 并发多挂起的非首个)事件照读 `suspended`(执行视角),记录不落(块聚合)。
 - 消费者提前 break:停止事件缓冲,run 照跑完(`result` 仍落定);懒启动不变(首个 `next()` 或首次读 `result` 才开始执行)。
 
 ## 错误、重试与状态机
@@ -149,7 +158,6 @@ interface WorkflowSnapshotStore {
 | bail | branch 建模;后加 minor |
 | validateInputs 开关 | 永远校验 |
 | time-travel / restart / restartAll | 引擎 load→重进原语;durable 归 Harness(#18) |
-| 块内(parallel / branch 臂 / foreach / 循环)的 suspend | 显式报错 + 迭代现场快照机制归后续 ticket(快照形状需先演化) |
 | shouldPersistSnapshot / prune 钩子 | 固定 step 边界写 |
 | resume CAS / serializedStepGraph / 多引擎适配 | adapter 可选扩展(`docs/architecture/storage.md`)/ 外部 runner 能力包方向 |
 | chunk 级流式透传 | step 内自行消费;后加 minor |

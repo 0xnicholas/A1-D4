@@ -655,11 +655,12 @@ describe('foreach:数组输入 + 自写并发闸 + 保序收集', () => {
     await vi.waitFor(() => expect(started).toEqual(['a', 'b']));
 
     releaseB.resolve();
+    releaseA.resolve();
+    // 同步点在满意义上等在飞落定(#54):b 失败后闸门不再拉新迭代,在飞的 a 落定后 run 才以原错误拒绝
     const error = await captureRejection(() => result.then(() => undefined));
     expect(error).toBe(boom);
 
     // 在飞迭代完成收尾,失败后不得再开新迭代
-    releaseA.resolve();
     await vi.waitFor(() => expect(completed).toEqual(['a']));
     expect(started).toEqual(['a', 'b']);
   });

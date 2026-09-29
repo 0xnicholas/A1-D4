@@ -73,8 +73,12 @@ _Avoid_: supervisor 协议、sub-agent 字段、`.network()`
 _Avoid_: DAG 执行器(本框架 workflow 不是 DAG)、状态机 DSL
 
 **快照 (Snapshot)**:
-run 的 JSON 化状态,两种:workflow 域 = step 边界的 stepResults + 位置;Harness 域 = durable agent loop 的消息列表 + step 计数 + 挂起点(仅工具调用边界审批闸产生)。suspend/resume 的共用机制,经 storage port 读写,默认内存实现。
+run 的 JSON 化状态,两种:workflow 域 = step 边界的 stepResults + 位置(块内挂起时另携迭代现场);Harness 域 = durable agent loop 的消息列表 + step 计数 + 挂起点(仅工具调用边界审批闸产生)。suspend/resume 的共用机制,经 storage port 读写,默认内存实现。
 _Avoid_: 事件溯源、完整历史(只保留每 run 最新一份)
+
+**迭代现场 (Iteration site)**:
+块内挂起时快照携带的块内重进坐标:挂起发生在块内哪一次执行、哪些执行已完成;记录能说清的部分(完成臂/挂起臂)不重复存。只随 suspended 快照出现,resume 据此重进块内。
+_Avoid_: suspendedPaths 式多路径挂起模型(不建路径模型,现场尽量由记录承载)、把迭代现场当作执行历史(只保留最新一份)
 
 **Memory**:
 框架的记忆子系统:thread/resource 身份 + 消息历史 + 可选工作记忆;存储走 port、默认内存实现;语义召回与 OM 类重机制不进核心,外部记忆系统(如 bunfold)经能力包桥接。

@@ -232,7 +232,7 @@ describe('失败与挂起:终态的流语义', () => {
     const resumed = expectSuccess(await run.resume({ step: 'approval', resumeData: { approved: true } }));
     expect(resumed.output).toEqual({ polished: 'ts:true' });
   });
-  it('块内 suspend:step-end 读 failed(该边界不能挂起 run),迭代器以块内挂起错误 reject', async () => {
+  it('块内 suspend:step-end 读 suspended(该边界真能挂起 run),run-end 落 suspended', async () => {
     const gate = createStep({
       id: 'gate',
       inputSchema: z.number(),
@@ -252,17 +252,17 @@ describe('失败与挂起:终态的流语义', () => {
     const run = workflow.createRun();
     const out = run.start({ inputData: [1] });
     const events: WorkflowEvent[] = [];
-    const error = await captureRejection(async () => {
-      for await (const event of out) events.push(event);
-    });
+    const outcome = await out.result;
+    // 迭代器不 break,消费到流末(#54:块内挂起 = 真挂起,不再是失败拒绝)
+    for await (const event of out) events.push(event);
 
-    // 块内 suspend 不是可挂起边界(v1 只接受顶层 then):run 随块内挂起错误失败,
-    // 该 step 的边界不读 suspended(记录也不落 suspended)——事件与记录同读法。
-    expect(error.message).toMatch(/suspend\(\) was called by step "gate" inside a foreach block/);
+    // 事件、记录、快照同读法:块内 step 的挂起边界读 suspended,run 以 suspended 终态收束
+    expect(outcome.status).toBe('suspended');
     expect(events).toEqual([
       { type: 'run-start', runId: run.runId, workflowId: 'fanout', input: [1] },
       { type: 'step-start', stepId: 'gate', input: 1 },
-      { type: 'step-end', stepId: 'gate', status: 'failed' },
+      { type: 'step-end', stepId: 'gate', status: 'suspended' },
+      { type: 'run-end', status: 'suspended' },
     ]);
   });
 });

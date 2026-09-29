@@ -272,6 +272,9 @@ async function resumeSnapshot<TOutput>(
       resumeData: options.resumeData,
       position: snapshot.position,
       stepResults: snapshot.stepResults,
+      // The block's iteration site when the run suspended inside a block (#54): the walk re-enters
+      // that block from it. A snapshot without one is the earlier top-level `then` shape.
+      ...(snapshot.iterationSite === undefined ? {} : { iterationSite: snapshot.iterationSite }),
       // The resumed segment continues the trace the suspended run was exported under.
       ...(snapshot.traceId === undefined ? {} : { traceId: snapshot.traceId }),
     },

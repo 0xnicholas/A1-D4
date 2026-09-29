@@ -210,3 +210,11 @@ mastra 有三个引擎,边界划在 `ExecutionEngine` 抽象类 + DefaultExecuti
 - **快照里的 trace 身份**:本文记录的 mastra `WorkflowRunState` 带 `tracingContext?`(可序列化的完整追踪上下文);本框架只加一个 `traceId?` 字段(#52 additive)——恢复段需要的全部信息就是「续哪条 trace」,parent 不随快照走,resume 在同一 trace 下开新的 root span(沿 `docs/architecture/harness.md` 对 agent 侧「resume = 同一 traceId 下的新 run span」的已钉模式)。
 - **流式的粒度**:mastra 的 workflow streaming 覆盖 step 边界之外的 token 级透传(`stream` / `observeStream` 一整层),本文 §6 把它记进「不在语义、全在重量」的一栏;本框架 v1 按 spec 只保留 run / step 边界事件(`run-start` / `step-start` / `step-end` / `run-end`),chunk 级透传裁出(step 内用户自行消费 agent 的 stream 输出对象),事件**带边界值**——粒度对齐、载荷复用 chunk 协议的判别联合,但词汇表是本框架自己的。
 - **span 的边界归属**:mastra 的 workflow span 树把 exec 与每个 step 执行各记一层;本框架按 spec 只钉两级(`workflow-run` / `workflow-step`),`workflow-step` **每次执行一个**(foreach 迭代 / 循环迭代 / parallel 臂各自一个同名 span),而 run 的 `stepResults` 仍按块聚合一条——观测是执行视角,快照是块视角。
+
+## 附:补记(实施期对照,#54,2026-09-30)
+
+实施 M3 块内挂起票([实施:suspend 的块内语义——迭代现场快照 + 块内 resume](https://github.com/0xnicholas/balsa/issues/54))时,沿本文 §4.1 / §4.2 的事实对照了本框架的落地差异(本次未再核对上游新源码,行号仍以本文快照版本为准):
+
+- **多路径挂起的表达**:本文记录的 mastra 快照带 `suspendedPaths` / `activePaths` / `stepExecutionPath` 三组路径集合并配 `serializedStepGraph`;本框架不建路径模型——快照只加一个可选 `iterationSite?` 判别联合字段(#54 additive),块内现场尽量由**既有记录**承载(parallel 完成臂 = success 记录、挂起臂 = suspended 记录),site 只补记录说不出的部分(foreach 的已收集前缀与挂起索引、循环的已完成迭代数与中途 tip)。多臂同时挂起不走 mastra 的「其余保持挂起、逐路径 resume」:每个挂起臂各落 suspended 记录、都可是 resume 目标,未被命名的随块重跑(无 resumeData)、再挂起则再收敛——单目标 resume 原语不变。
+- **重开语义**:mastra restart 是 at-least-once(「崩溃瞬间正在执行的 step 会整体重跑」,本文 §4.2);本框架在进程内取**等落定**语义:挂起(与失败)信号出现后块等在飞执行落定才离场,已完成执行的输出不丢、不双跑;跨进程的 at-least-once 重开归 Harness 的 load→重进原语,不是引擎内建。
+- **foreach 部分进度的序列化**:mastra 按执行路径携带状态;本框架用 `collected: Record<index-as-string, output>`(稀疏数组在 JSON 里产生 `null`,与真实 null 输出无法区分——键字符串化消除歧义),洞 = 未完成,resume 时回放 + 重跑。

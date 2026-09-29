@@ -16,6 +16,7 @@ import type {
 import type { WorkflowEvent } from './events.js';
 import type {
   StepStatus,
+  WorkflowIterationSite,
   WorkflowRunSnapshot,
   WorkflowRunStatus,
   WorkflowSnapshotStore,
@@ -39,9 +40,10 @@ import { executeWithRetries } from './retry.js';
  * holding, and `sleep` waits in process for a resolved duration.
  *
  * Running is also suspending: a step's `suspend(payload)` throws the control signal up to this loop,
- * which records the step as `suspended`, writes the run's snapshot and returns the `suspended`
- * outcome — the run unwinds, and `run.resume` re-enters this same loop from the snapshot's
- * `position`. Snapshots are written at fixed points, never through hooks: after every completed entry
+ * which writes the run's snapshot — with the entry position, plus the block's iteration site when
+ * the step ran inside a block (#54) — and returns the `suspended` outcome. The run unwinds, and
+ * `run.resume` re-enters this same loop from the snapshot's `position` (inside its block, from
+ * the site). Snapshots are written at fixed points, never through hooks: after every completed entry
  * when storage is attached, at a suspend, and at the terminal state.
  *
  * The walk is instrumented at the very boundaries it records: the lifecycle events
@@ -80,6 +82,11 @@ export interface WalkResumePoint {
   readonly position: number;
   /** The snapshot's per-step records: the tip is rebuilt from them, never by re-running entries. */
   readonly stepResults: Readonly<Record<string, WorkflowStepResultSnapshot>>;
+  /**
+   * The block's iteration site (#54): present when the run suspended inside a block, and the walk
+   * re-enters that block from it. Absent = the top-level `then` suspension of the earlier shape.
+   */
+  readonly iterationSite?: WorkflowIterationSite | undefined;
   /**
    * The trace the suspended run's spans belong to (`WorkflowRunSnapshot.traceId`): the resumed
    * segment opens a new `workflow-run` span in it, so a suspension does not break the trace.
@@ -152,6 +159,8 @@ interface WalkState {
   resumingStepId: string | undefined;
   /** The validated resume data for `resumingStepId`. */
   resumeData: unknown;
+  /** The resumed block's iteration site, when the walk re-enters a block; cleared with the entry. */
+  resumeSite: WorkflowIterationSite | undefined;
   /** Where the walk's lifecycle events go — the caller's sink, or the walk's own drop. */
   readonly emit: (event: WorkflowEvent) => void;
   /** The run's spans (`undefined` without a tracer — the walk's only zero-overhead branch). */
@@ -193,6 +202,7 @@ export async function walk(
     input: options.inputData,
     resumingStepId: undefined,
     resumeData: undefined,
+    resumeSite: undefined,
     emit: options.emit ?? dropEvent,
     // The run's root span is opened before the entry boundary so a rejected start is recorded too;
     // it ends on every exit path below (`docs/architecture/observability.md`「自动埋点」).
@@ -306,19 +316,18 @@ async function runWalk(state: WalkState, options: WalkOptions): Promise<Workflow
         value = await runEntry(state, entry, value);
       } catch (error) {
         if (!isSuspendSignal(error)) throw error;
-        if (entry.type !== 'then' || entry.step.id !== error.stepId) {
-          throw unsupportedSuspend(workflow.id, entry, error);
-        }
-        // The step's record was written `suspended` by `runAndRecordStep`; the snapshot pins the
-        // entry to re-enter from (its input is rebuilt from the records around it, never stored),
-        // and the run hands its caller the suspended outcome.
-        await persist(state, 'suspended', position);
+        // The signal's record was written where it was raised (`runAndRecordStep` for a then step
+        // or a parallel / branch arm, the block's aggregate for foreach / the loops), and a block
+        // has attached its iteration site. The snapshot pins the entry to re-enter from — its
+        // input is rebuilt from the records around it, never stored.
+        await persist(state, 'suspended', position, error.iterationSite);
         return { status: 'suspended', stepId: error.stepId, stepResults: state.stepResults };
       }
-      // The resumed step has run: resumeData belongs to that step alone, later entries see a
-      // normal pass (`undefined`).
+      // The resumed step has run: resumeData belongs to that one execution alone, later entries
+      // and later iterations see a normal pass (`undefined`).
       state.resumingStepId = undefined;
       state.resumeData = undefined;
+      state.resumeSite = undefined;
       // A step that ignored the abort at least cannot let the run succeed: the boundary after it
       // re-checks, so cancellation always lands the run in `failed` (AbortError).
       throwIfAborted(options.signal);
@@ -346,9 +355,8 @@ async function runWalk(state: WalkState, options: WalkOptions): Promise<Workflow
 async function runEntry(state: WalkState, entry: WorkflowEntry, value: unknown): Promise<unknown> {
   switch (entry.type) {
     case 'then':
-      // The one entry whose suspend the run can act on: a `then` step's suspend records the step
-      // and suspends the run (every other entry shape drops the record — see `runAndRecordStep`).
-      return runAndRecordStep(state, entry.step, value, true);
+      // The resumed step, when the walk re-entered at this entry, is the one holding resumeData.
+      return runAndRecordStep(state, entry.step, value, state.resumingStepId === entry.step.id);
     case 'parallel':
       return runParallel(state, entry, value);
     case 'branch':
@@ -375,7 +383,12 @@ async function runEntry(state: WalkState, entry: WorkflowEntry, value: unknown):
  * 快照」): a fresh table each time — records are replaced, never mutated, so a shallow copy is
  * enough — with the run's validated input and the entry position to re-enter from.
  */
-async function persist(state: WalkState, status: WorkflowRunStatus, position: number): Promise<void> {
+async function persist(
+  state: WalkState,
+  status: WorkflowRunStatus,
+  position: number,
+  iterationSite?: WorkflowIterationSite | undefined,
+): Promise<void> {
   const traceId = state.tracing?.runSpan.traceId;
   const snapshot: WorkflowRunSnapshot = {
     runId: state.runId,
@@ -383,6 +396,9 @@ async function persist(state: WalkState, status: WorkflowRunStatus, position: nu
     input: state.input,
     stepResults: { ...state.stepResults },
     position,
+    // The iteration site rides only a suspension-inside-a-block snapshot (#54): running and
+    // terminal snapshots have none — the walk has left the block, or never had one.
+    ...(iterationSite === undefined ? {} : { iterationSite }),
     // The trace rides the snapshot so a resumed segment continues it (`docs/architecture/
     // observability.md`「suspend/resume」). An untraced run — or a trace the sampler rejected,
     // whose NoOpSpan carries no id — writes none.
@@ -402,8 +418,10 @@ async function enterResume(
   resume: WalkResumePoint,
 ): Promise<{ readonly value: unknown; readonly position: number }> {
   const { workflow } = state;
-  // The target first: the snapshot must be suspended at the step `resume` names. Naming a
-  // different step is a caller bug, and the snapshot knows which step is waiting — say so.
+  // The target first: the snapshot must be suspended at the step `resume` names. Naming a step
+  // that is not suspended is a caller bug, and the snapshot knows which steps are waiting — say
+  // so. Other suspended records (a second parallel arm that also suspended, #54) are no obstacle:
+  // each is resumable in its own right, the un-named ones re-run without resumeData.
   if (state.stepResults[resume.stepId]?.status !== 'suspended') {
     const suspended = Object.entries(state.stepResults).find(
       ([, record]) => record.status === 'suspended',
@@ -423,14 +441,78 @@ async function enterResume(
       `workflow "${workflow.id}": the snapshot's position ${resume.position} is outside the entry list — the definition and the snapshot do not match`,
     );
   }
-  if (entry.type !== 'then' || entry.step.id !== resume.stepId) {
+  const step = resumeTargetStep(entry, resume.stepId);
+  if (resume.iterationSite === undefined) {
+    // The earlier shape: no site means the top-level `then` suspension, and the entry must hold it.
+    if (entry.type !== 'then' || entry.step.id !== resume.stepId) {
+      throw new Error(
+        `workflow "${workflow.id}": step "${resume.stepId}" cannot be resumed from position ${resume.position} — the snapshot has no iteration site, and the entry is not that step's top-level then entry`,
+      );
+    }
+  } else {
+    // The site must agree with the entry — its kind and the named step's membership in that block.
+    checkIterationSite(workflow.id, entry, resume.iterationSite, resume.stepId, resume.position);
+    state.resumeSite = resume.iterationSite;
+  }
+  if (step === undefined) {
     throw new Error(
-      `workflow "${workflow.id}": step "${resume.stepId}" cannot be resumed from position ${resume.position} — suspend/resume supports a step in a top-level then entry only`,
+      `workflow "${workflow.id}": step "${resume.stepId}" is not a step of the entry at position ${resume.position} — the definition and the snapshot do not match`,
     );
   }
-  state.resumeData = await validateResumeData(workflow.id, entry.step, resume.resumeData);
+  state.resumeData = await validateResumeData(workflow.id, step, resume.resumeData);
   state.resumingStepId = resume.stepId;
   return { value: replayEntries(state, resume.position), position: resume.position };
+}
+
+/**
+ * The step a resume names inside the entry its snapshot points at: a then step, a block arm, or
+ * the block's own step. `undefined` when the entry holds no such step (a mismatch the callers
+ * report with their own words).
+ */
+function resumeTargetStep(entry: WorkflowEntry, stepId: string): Step | undefined {
+  switch (entry.type) {
+    case 'then':
+      return entry.step.id === stepId ? entry.step : undefined;
+    case 'parallel':
+      return entry.steps.find((step) => step.id === stepId);
+    case 'branch': {
+      const arm = entry.branches.find(([, step]) => step.id === stepId);
+      return arm === undefined ? undefined : arm[1];
+    }
+    case 'foreach':
+    case 'dowhile':
+    case 'dountil':
+      return entry.step.id === stepId ? entry.step : undefined;
+    case 'sleep':
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * A site and its entry must agree (#54): the site's kind is the entry's block type (the two loop
+ * entries share the `loop` kind), and the resumed step must be a step of that block. A snapshot
+ * that disagrees with the definition is explicit about it — it cannot be resumed silently wrong.
+ */
+function checkIterationSite(
+  workflowId: string,
+  entry: WorkflowEntry,
+  site: WorkflowIterationSite,
+  stepId: string,
+  position: number,
+): void {
+  const expected = entry.type === 'dowhile' || entry.type === 'dountil' ? 'loop' : entry.type;
+  if (site.kind !== expected) {
+    throw new Error(
+      `workflow "${workflowId}": the snapshot's iteration site (kind "${site.kind}") does not match the ${entry.type} block at position ${position} — the definition and the snapshot do not match`,
+    );
+  }
+  if (resumeTargetStep(entry, stepId) === undefined) {
+    throw new Error(
+      `workflow "${workflowId}": step "${stepId}" is not a step of the ${entry.type} block at position ${position} — the definition and the snapshot do not match`,
+    );
+  }
 }
 
 /**
@@ -488,53 +570,36 @@ function recordedOutput(state: WalkState, stepId: string): unknown {
   return record.output;
 }
 
-/**
- * The explicit failure a suspend raised outside a resumable entry means (v1): the snapshot shape has
- * `stepResults` + `position` only, and `position` is the entry index — a block's iteration site
- * (which iteration, how many collected, how many in flight) has no representation there. So a
- * `parallel` block, a `branch` arm, a `foreach` run and the loop bodies cannot be resumed from; the
- * signal becomes a plain error naming the block and the step, and the run fails loud instead of
- * suspending into a snapshot nothing can resume. Iteration-site semantics are a separate ticket.
- */
-function unsupportedSuspend(workflowId: string, entry: WorkflowEntry, signal: SuspendSignal): Error {
-  return new Error(
-    `workflow "${workflowId}": suspend() was called by step "${signal.stepId}" inside a ${entry.type} block — suspend/resume supports a step in a top-level then entry only (a block's iteration site is not resumable yet)`,
-  );
-}
-
 /** The recorded output of an already-run step; `undefined` when it has no recorded result. */
 function getStepResult(state: WalkState, stepId: string): unknown {
   return state.stepResults[stepId]?.output;
 }
 
 /**
- * Runs one step and records it: status, output and boundary timestamps, keyed by step id.
- * `suspendsRun` says whether a suspend raised at this boundary can suspend the run — true only for
- * a step in a top-level `then` entry, the one shape `resume` can re-enter. It decides both the
- * step's recorded result and the status its boundary events report: a step that suspends inside a
- * block leaves no record and reads `failed`, because the run cannot suspend there (the walker fails
- * it loudly) and no snapshot may claim a `suspended` step on a failed run.
+ * Runs one step and records it: status, output and boundary timestamps, keyed by step id. A
+ * suspend raised here is recorded `suspended` with its payload — never `failed` — wherever the
+ * step runs: a top-level `then` step, a `parallel` arm or a `branch` arm all record their own
+ * suspension (#54; `foreach` and the loops record the block's aggregate where they run it).
+ * `resumeFor` says whether this execution is the one the walk's resumeData belongs to.
  */
 async function runAndRecordStep(
   state: WalkState,
   step: Step,
   inputData: unknown,
-  suspendsRun: boolean,
+  resumeFor: boolean,
 ): Promise<unknown> {
   const startedAt = Date.now();
   let output: unknown;
   try {
-    output = await executeStep(state, step, inputData, suspendsRun);
+    output = await executeStep(state, step, inputData, resumeFor);
   } catch (error) {
-    // A suspend is not a failure: the step is recorded `suspended` with its payload (never
-    // `failed`) where the run can suspend, and the signal keeps travelling to the entry loop.
+    // A suspend is not a failure: the step is recorded `suspended` with its payload, and the
+    // signal keeps travelling to the entry loop.
     if (isSuspendSignal(error)) {
-      if (suspendsRun) {
-        recordStep(state, step.id, startedAt, {
-          status: 'suspended',
-          suspendPayload: error.payload,
-        });
-      }
+      recordStep(state, step.id, startedAt, {
+        status: 'suspended',
+        suspendPayload: error.payload,
+      });
     } else {
       recordStep(state, step.id, startedAt, { status: 'failed' });
     }
@@ -562,13 +627,14 @@ function recordStep(
  * value through this step's input schema), and the validated value is what `execute` receives —
  * validated once, then retried as a whole on failure (`step.retries`, the fixed-interval policy of
  * `retry.ts`). `foreach` and the loops call this per iteration, so N runs of one step id become one
- * aggregate record instead of N overwrites.
+ * aggregate record instead of N overwrites. `resumeFor` routes the walk's resumeData to this one
+ * execution — the resumed arm, the suspended iteration — never to the step id at large.
  */
 async function executeStep(
   state: WalkState,
   step: Step,
   inputData: unknown,
-  suspendsRun: boolean,
+  resumeFor: boolean,
 ): Promise<unknown> {
   // The step boundary's events frame the whole crossing — the arriving value, the validation, the
   // attempts — and one pair is emitted per execution: a `foreach` iteration is its own crossing,
@@ -581,7 +647,7 @@ async function executeStep(
     const validated = await validateStepInput(state.workflow.id, step, inputData);
     span?.update({ input: validated });
     const output = await executeWithRetries(
-      async () => step.execute(stepContext(state, step, validated)),
+      async () => step.execute(stepContext(state, step, validated, resumeFor)),
       step.retries ?? 0,
       state.signal,
     );
@@ -589,11 +655,11 @@ async function executeStep(
     span?.update({ output });
     return output;
   } catch (error) {
-    // A suspend is not a step failure where the run can act on it: the boundary closes `suspended`
-    // and the signal keeps travelling. Where the run cannot act on it (a block's iteration site),
-    // the run fails there, so the boundary reads `failed` — the record says the same thing.
+    // A suspend is not a step failure, wherever it was raised (#54): the boundary closes
+    // `suspended` and the signal keeps travelling — events, records and snapshot all read the
+    // same suspension.
     const suspend = isSuspendSignal(error);
-    const status: StepStatus = suspend && suspendsRun ? 'suspended' : 'failed';
+    const status: StepStatus = suspend ? 'suspended' : 'failed';
     state.emit({ type: 'step-end', stepId: step.id, status });
     if (!suspend) span?.error(error);
     throw error;
@@ -620,14 +686,19 @@ function startStepSpan(state: WalkState, step: Step): Span | undefined {
 /**
  * The context bag every step `execute` receives — and every condition, which gets the same bag minus
  * the step's own powers: no step means no `suspend` (a condition cannot suspend a run) and no
- * `resumeData` (resuming is the step's business).
+ * `resumeData` (resuming is the step's business). `resumeFor` routes the walk's resumeData into
+ * this one execution — the resumed step — so the same step id running as a later iteration or a
+ * sibling arm never sees it (#54).
  */
-function stepContext(state: WalkState, step: Step | undefined, inputData: unknown): StepContext {
+function stepContext(
+  state: WalkState,
+  step: Step | undefined,
+  inputData: unknown,
+  resumeFor = false,
+): StepContext {
   // The erased `StepContext` types `resumeData` as `undefined` (the real type lives on the step's
-  // own `createStep` call site); the walker hands the validated value to the resumed step itself.
-  const resumeData = (
-    step !== undefined && step.id === state.resumingStepId ? state.resumeData : undefined
-  ) as undefined;
+  // own `createStep` call site); the walker hands the validated value to the resumed execution.
+  const resumeData = (resumeFor ? state.resumeData : undefined) as undefined;
   return {
     inputData,
     runId: state.runId,
@@ -653,22 +724,54 @@ function suspendOutsideStep(): never {
 
 /**
  * `.parallel([a, b])` (`docs/architecture/workflows.md`「控制流算子」): every step receives the same
- * value (the previous entry's output) and runs concurrently — `Promise.all`, no concurrency cap.
- * The block is a synchronization point: it completes only once every step has; the first rejection
- * fails the whole block (steps already in flight keep running, as with `Promise.all`). Output =
- * `{ [step.id]: output }`, keyed in definition order.
+ * value (the previous entry's output) and runs concurrently — no concurrency cap. The block is a
+ * synchronization point in full (#54): it waits for every arm to settle before leaving — a
+ * suspend snapshot must say which arms completed, so a still-running arm's output is not lost to a
+ * snapshot written without it — and a suspend outranks a sibling failure settled in the same
+ * window (the failed arm keeps its `failed` record and re-runs when the block is re-entered).
+ * Output = `{ [step.id]: output }`, keyed in definition order.
  *
- * Each step records its own result under its id, so `getStepResult` finds them downstream; the
- * keyed object itself only flows on as the next entry's value (entries have no id of their own).
+ * A resumed walk re-enters the block records-first: an arm with a `success` record replays it and
+ * never re-executes; the arms without one — failed, never-run, or a suspending arm the resume did
+ * not name — run afresh, and the named arm's execution carries the resumeData. A suspend attaches
+ * the site `{ kind: 'parallel' }` to its signal: the records are the site. Each suspending arm kept
+ * its own `suspended` record, so any of them can be the next resume target.
  */
 async function runParallel(
   state: WalkState,
   entry: ParallelEntry,
   inputData: unknown,
 ): Promise<Record<string, unknown>> {
-  const outputs = await Promise.all(
-    entry.steps.map((step) => runAndRecordStep(state, step, inputData, false)),
+  const outputs = new Array<unknown>(entry.steps.length);
+  /** Suspends and failures in settle order — the order the block would have rejected in. */
+  const suspends: SuspendSignal[] = [];
+  const failures: unknown[] = [];
+  await Promise.all(
+    entry.steps.map(async (step, index) => {
+      const record = state.stepResults[step.id];
+      if (record?.status === 'success') {
+        outputs[index] = record.output;
+        return;
+      }
+      try {
+        outputs[index] = await runAndRecordStep(
+          state,
+          step,
+          inputData,
+          state.resumingStepId === step.id,
+        );
+      } catch (error) {
+        if (isSuspendSignal(error)) suspends.push(error);
+        else failures.push(error);
+      }
+    }),
   );
+  if (suspends.length > 0) {
+    const winner = suspends[0]!;
+    winner.iterationSite = { kind: 'parallel' };
+    throw winner;
+  }
+  if (failures.length > 0) throw failures[0]!;
   return Object.fromEntries(entry.steps.map((step, index) => [step.id, outputs[index]] as const));
 }
 
@@ -686,12 +789,50 @@ async function runBranch(
   entry: BranchEntry,
   inputData: unknown,
 ): Promise<Record<string, unknown>> {
+  // A resumed walk re-enters the branch records-first: the arm with a record is the one the run
+  // chose — conditions are not re-evaluated (the replay philosophy; a condition's answer belongs
+  // to the pass that asked it). The recorded arm re-runs holding the resumeData.
+  if (state.resumeSite?.kind === 'branch') {
+    const chosen = entry.branches.find(([, step]) => state.stepResults[step.id] !== undefined);
+    if (chosen === undefined) {
+      throw new Error(
+        `workflow "${state.workflow.id}": the snapshot's iteration site names a branch block, but no arm of the block at this position has a record — the definition and the snapshot do not match`,
+      );
+    }
+    return { [chosen[1].id]: await reenterRecordedArm(state, chosen[1], inputData) };
+  }
   for (const [condition, step] of entry.branches) {
     if (await condition(stepContext(state, undefined, inputData))) {
-      return { [step.id]: await runAndRecordStep(state, step, inputData, false) };
+      try {
+        return {
+          [step.id]: await runAndRecordStep(state, step, inputData, state.resumingStepId === step.id),
+        };
+      } catch (error) {
+        // The suspending arm's record is already written; the site says the branch's chosen arm —
+        // the record names which one (conditions are not re-evaluated on re-entry).
+        if (isSuspendSignal(error)) error.iterationSite = { kind: 'branch' };
+        throw error;
+      }
     }
   }
   return {};
+}
+
+/**
+ * Re-runs the arm a resumed branch comes back to: the arm whose record the snapshot carries. A
+ * suspend here attaches the same site again — the arm may want a second answer before it lets go.
+ */
+async function reenterRecordedArm(
+  state: WalkState,
+  step: Step,
+  inputData: unknown,
+): Promise<unknown> {
+  try {
+    return await runAndRecordStep(state, step, inputData, state.resumingStepId === step.id);
+  } catch (error) {
+    if (isSuspendSignal(error)) error.iterationSite = { kind: 'branch' };
+    throw error;
+  }
 }
 
 /**
@@ -701,14 +842,19 @@ async function runBranch(
  * `concurrency` (resolved at definition time, an integer ≥ 1) is the gate width: `1` runs the
  * iterations one after another, `>1` keeps exactly that many in flight and starts the next element
  * as soon as a slot frees — a self-written streaming gate, never a batch of `Promise.all`s. The
- * block is a synchronization point; the first failing iteration fails it and no further iteration
- * is started (in-flight ones finish), as with `Promise.all`.
+ * block is a synchronization point; a failing or suspending iteration stops the gate from pulling
+ * new indices, and the block waits for the in-flight ones to settle before it leaves (#54 — a
+ * suspend snapshot must be able to say what was collected).
  *
- * The step's record is the collected array, written when the block completes (iterations do not
- * record per run): `getStepResult(step.id)` returns the block's output, and inside its own
- * iterations the id stays unrecorded — like any step reading itself. A suspend raised by an
- * iteration unwinds the block and is not a step failure: it leaves no record at all (the walker
- * fails the run — a block's iteration site is not resumable).
+ * A suspend (#54): the first signal to settle is the run's suspension; the block records it under
+ * the step id (the aggregate record the block owns, holding the winning iteration's payload) and
+ * carries the iteration site — the collected outputs so far (keyed by index) and the suspended
+ * index. Iterations that also suspended are holes: unrecorded, re-run without resumeData when the
+ * block re-enters (they suspend again if they still want an answer). On a resumed walk the site's
+ * collected outputs seed the array — done iterations never re-execute — and `resumeData` goes to
+ * the suspended index alone. The step's success record is the collected array, written when the
+ * block completes; `getStepResult(step.id)` returns the block's output, and inside its own
+ * iterations the id stays unrecorded — like any step reading itself.
  */
 async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unknown): Promise<unknown[]> {
   if (!Array.isArray(inputData)) {
@@ -717,32 +863,66 @@ async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unkn
     );
   }
 
+  const site = state.resumeSite?.kind === 'foreach' ? state.resumeSite : undefined;
   const startedAt = Date.now();
   const outputs = new Array<unknown>(inputData.length);
-  let failed = false;
+  /** Which indices already hold an output — seeded from the site, filled as iterations settle. */
+  const done = new Array<boolean>(inputData.length).fill(false);
+  if (site !== undefined) {
+    for (const key of Object.keys(site.collected)) {
+      const index = Number(key);
+      if (Number.isInteger(index) && index >= 0 && index < inputData.length) {
+        outputs[index] = site.collected[key];
+        done[index] = true;
+      }
+    }
+  }
+  /** Suspends (with their index) and failures in settle order — the order the block would have rejected in. */
+  const suspends: { readonly signal: SuspendSignal; readonly index: number }[] = [];
+  const failures: unknown[] = [];
+  let stopped = false;
   let nextIndex = 0;
-  /** One gate slot: pulls the next unconsumed index whenever it frees up, until the block fails. */
+  /** One gate slot: pulls the next unconsumed index whenever it frees up, until the block stops. */
   const worker = async (): Promise<void> => {
-    while (!failed && nextIndex < inputData.length) {
+    while (!stopped && nextIndex < inputData.length) {
       const index = nextIndex++;
+      if (done[index]) continue;
+      const resumeFor =
+        site !== undefined && index === site.suspendedIndex && state.resumingStepId === entry.step.id;
       try {
-        outputs[index] = await executeStep(state, entry.step, inputData[index], false);
+        outputs[index] = await executeStep(state, entry.step, inputData[index], resumeFor);
+        done[index] = true;
       } catch (error) {
-        // Flag the failure here, before it travels through `Promise.all`: sibling slots see it and
-        // stop pulling new indices right away (a suspend unwinds the block the same way).
-        failed = true;
-        throw error;
+        // Stop the gate here, before the error travels: sibling slots see it and stop pulling new
+        // indices right away (in-flight iterations keep running; the block waits for them below).
+        stopped = true;
+        if (isSuspendSignal(error)) suspends.push({ signal: error, index });
+        else failures.push(error);
       }
     }
   };
 
-  try {
-    await Promise.all(Array.from({ length: Math.min(entry.concurrency, inputData.length) }, worker));
-  } catch (error) {
-    if (!isSuspendSignal(error)) {
-      recordStep(state, entry.step.id, startedAt, { status: 'failed' });
-    }
-    throw error;
+  await Promise.all(
+    Array.from({ length: Math.min(entry.concurrency, inputData.length) }, worker),
+  );
+  if (suspends.length > 0) {
+    const winner = suspends[0]!;
+    recordStep(state, entry.step.id, startedAt, {
+      status: 'suspended',
+      suspendPayload: winner.signal.payload,
+    });
+    winner.signal.iterationSite = {
+      kind: 'foreach',
+      suspendedIndex: winner.index,
+      collected: Object.fromEntries(
+        done.flatMap((settled, index) => (settled ? [[String(index), outputs[index]] as const] : [])),
+      ),
+    };
+    throw winner.signal;
+  }
+  if (failures.length > 0) {
+    recordStep(state, entry.step.id, startedAt, { status: 'failed' });
+    throw failures[0]!;
   }
   recordStep(state, entry.step.id, startedAt, { status: 'success', output: outputs });
   return outputs;
@@ -761,8 +941,15 @@ async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unkn
  * other input), so the loop is a fold until the condition stops holding. Output = the last
  * iteration's output; the block records one result under the step id, written when the loop
  * completes (like `foreach`: the block has no id of its own, and reading the step id from inside is
- * unrecorded). A suspend raised by an iteration unwinds the block without a record — the iteration
- * site is not resumable, and it is not a step failure either.
+ * unrecorded).
+ *
+ * A suspend inside an iteration (#54): the block records `suspended` under the step id (the
+ * aggregate record, holding the winning payload) and carries the site — the completed iteration
+ * count and the value the suspended iteration consumed, a mid-block tip no record holds. A
+ * resumed walk re-enters at that value and runs the suspended iteration holding the resumeData;
+ * a `dowhile` skips its pre-check for that one iteration (it was admitted before the suspension,
+ * and conditions are never re-evaluated for a pass that already asked them). Later iterations
+ * check as normal, on the same `iterationCount` basis.
  *
  * Throwing from the condition is the maximum-iteration gate: the error fails the run verbatim.
  * `iterationCount` counts completed iterations, so `if (iterationCount >= n) throw` caps the loop
@@ -773,18 +960,24 @@ async function runLoop(
   entry: DowhileEntry | DountilEntry,
   inputData: unknown,
 ): Promise<unknown> {
+  const site = state.resumeSite?.kind === 'loop' ? state.resumeSite : undefined;
   const startedAt = Date.now();
-  let value = inputData;
-  let iterationCount = 0;
+  let value = site !== undefined ? site.value : inputData;
+  let iterationCount = site !== undefined ? site.iterationCount : 0;
+  // The re-entered iteration was admitted before the suspension: one pre-check to skip, and one
+  // execution holding the resumeData — both spent on the first pass through the body.
+  let resuming = site !== undefined && state.resumingStepId === entry.step.id;
   try {
     for (;;) {
       if (
+        !resuming &&
         entry.type === 'dowhile' &&
         !(await loopConditionHolds(state, entry, value, iterationCount))
       ) {
         break;
       }
-      value = await executeStep(state, entry.step, value, false);
+      value = await executeStep(state, entry.step, value, resuming);
+      resuming = false;
       iterationCount += 1;
       if (
         entry.type === 'dountil' &&
@@ -794,7 +987,15 @@ async function runLoop(
       }
     }
   } catch (error) {
-    if (!isSuspendSignal(error)) {
+    if (isSuspendSignal(error)) {
+      // `value` still holds the suspended iteration's input (the assignment never happened); the
+      // site pins it with the completed count — exactly what re-entry needs.
+      recordStep(state, entry.step.id, startedAt, {
+        status: 'suspended',
+        suspendPayload: error.payload,
+      });
+      error.iterationSite = { kind: 'loop', iterationCount, value };
+    } else {
       recordStep(state, entry.step.id, startedAt, { status: 'failed' });
     }
     throw error;
