@@ -2,6 +2,7 @@ import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../mode
 import { assertModelChain } from '../model/fallback.js';
 import { assertModel } from '../model/resolve.js';
 import type { Tracer } from '../observability/index.js';
+import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
 import { toModelTools } from '../tools/to-model-tools.js';
 import { resolveDynamicArgument } from './dynamic.js';
@@ -10,6 +11,7 @@ import type { AgentTracing } from './loop.js';
 import { runProcessInput } from './processors.js';
 import type { Processor } from './processors.js';
 import { createAgentStream } from './stream.js';
+import { toStructuredResponseFormat } from './structured-output.js';
 import type {
   AgentConfig,
   AgentGenerateResult,
@@ -18,6 +20,7 @@ import type {
   DynamicArgument,
   ModelInput,
   RequestContext,
+  StructuredOutputConfig,
 } from './types.js';
 
 /**
@@ -77,7 +80,16 @@ export class Agent {
    * back to the model and repeats until a step requests no tool call or `maxSteps` is reached;
    * per-call behavior is controlled through `AgentRunOptions` — see `docs/architecture/agent.md`
    *「Agent loop」.
+   *
+   * `structuredOutput` asks for a structured answer: the model calls carry the schema as JSON
+   * Schema and the run's terminal text must validate against it, strictly — the validated value is
+   * the result's `object` (`docs/architecture/agent.md`「执行语义」).
    */
+  stream<TSchema extends StandardSchema>(
+    input: string | ModelMessage[],
+    options: AgentRunOptions & { readonly structuredOutput: StructuredOutputConfig<TSchema> },
+  ): AgentStreamResult<StandardSchemaV1.InferOutput<TSchema>>;
+  stream(input: string | ModelMessage[], options?: AgentRunOptions): AgentStreamResult;
   stream(input: string | ModelMessage[], options: AgentRunOptions = {}): AgentStreamResult {
     const model = this.model;
     const name = this.name;
@@ -115,6 +127,7 @@ export class Agent {
         tracing: toTracing(tracer, options),
         // The user's model call settings are recorded on the step span under this name.
         parameters: options.modelSettings,
+        structuredOutput: options.structuredOutput,
       });
     });
   }
@@ -124,13 +137,19 @@ export class Agent {
    *
    * `generate()` and `stream()` share the single code path, so their terminal values always agree.
    */
+  async generate<TSchema extends StandardSchema>(
+    input: string | ModelMessage[],
+    options: AgentRunOptions & { readonly structuredOutput: StructuredOutputConfig<TSchema> },
+  ): Promise<AgentGenerateResult<StandardSchemaV1.InferOutput<TSchema>>>;
+  async generate(input: string | ModelMessage[], options?: AgentRunOptions): Promise<AgentGenerateResult>;
   async generate(
     input: string | ModelMessage[],
     options: AgentRunOptions = {},
   ): Promise<AgentGenerateResult> {
     const result = this.stream(input, options);
-    const [text, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
+    const [text, object, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
       result.text,
+      result.object,
       result.toolCalls,
       result.toolResults,
       result.usage,
@@ -138,7 +157,7 @@ export class Agent {
       result.steps,
     ]);
 
-    return { text, toolCalls, toolResults, usage, finishReason, steps };
+    return { text, object, toolCalls, toolResults, usage, finishReason, steps };
   }
 }
 
@@ -182,6 +201,12 @@ function toCallOptions(
   if (tools !== undefined && Object.keys(tools).length > 0) {
     callOptions.tools = toModelTools(tools);
   }
+  // A structured run owns `responseFormat` on every model call: the schema tells the provider the
+  // shape to answer in, so the run's terminal text can be validated (strict) instead of hoped for.
+  // Written after the `modelSettings` spread like the other framework-owned fields.
+  if (options.structuredOutput !== undefined) {
+    callOptions.responseFormat = toStructuredResponseFormat(options.structuredOutput);
+  }
   if (options.signal !== undefined) callOptions.abortSignal = options.signal;
   if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
   return { prompt: toPrompt(instructions, input), callOptions };
@@ -207,6 +232,7 @@ function toRequestContext(options: AgentRunOptions): RequestContext {
     parentSpanId: _parentSpanId,
     hideInput: _hideInput,
     hideOutput: _hideOutput,
+    structuredOutput: _structuredOutput,
     signal,
     ...bag
   } = options;

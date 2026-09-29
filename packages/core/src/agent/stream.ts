@@ -30,15 +30,16 @@ export function missingFinishError(): ModelContractError {
  *   authoritative result (`AgentGenerateResult`), which the loop builds from its post-processor step
  *   records. The chunk stream is never re-accumulated here — a processor's `processOutputStep`
  *   rewrite is what `steps` / `text` / `usage` report, while the live chunks stay the model's own
- *   output.
+ *   output. The structured output of a `structuredOutput` run (`object`) comes from that same return
+ *   value: the loop validated the terminal text before it returned.
  * - **Lazy terminal promises**: a promise is created when it is read, so a run whose terminal
  *   values nobody awaits cannot produce unhandled rejections.
  * - **A failed run** rejects the iterator where the failure surfaced and rejects every terminal
  *   promise with the same error — the error `processError` settled on, when processors replaced it.
  */
-export function createAgentStream(
-  run: () => AsyncGenerator<Chunk, AgentGenerateResult, void>,
-): AgentStreamResult {
+export function createAgentStream<TObject = unknown>(
+  run: () => AsyncGenerator<Chunk, AgentGenerateResult<TObject>, void>,
+): AgentStreamResult<TObject> {
   let started = false;
   let settled = false;
   let failure: { readonly error: unknown } | undefined;
@@ -48,6 +49,7 @@ export function createAgentStream(
   const waiting: WaitForNext[] = [];
 
   const text = createTerminal<string>();
+  const objectTerminal = createTerminal<TObject>();
   const usageTerminal = createTerminal<Usage>();
   const stepsTerminal = createTerminal<readonly AgentStep[]>();
   const toolCallsTerminal = createTerminal<readonly ToolCallChunk[]>();
@@ -90,10 +92,11 @@ export function createAgentStream(
   }
 
   /** The run completed: its terminal result settles every terminal value. */
-  function settle(outcome: AgentGenerateResult): void {
+  function settle(outcome: AgentGenerateResult<TObject>): void {
     settled = true;
     for (const waiter of waiting.splice(0)) waiter.resolve(DONE);
     text.settle(outcome.text);
+    objectTerminal.settle(outcome.object);
     usageTerminal.settle(outcome.usage);
     stepsTerminal.settle(outcome.steps);
     toolCallsTerminal.settle(outcome.toolCalls);
@@ -106,6 +109,7 @@ export function createAgentStream(
     failure = { error };
     for (const waiter of waiting.splice(0)) waiter.reject(error);
     text.fail(error);
+    objectTerminal.fail(error);
     usageTerminal.fail(error);
     stepsTerminal.fail(error);
     toolCallsTerminal.fail(error);
@@ -138,6 +142,10 @@ export function createAgentStream(
     get text() {
       start();
       return text.promise();
+    },
+    get object() {
+      start();
+      return objectTerminal.promise();
     },
     get toolCalls() {
       start();

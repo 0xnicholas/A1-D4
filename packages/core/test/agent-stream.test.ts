@@ -5,6 +5,7 @@ import { assistant } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
 import type { FakeResponse } from './helpers/fake-model.js';
 import { collect } from './helpers/collect.js';
+import { UNKNOWN_USAGE } from './helpers/usage.js';
 
 /**
  * stream() 输出对象双消费(M1-05 #26):同一个对象既可 `for await` 消费核心自有 chunk 协议流,
@@ -12,12 +13,6 @@ import { collect } from './helpers/collect.js';
  * `generate()` = `stream()` + await 终值,单一代码路径、行为一致(agent.md「执行语义」)。断言只走
  * 公开面(@balsa/core/agent)与脚本化假模型接缝(@see helpers/fake-model.ts),不触内部实现。
  */
-const UNKNOWN_USAGE = {
-  inputTokens: undefined,
-  outputTokens: undefined,
-  totalTokens: undefined,
-};
-
 describe('Agent.stream:for-await 消费 chunk 协议流', () => {
   it('按流序下发 text-delta / tool-call / tool-result / finish,chunk 形状全部来自自有协议', async () => {
     const model = fakeModel([

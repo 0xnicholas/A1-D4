@@ -49,7 +49,7 @@ _Avoid_: session、conversation(那是 Memory 域的词)
 _Avoid_: iteration、loop iteration(规范统一用 step)
 
 **输出对象 (Output object)**:
-stream() 的返回对象:既可 for-await 消费 chunk 协议流,又可 await 其终值(text / usage / steps / finishReason 等);generate() 复用同一代码路径。
+stream() 的返回对象:既可 for-await 消费 chunk 协议流,又可 await 其终值(text / object / usage / steps / finishReason 等);generate() 复用同一代码路径。
 _Avoid_: generate/stream 分离的双实现
 
 **Processor**:

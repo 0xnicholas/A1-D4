@@ -7,6 +7,7 @@ import type {
 } from '../model/chunks.js';
 import type { Model, ModelCallOptions, ModelProviderOptions } from '../model/contract.js';
 import type { Tracer } from '../observability/index.js';
+import type { StandardSchema } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
 import type { Processor } from './processors.js';
 
@@ -143,8 +144,31 @@ export interface AgentRunOptions {
   readonly hideInput?: boolean | undefined;
   /** Erase `output` from every exported event of this run's trace (see `hideInput`). */
   readonly hideOutput?: boolean | undefined;
+  /**
+   * Ask for a structured answer: the schema is sent to the model as JSON Schema (`responseFormat`
+   * on every model call of the run), and the run's terminal text is parsed as JSON and validated
+   * against it — strictly: an answer that is not JSON, or does not match the schema, fails the run
+   * with `StructuredOutputError` (`docs/architecture/agent.md`「执行语义」). The validated value
+   * settles the output object's `object`; absent = the run's answer is plain text, `object` is
+   * `undefined`.
+   */
+  readonly structuredOutput?: StructuredOutputConfig | undefined;
   /** User per-call request context properties. */
   readonly [key: string]: unknown;
+}
+
+/**
+ * The `structuredOutput` run option (`docs/architecture/agent.md`「执行语义」): the shape the model's
+ * final answer must have, as a Standard Schema dual interface (ADR-0003).
+ *
+ * One schema, no other switches: the validation strategy of v1 is fixed at strict (a non-conforming
+ * answer fails the run — there is no `errorStrategy`). The schema's type drives the output object's
+ * `object` wherever it is statically known: `StructuredOutputConfig<TSchema>` makes `object`
+ * `StandardSchemaV1.InferOutput<TSchema>`.
+ */
+export interface StructuredOutputConfig<TSchema extends StandardSchema = StandardSchema> {
+  /** The shape the run's final answer must have (Standard Schema: validate + JSON Schema). */
+  readonly schema: TSchema;
 }
 
 /**
@@ -177,12 +201,19 @@ export interface AgentStep {
  *   has not started yet; terminal values that are never read are never created, so a consumer
  *   that only iterates cannot be hit by unhandled rejections.
  *
- * The remaining getter the Agent spec enumerates lands with its feature: `object` with
- * `structuredOutput` (M1-13, #34). Widening the surface is additive.
+ * `TObject` is the type of the run's structured output: the schema's output type when the run asks
+ * for one (see the `stream()` overloads), `unknown` otherwise.
  */
-export interface AgentStreamResult extends AsyncIterable<Chunk> {
+export interface AgentStreamResult<TObject = unknown> extends AsyncIterable<Chunk> {
   /** Text of the run's final step (intermediate steps' text is in `steps`). */
   readonly text: Promise<string>;
+  /**
+   * The run's structured output: the final step's text parsed as JSON and validated against
+   * `structuredOutput.schema` (`docs/architecture/agent.md`「执行语义」). Resolves `undefined` when
+   * the run was not asked for one; rejects with `StructuredOutputError` when the answer is not JSON
+   * or does not match the schema (strict), and with the run's own error when the run failed.
+   */
+  readonly object: Promise<TObject>;
   /** Tool calls the model requested over the whole run — `steps` flattened, in step order. */
   readonly toolCalls: Promise<readonly ToolCallChunk[]>;
   /** Tool results recorded over the whole run (framework- and provider-executed) — `steps` flattened. */
@@ -196,9 +227,15 @@ export interface AgentStreamResult extends AsyncIterable<Chunk> {
 }
 
 /** The terminal result of `generate()`: `stream()`'s awaited terminal values. */
-export interface AgentGenerateResult {
+export interface AgentGenerateResult<TObject = unknown> {
   /** Text of the run's final step (intermediate steps' text is in `steps`). */
   readonly text: string;
+  /**
+   * The run's structured output — the schema's validated value (`structuredOutput.schema`), or
+   * `undefined` when the run was not asked for one. A non-conforming answer never reaches here: it
+   * fails the run with `StructuredOutputError` (strict).
+   */
+  readonly object: TObject;
   /** Tool calls the model requested over the whole run — `steps` flattened, in step order. */
   readonly toolCalls: readonly ToolCallChunk[];
   /** Tool results recorded over the whole run (framework- and provider-executed) — `steps` flattened. */

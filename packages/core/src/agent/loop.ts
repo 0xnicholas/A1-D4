@@ -15,12 +15,13 @@ import type { ModelFallbackFailure } from '../model/fallback.js';
 import { normalizeStream } from '../model/normalize.js';
 import { AGENT_RUN_SPAN, AGENT_STEP_SPAN, TOOL_CALL_SPAN } from '../observability/index.js';
 import type { Span, Tracer } from '../observability/index.js';
-import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
+import { formatIssues, messageOf, validateSchema } from '../standard-schema-runtime.js';
 import type { Tool, ToolContext } from '../tools/index.js';
 import { missingFinishError } from './stream.js';
 import { runProcessError, runProcessOutputStep } from './processors.js';
 import type { Processor } from './processors.js';
-import type { AgentGenerateResult, AgentStep, RequestContext } from './types.js';
+import { toStructuredObject } from './structured-output.js';
+import type { AgentGenerateResult, AgentStep, RequestContext, StructuredOutputConfig } from './types.js';
 
 /** How many model calls one run may make when the caller pins no `maxSteps` (`agent.md`「执行语义」). */
 export const DEFAULT_MAX_STEPS = 5;
@@ -47,6 +48,14 @@ export interface AgentLoopOptions {
   readonly agentName: string;
   /** The run's request context — framework-written `signal` / `runId` plus the user's bag. */
   readonly requestContext: RequestContext;
+  /**
+   * The run's structured-output option (`AgentRunOptions.structuredOutput`), present only when the
+   * run asked for one: the run's terminal text is parsed as JSON and validated against the schema,
+   * strictly, and the validated value settles the run's `object` (`docs/architecture/agent.md`
+   *「执行语义」). The schema is also what the run's model calls carry as `responseFormat` — built by
+   * the agent before the loop starts.
+   */
+  readonly structuredOutput?: StructuredOutputConfig | undefined;
   /**
    * The run's observability wiring, present only when a tracer is attached (`AgentConfig.tracer`).
    * Absent = the whole observability subsystem stays out of the loop: no span object is created
@@ -113,13 +122,22 @@ export interface AgentTracing {
 export async function* runAgentLoop(
   options: AgentLoopOptions,
 ): AsyncGenerator<Chunk, AgentGenerateResult, void> {
-  const { models, callOptions, tools, maxSteps, requestContext, processors } = options;
+  const { models, callOptions, tools, maxSteps, requestContext, processors, structuredOutput } =
+    options;
   const prompt: ModelMessage[] = [...options.prompt];
   /** The run's authoritative step records — the processors' rewrites included. */
   const steps: AgentStep[] = [];
   // The run boundary: one root span per run, the parent every step span hangs under. Absent tracer
   // ⇒ `undefined`, and no span is ever created — the loop's only zero-overhead branch.
   const runSpan = startRunSpan(options);
+  /**
+   * The terminal reason of the step that ended the run — set by the step whose tools left nothing
+   * pending, or by the cap's last step. The run's terminal values are built after the loop, outside
+   * the step boundary: a structured run validates its terminal text there, so a text that does not
+   * become the schema's value fails the run without marking the model call that produced it (the
+   * call succeeded; the run's output contract did not — `docs/architecture/agent.md`「执行语义」).
+   */
+  let settled: FinishReason | undefined;
 
   try {
     for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
@@ -295,7 +313,10 @@ export async function* runAgentLoop(
         // object's `text` (`observability.md`「自动埋点」; the step span keeps the model's response).
         runSpan?.update({ output: record.text });
 
-        if (pending.length === 0 || lastStep) return runOutcome(steps, terminalFinish.finishReason);
+        if (pending.length === 0 || lastStep) {
+          settled = terminalFinish.finishReason;
+          break;
+        }
 
         // Provider-executed results stay paired with their calls inside the assistant message;
         // framework-executed ones follow in the `tool` message (the vendor-shaped split, from the
@@ -311,8 +332,22 @@ export async function* runAgentLoop(
         stepSpan?.end();
       }
     }
+
+    if (settled === undefined) {
+      // Unreachable: `maxSteps` is at least 1, so the last iteration always takes the terminal
+      // branch — its step set `settled`, or it ran that step's tools first and then did.
+      throw new Error('The agent loop ended without settling its run.');
+    }
+
+    const outcome = await runOutcome(steps, settled, structuredOutput);
+    // A structured run's span reports the structured result — it is what the caller consumes
+    // (`observability.md`「自动埋点」: agent-run output is the terminal text or the structured result).
+    if (structuredOutput !== undefined) runSpan?.update({ output: outcome.object });
+    return outcome;
   } catch (error) {
-    // A failed run leaves both its root span and the failing step's span carrying the error.
+    // A failed run leaves its root span carrying the error (a failed step also carries it on its
+    // own step span; a structured-output failure has no failing step — the run did not meet its
+    // output contract).
     runSpan?.error(error);
     throw error;
   } finally {
@@ -320,10 +355,6 @@ export async function* runAgentLoop(
     // abandoning the generator.
     runSpan?.end();
   }
-
-  // Unreachable: `maxSteps` is at least 1, so the last iteration always takes one of the terminal
-  // branches (its step returned the outcome, or its tools ran and then it did).
-  throw new Error('The agent loop ended without settling its run.');
 }
 
 /**
@@ -421,9 +452,9 @@ async function executeToolCall(
 
   let input: unknown;
   if (tool.inputSchema !== undefined) {
-    const validation = await validate(tool.inputSchema, call.input);
-    if ('message' in validation) {
-      const message = `Invalid input for tool '${call.toolName}': ${validation.message}`;
+    const validation = await validateSchema(tool.inputSchema, call.input);
+    if ('issues' in validation) {
+      const message = `Invalid input for tool '${call.toolName}': ${formatIssues(validation.issues)}`;
       return { failure: { error: new Error(message), toMessage: messageOf } };
     }
     input = validation.value;
@@ -444,9 +475,9 @@ async function executeToolCall(
   }
 
   if (tool.outputSchema !== undefined) {
-    const validation = await validate(tool.outputSchema, output);
-    if ('message' in validation) {
-      const message = `Tool '${call.toolName}' returned an invalid output: ${validation.message}`;
+    const validation = await validateSchema(tool.outputSchema, output);
+    if ('issues' in validation) {
+      const message = `Tool '${call.toolName}' returned an invalid output: ${formatIssues(validation.issues)}`;
       return { failure: { error: new Error(message), toMessage: messageOf } };
     }
     output = validation.value;
@@ -507,30 +538,6 @@ function toolResult(call: ToolCallChunk, output: unknown, isError: boolean): Too
   };
 }
 
-/** Runs a Standard Schema validation, turning a throwing vendor into an issue message. */
-async function validate(
-  schema: StandardSchema,
-  value: unknown,
-): Promise<{ readonly value: unknown } | { readonly message: string }> {
-  try {
-    const result = await schema['~standard'].validate(value);
-    if (result.issues === undefined) return { value: result.value };
-    return { message: formatIssues(result.issues) };
-  } catch (error) {
-    return { message: messageOf(error) };
-  }
-}
-
-/** One readable line per issue, path first: `city: expected string, received number`. */
-function formatIssues(issues: readonly StandardSchemaV1.Issue[]): string {
-  return issues.map(formatIssue).join('; ');
-}
-
-function formatIssue(issue: StandardSchemaV1.Issue): string {
-  const path = issue.path?.map((segment) => String(typeof segment === 'object' ? segment.key : segment)).join('.');
-  return path === undefined || path === '' ? issue.message : `${path}: ${issue.message}`;
-}
-
 /**
  * The assistant message of a finished step, appended to the prompt before the next model call: the
  * step's text (when it produced any), its tool calls, and the results the provider executed itself.
@@ -585,18 +592,29 @@ function toJsonValue(value: unknown): JsonValue {
   return serialized === undefined ? null : (JSON.parse(serialized) as JsonValue);
 }
 
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /**
  * The run's terminal values, built from its authoritative step records (processors' rewrites
  * included): the last step's text settles `text`, the records flatten into run-wide tool calls /
  * results, and usage accumulates across steps.
+ *
+ * A structured run (`structuredOutput`) also settles `object` here: the very text `text` reports is
+ * parsed as JSON and validated against the schema — strictly, so a terminal text that does not
+ * become the schema's value fails the run with `StructuredOutputError`
+ * (`docs/architecture/agent.md`「执行语义」). Validating the processed record keeps one truth: what a
+ * `processOutputStep` rewrote is both the run's text and the text the structured output is read from.
  */
-function runOutcome(steps: readonly AgentStep[], finishReason: FinishReason): AgentGenerateResult {
+async function runOutcome(
+  steps: readonly AgentStep[],
+  finishReason: FinishReason,
+  structuredOutput: StructuredOutputConfig | undefined,
+): Promise<AgentGenerateResult> {
+  const text = steps.at(-1)?.text ?? '';
   return {
-    text: steps.at(-1)?.text ?? '',
+    text,
+    object:
+      structuredOutput === undefined
+        ? undefined
+        : await toStructuredObject(structuredOutput, text),
     toolCalls: steps.flatMap((step) => step.toolCalls),
     toolResults: steps.flatMap((step) => step.toolResults),
     usage: steps.reduce<Usage>((total, step) => addUsage(total, step.usage), UNKNOWN_USAGE),

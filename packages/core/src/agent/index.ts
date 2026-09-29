@@ -2,11 +2,12 @@
  * `@balsa/core/agent` — agent core.
  *
  * Five-field surface, dynamic arguments and RequestContext, dual-consumption output object,
- * built-in loop, processors, and as-tool composition.
+ * built-in loop, processors, structured output, and as-tool composition.
  * Spec: `docs/architecture/agent.md`.
  */
 export { Agent } from './agent.js';
 export { resolveDynamicArgument } from './dynamic.js';
+export { StructuredOutputError } from './structured-output.js';
 export type {
   ProcessErrorArgs,
   ProcessErrorResult,
@@ -26,4 +27,5 @@ export type {
   ModelInput,
   ModelSettings,
   RequestContext,
+  StructuredOutputConfig,
 } from './types.js';

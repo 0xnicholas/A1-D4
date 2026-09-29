@@ -1,4 +1,5 @@
 import type { JsonSchemaObject, ModelFunctionTool } from '../model/contract.js';
+import { toJsonSchema } from '../standard-schema-runtime.js';
 import type { Tool } from './tool.js';
 
 /**
@@ -33,7 +34,5 @@ function toInputSchema(tool: Tool): JsonSchemaObject {
     // An argument-less tool still declares the shape the model must produce.
     return { type: 'object', properties: {} };
   }
-  return tool.inputSchema['~standard'].jsonSchema.input({
-    target: 'draft-07',
-  }) as JsonSchemaObject;
+  return toJsonSchema(tool.inputSchema);
 }
