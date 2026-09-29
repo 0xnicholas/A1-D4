@@ -71,6 +71,8 @@
 - **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsa/issues/20)。
 - 之后每个里程碑一个 0.x;0.x 阶段允许跨里程碑破型。
 - **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
+- **修订(M2 收尾,2026-09-29)**:M1 末未执行发布(定名门已过,版本仍 0.0.0);首个公开版本拍板为 **0.1.0**——含 M1+M2 全部内容、不跳号;changelog = GitHub Release notes(tag + Release,仓库不新增 `CHANGELOG.md`);凭证 = owner 手动发布(前置:创建 npm org `@balsa`,registry 查实仍 FREE);此后 M3→0.2、M4→0.3、M5→1.0。依据 [实施:M2 收尾——字节预算、导出核对、verify 全绿](https://github.com/0xnicholas/balsa/issues/44) 决议评论。
+- **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
 
 ## 延后清单(post-v1,需求信号触发)
 
