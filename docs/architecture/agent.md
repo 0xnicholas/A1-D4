@@ -84,7 +84,7 @@ const researcherAsTool = async (ctx: RequestContext) =>
 组合语义要点:
 
 - **上下文零透传**:委派输入由包装器显式构造,父 run 上下文默认一字节都不传给 sub-agent。mastra 委派协议的 messageFilter / delegation 钩子 / result references 全服务于「委派隐式共享父上下文」这一前提;显式组合下它们退化为用户态平凡代码——裁剪上下文 = 构造 prompt,钩子 = 包装器前后代码,结果引用 = 包装器持有历史注入 prompt。
-- **取消与观测沿链**:`signal` 透传一行;`traceId` / `spanId` 经工具 ctx 取出(Tools 规范六件套),委派 run 挂为当前 tool-call span 的子 span,多 agent 观测树不断裂。
+- **取消与观测沿链**:`signal` 透传一行;`traceId` / `spanId` 经工具 ctx 取出(Tools 规范六件套),委派 run 挂为当前 tool-call span 的子 span,多 agent 观测树不断裂。父侧无 trace(未挂 tracer 或采样不通过)时,工具 ctx 的两个字段是空串——空串不是可续接的 parent,委派 run 起自己的新 trace,不产生空 trace id 的残破 span。
 - **memory**:默认无状态(包装器不传 memory);带记忆委派 = 显式传 `memory: { thread, resource }`,thread 策略(每次委派新 thread / 固定 thread)归应用。
 - **嵌套审批不支持**:审批闸只挂最外层入口 agent(`createDurableAgent`,见 `docs/architecture/harness.md`);内层 sub-agent 不做 durable 包装,其工具直接执行——要闸内层危险工具就上提到父级闸。sub run 以 `suspended` 收尾时,包装器按普通文本结果回喂父模型;恢复 = 应用层 resume sub + signal 唤醒父(Harness 原语组合,无新机制)。
 - **演化门**:真实需求信号(as-tool 模式的重复痛点——包装样板、传播遗漏、嵌套审批诉求)触发重开内建问题;落点 = `createSupervisor` 类能力包优先,仅当其证明需要核心新缝时才以 minor 字段进核心(ADR-0012)。

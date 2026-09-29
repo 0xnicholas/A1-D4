@@ -285,6 +285,30 @@ describe('run option:trace 续接(traceId / parentSpanId)', () => {
     expect(spanOfType(memory, AGENT_STEP_SPAN).traceId).toBe(TRACE);
   });
 
+  it('空串 = 无 trace:起自己的新 trace;空 traceId + 真 parentSpanId 的混合对也不接', async () => {
+    const memory = memoryExporter();
+    const tracer = createTracer({ exporters: [memory] });
+    const agent = new Agent({
+      name: 'assistant',
+      instructions: INSTRUCTIONS,
+      model: fakeModel([{ text: 'a' }, { text: 'b' }]),
+      tracer,
+    });
+
+    // 工具 ctx 对“无 trace”的编码;混合的半截续接(trace 空、parent 真)同样不成接,不报 tracer 契约错
+    await agent.generate('first', { traceId: '', parentSpanId: '' });
+    await agent.generate('second', { traceId: '', parentSpanId: PARENT });
+
+    const runs = memory.spans().filter((span) => span.type === AGENT_RUN_SPAN);
+    expect(runs).toHaveLength(2);
+    for (const run of runs) {
+      expect(run.traceId).toMatch(TRACE_ID);
+      expect(run.parentSpanId).toBeUndefined();
+    }
+    // 各自起新 trace,互不续接
+    expect(runs[0]?.traceId).not.toBe(runs[1]?.traceId);
+  });
+
   it('采样函数收到续接的外部 parent;起新 trace 时收到 undefined', async () => {
     const parents: Array<{ traceId: string; parentSpanId?: string } | undefined> = [];
     const memory = memoryExporter();

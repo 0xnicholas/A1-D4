@@ -93,7 +93,7 @@ tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 ## 上下文传播与身份
 
 - **框架内部显式传播**:Agent loop / Workflow walker 沿执行树把 parent span 传给下一代——**不用 AsyncLocalStorage**(edge / CF Workers 需 compat flag,且隐式上下文是魔法)。用户 tool 内自建 span 同样走显式 parent(tracer API 参数)。内核缝是 `startSpan` 的两种入参:`{ parent }` 传活 span(正常执行树),或 root 创建时传 `{ traceId, parentSpanId }` 续接别处开始的 trace——二者互斥,`parentSpanId` 必须与 `traceId` 同来。
-- **外部 trace 延续**:run 级 option(Agent generate/stream 与 workflow createRun)接受可选 `{ traceId?, parentSpanId? }`;解析 `traceparent` header 是应用层的事。(ALS 集成归延后的 OTel bridge。)
+- **外部 trace 延续**:run 级 option(Agent generate/stream 与 workflow createRun)接受可选 `{ traceId?, parentSpanId? }`;解析 `traceparent` header 是应用层的事。空串不是可续接的 id(tool ctx 对"无 trace"的编码,见 `tools.md`「执行上下文」):`traceId` 为空串时整对作废——run 起自己的新 trace,不产生空 trace id 的残破 span;`parentSpanId` 为空串则只丢 parent。(ALS 集成归延后的 OTel bridge。)
 - **suspend/resume**:traceId 进 workflow 快照,resume 续同一 trace。
 
 ## Exporter 清单

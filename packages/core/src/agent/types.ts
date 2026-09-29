@@ -129,12 +129,15 @@ export interface AgentRunOptions {
   /**
    * The trace to continue: the run's `agent-run` span attaches to a trace started elsewhere (an
    * incoming `traceparent`, a parent run — as-tool composition reads it from the tool context).
-   * Absent = the run starts a fresh trace. Only meaningful with an attached tracer.
+   * Absent = the run starts a fresh trace. An empty string is the tool context's "no trace"
+   * encoding (`NoOpSpan` / no tracer) and counts as absent — the delegated run then starts its own
+   * trace instead of hanging off a nonexistent parent. Only meaningful with an attached tracer.
    */
   readonly traceId?: string | undefined;
   /**
    * The parent span inside the continued trace; requires `traceId` (the tracer rejects one without
-   * the other). Absent = the run's `agent-run` span hangs directly under the continued trace.
+   * the other). Absent = the run's `agent-run` span hangs directly under the continued trace. An
+   * empty string counts as absent, and so it does when the trace id is empty.
    */
   readonly parentSpanId?: string | undefined;
   /**

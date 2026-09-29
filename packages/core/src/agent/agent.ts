@@ -256,13 +256,23 @@ function toMaxSteps(maxSteps: number | undefined): number {
  * The observability wiring of one run: `undefined` without a tracer, so the loop's only branch is
  * one presence check. The trace continuation and hiding options only mean something with a tracer,
  * hence the clump — they cannot travel alone.
+ *
+ * Empty-string continuation ids mean "no trace", not a parent with an empty id: the tool context
+ * encodes an untraced call as `traceId: ''` / `spanId: ''` (`NoOpSpan` / no tracer), and an as-tool
+ * delegation passes them through verbatim — such a run starts its own trace instead of hanging off
+ * a nonexistent parent (`docs/architecture/agent.md`「多 agent 组合」). An empty trace id voids the
+ * whole pair (a parent outside a trace means nothing); an empty parent id only drops the parent.
+ * A real parent id without any trace id is still left for the tracer to reject loudly.
  */
 function toTracing(tracer: Tracer | undefined, options: AgentRunOptions): AgentTracing | undefined {
   if (tracer === undefined) return undefined;
+  const traceId = options.traceId === '' ? undefined : options.traceId;
+  const parentSpanId =
+    options.traceId === '' || options.parentSpanId === '' ? undefined : options.parentSpanId;
   return {
     tracer,
-    ...(options.traceId === undefined ? {} : { traceId: options.traceId }),
-    ...(options.parentSpanId === undefined ? {} : { parentSpanId: options.parentSpanId }),
+    ...(traceId === undefined ? {} : { traceId }),
+    ...(parentSpanId === undefined ? {} : { parentSpanId }),
     ...(options.hideInput === undefined ? {} : { hideInput: options.hideInput }),
     ...(options.hideOutput === undefined ? {} : { hideOutput: options.hideOutput }),
   };
