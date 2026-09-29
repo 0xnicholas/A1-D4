@@ -72,7 +72,7 @@
 - 之后每个里程碑一个 0.x;0.x 阶段允许跨里程碑破型。
 - **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
 - **修订(M2 收尾,2026-09-29)**:M1 末未执行发布(定名门已过,版本仍 0.0.0);首个公开版本拍板为 **0.1.0**——含 M1+M2 全部内容、不跳号;changelog = GitHub Release notes(tag + Release,仓库不新增 `CHANGELOG.md`);凭证 = owner 手动发布(前置:创建 npm org `@balsa`,registry 查实仍 FREE);此后 M3→0.2、M4→0.3、M5→1.0。依据 [实施:M2 收尾——字节预算、导出核对、verify 全绿](https://github.com/0xnicholas/balsa/issues/44) 决议评论。
-- **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
+- **修订(M3 收尾,2026-09-29)**:M3 编排交付并核验——`./workflows` 13,958 B(字节预算 7/7 内)、导出三面一致(export-map / entry-points 测试 + `check:dist` 7 子路径)、`pnpm verify` 全绿(569 例 38 文件)、`examples/workflow-approval` 以本地 OpenAI-compatible mock 端到端跑通;0.2 = M1+M2+M3 全部内容,流程沿 0.1 结论(tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 与 0.2 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含 0.1.0 / 0.2 的先后)归 owner 手工前置。依据 [实施:examples/workflow-approval + M3 收尾](https://github.com/0xnicholas/balsa/issues/53) 决议评论。
 
 ## 延后清单(post-v1,需求信号触发)
 
