@@ -3,14 +3,15 @@ import { z } from 'zod';
 import { createStep, createWorkflow } from '@balsa/core/workflows';
 import { WorkflowValidationError } from '@balsa/core/workflows';
 import type { StepContext } from '@balsa/core/workflows';
-import { captureRejection } from './helpers/assertions.js';
+import { captureError, captureRejection } from './helpers/assertions.js';
 
 /**
  * 控制流算子同步点(M3 #49,`docs/architecture/workflows.md`「控制流算子」):parallel / branch /
  * foreach 的执行语义,以及 `getStepResult` 在 keyed 输出下的读法。
  *
  * - parallel:`Promise.all` 全并发、无并发上限、任一步失败整块失败、同步点,输出 `{ [step.id]: output }`;
- * - branch:按定义序求值、第一个真分支执行,输出只有一个 key 有值的 keyed 对象;
+ * - branch:按定义序求值、第一个真分支执行,输出只有一个 key 有值的 keyed 对象(分支臂按规范共享
+ *   IO schema;不一致的臂在运行期由该臂的 input 边界拦下);无真分支 = `{}`;
  * - foreach:输入必须是数组、concurrency 默认 1、>1 用自写并发闸(流式补位,不引 fastq)、保序收集、同步点,输出数组。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径,不触内部模块;并发断言用一次性闸门(deferred)自行
@@ -662,20 +663,22 @@ describe('foreach:数组输入 + 自写并发闸 + 保序收集', () => {
     expect(started).toEqual(['a', 'b']);
   });
 
-  it('concurrency 定义期归一化:非法值落 1,小数取整', () => {
-    const entryFor = (concurrency: number) =>
+  it('concurrency:缺省 1;非正整数在定义期显式报错(不静默改写)', () => {
+    const entryFor = (options?: { readonly concurrency?: number }) =>
       createWorkflow({
         id: 'article',
         inputSchema: draftsInput,
         outputSchema: z.array(polishedOut),
       })
-        .foreach(polish, { concurrency })
+        .foreach(polish, options)
         .commit().entries[0];
 
-    expect(entryFor(0)).toEqual({ type: 'foreach', step: polish, concurrency: 1 });
-    expect(entryFor(-2)).toEqual({ type: 'foreach', step: polish, concurrency: 1 });
-    expect(entryFor(Number.NaN)).toEqual({ type: 'foreach', step: polish, concurrency: 1 });
-    expect(entryFor(Number.POSITIVE_INFINITY)).toEqual({ type: 'foreach', step: polish, concurrency: 1 });
-    expect(entryFor(2.7)).toEqual({ type: 'foreach', step: polish, concurrency: 2 });
+    expect(entryFor()).toEqual({ type: 'foreach', step: polish, concurrency: 1 });
+    expect(entryFor({ concurrency: 4 })).toEqual({ type: 'foreach', step: polish, concurrency: 4 });
+    for (const invalid of [0, -2, 2.7, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const error = captureError(() => entryFor({ concurrency: invalid }));
+      expect(error.message).toMatch(/article/);
+      expect(error.message).toMatch(/concurrency/);
+    }
   });
 });

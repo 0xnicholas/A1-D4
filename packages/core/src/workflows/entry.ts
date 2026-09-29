@@ -51,7 +51,7 @@ export interface ParallelEntry {
 /** One authored branch pair: `[condition, step]`. */
 export type BranchPair = readonly [BranchCondition, Step];
 
-/** `.branch([[cond, step], …])`: first truthy condition runs; the output is a keyed object with one value. */
+/** `.branch([[cond, step], …])`: first truthy condition runs; the output is a keyed object with one value (`{}` when nothing matched). */
 export interface BranchEntry {
   readonly type: 'branch';
   readonly branches: readonly BranchPair[];
@@ -62,8 +62,8 @@ export interface ForeachEntry {
   readonly type: 'foreach';
   readonly step: Step;
   /**
-   * Concurrency cap (gate width), normalized at definition time — `1` when the options were
-   * omitted or the given cap was not a finite number ≥ 1, floored to an integer otherwise.
+   * Concurrency cap (gate width), resolved at definition time — `1` when the options were omitted;
+   * the builder rejects a cap that is not an integer ≥ 1.
    */
   readonly concurrency: number;
 }

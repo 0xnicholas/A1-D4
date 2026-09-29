@@ -67,7 +67,7 @@ export async function* walk(
     throwIfAborted(options.signal);
     switch (entry.type) {
       case 'then':
-        value = await runStep(state, entry.step, value);
+        value = await runAndRecordStep(state, entry.step, value);
         break;
       case 'parallel':
         value = await runParallel(state, entry, value);
@@ -110,17 +110,27 @@ function getStepResult(state: WalkState, stepId: string): unknown {
 }
 
 /** Runs one step and records it: status, output and boundary timestamps, keyed by step id. */
-async function runStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
+async function runAndRecordStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
   const startedAt = Date.now();
   let output: unknown;
   try {
     output = await executeStep(state, step, inputData);
   } catch (error) {
-    state.stepResults[step.id] = { status: 'failed', startedAt, endedAt: Date.now() };
+    recordStep(state, step.id, startedAt, { status: 'failed' });
     throw error;
   }
-  state.stepResults[step.id] = { status: 'success', output, startedAt, endedAt: Date.now() };
+  recordStep(state, step.id, startedAt, { status: 'success', output });
   return output;
+}
+
+/** Records one step result under its id: the status, the output when there is one, the timestamps. */
+function recordStep(
+  state: WalkState,
+  stepId: string,
+  startedAt: number,
+  result: { readonly status: 'success' | 'failed'; readonly output?: unknown },
+): void {
+  state.stepResults[stepId] = { ...result, startedAt, endedAt: Date.now() };
 }
 
 /**
@@ -162,17 +172,20 @@ async function runParallel(
   entry: ParallelEntry,
   inputData: unknown,
 ): Promise<Record<string, unknown>> {
-  const outputs = await Promise.all(entry.steps.map((step) => runStep(state, step, inputData)));
+  const outputs = await Promise.all(
+    entry.steps.map((step) => runAndRecordStep(state, step, inputData)),
+  );
   return Object.fromEntries(entry.steps.map((step, index) => [step.id, outputs[index]] as const));
 }
 
 /**
- * `.branch([[cond, step], …])`: conditions are evaluated in definition order with the same context
- * bag a step receives (`inputData` = the previous entry's output), and the first truthy one runs
- * its step — later conditions are not evaluated at all. Output = a keyed object whose only key is
- * the executed step's id; when no condition is truthy the output is `{}` (the tip value is
- * consumed by the block, never passed through). Branch arms are expected to share their IO
- * schemas; each arm still validates the tip value at its own step boundary.
+ * `.branch([[cond, step], …])` (`docs/architecture/workflows.md`「控制流算子」): conditions are
+ * evaluated in definition order with the same context bag a step receives (`inputData` = the
+ * previous entry's output), and the first truthy one runs its step — later conditions are not
+ * evaluated at all. Output = a keyed object whose only key is the executed step's id; when no
+ * condition is truthy the output is `{}` (the tip value is consumed by the block, never passed
+ * through). Branch arms are expected to share their IO schemas; each arm still validates the tip
+ * value at its own step boundary.
  */
 async function runBranch(
   state: WalkState,
@@ -181,20 +194,21 @@ async function runBranch(
 ): Promise<Record<string, unknown>> {
   for (const [condition, step] of entry.branches) {
     if (await condition(stepContext(state, inputData))) {
-      return { [step.id]: await runStep(state, step, inputData) };
+      return { [step.id]: await runAndRecordStep(state, step, inputData) };
     }
   }
   return {};
 }
 
 /**
- * `.foreach(step, { concurrency })`: the previous entry's output must be an array; every element is
- * one iteration of the same step (validated at the step boundary like any other input) and the
- * outputs are collected in index order. `concurrency` (normalized at definition time) is the gate
- * width: `1` runs the iterations one after another, `>1` keeps exactly that many in flight and
- * starts the next element as soon as a slot frees — a self-written streaming gate, never a batch
- * of `Promise.all`s. The block is a synchronization point; the first failing iteration fails it
- * and no further iteration starts (in-flight ones finish), as with `Promise.all`.
+ * `.foreach(step, { concurrency })` (`docs/architecture/workflows.md`「控制流算子」): the previous
+ * entry's output must be an array; every element is one iteration of the same step (validated at
+ * the step boundary like any other input) and the outputs are collected in index order.
+ * `concurrency` (resolved at definition time, an integer ≥ 1) is the gate width: `1` runs the
+ * iterations one after another, `>1` keeps exactly that many in flight and starts the next element
+ * as soon as a slot frees — a self-written streaming gate, never a batch of `Promise.all`s. The
+ * block is a synchronization point; the first failing iteration fails it and no further iteration
+ * is started (in-flight ones finish), as with `Promise.all`.
  *
  * The step's record is the collected array, written when the block completes (iterations do not
  * record per run): `getStepResult(step.id)` returns the block's output, and inside its own
@@ -210,23 +224,29 @@ async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unkn
   const startedAt = Date.now();
   const outputs = new Array<unknown>(inputData.length);
   let failed = false;
-  let next = 0;
-  /** One gate slot: pulls the next unconsumed index whenever it frees up, until an iteration fails. */
+  let nextIndex = 0;
+  /** One gate slot: pulls the next unconsumed index whenever it frees up, until the block fails. */
   const worker = async (): Promise<void> => {
-    while (!failed && next < inputData.length) {
-      const index = next++;
-      outputs[index] = await executeStep(state, entry.step, inputData[index]);
+    while (!failed && nextIndex < inputData.length) {
+      const index = nextIndex++;
+      try {
+        outputs[index] = await executeStep(state, entry.step, inputData[index]);
+      } catch (error) {
+        // Flag the failure here, before it travels through `Promise.all`: sibling slots see it and
+        // stop pulling new indices right away.
+        failed = true;
+        throw error;
+      }
     }
   };
 
   try {
     await Promise.all(Array.from({ length: Math.min(entry.concurrency, inputData.length) }, worker));
   } catch (error) {
-    failed = true;
-    state.stepResults[entry.step.id] = { status: 'failed', startedAt, endedAt: Date.now() };
+    recordStep(state, entry.step.id, startedAt, { status: 'failed' });
     throw error;
   }
-  state.stepResults[entry.step.id] = { status: 'success', output: outputs, startedAt, endedAt: Date.now() };
+  recordStep(state, entry.step.id, startedAt, { status: 'success', output: outputs });
   return outputs;
 }
 

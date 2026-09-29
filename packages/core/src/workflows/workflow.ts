@@ -234,7 +234,7 @@ export function createWorkflow<
       return builder;
     },
     foreach(step, options) {
-      push({ type: 'foreach', step, concurrency: normalizeConcurrency(options?.concurrency) });
+      push({ type: 'foreach', step, concurrency: resolveConcurrency(config.id, options?.concurrency) });
       return builder;
     },
     dowhile(step, cond) {
@@ -258,13 +258,18 @@ export function createWorkflow<
 }
 
 /**
- * Normalizes a `.foreach` concurrency cap at definition time (the entry carries the number): an
- * omitted or non-finite cap below `1` becomes `1` (sequential), anything else is floored to an
- * integer — `0`, negative and `NaN` can never produce a gate that starts no iteration at all.
+ * Resolves a `.foreach` concurrency cap at definition time (the entry carries the number):
+ * omitted → `1` (sequential); anything else must be an integer ≥ 1 — `0`, a negative, a fraction
+ * or a non-finite number is a definition error, never a silently different gate.
  */
-function normalizeConcurrency(concurrency: number | undefined): number {
-  if (concurrency === undefined || !Number.isFinite(concurrency) || concurrency < 1) return 1;
-  return Math.floor(concurrency);
+function resolveConcurrency(workflowId: string, concurrency: number | undefined): number {
+  if (concurrency === undefined) return 1;
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error(
+      `workflow "${workflowId}": the foreach concurrency must be an integer >= 1, got ${String(concurrency)}`,
+    );
+  }
+  return concurrency;
 }
 
 /** Freezes one entry and the arrays it owns, so a committed definition cannot be mutated. */

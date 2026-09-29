@@ -2,6 +2,7 @@
 
 > 来源:wayfinder ticket #11(决策:Workflow 引擎语义)。本文件是 Workflows 子系统的架构规范。
 > 决策记录见 `docs/adr/0006-workflow-engine-semantics.md`;术语见 `CONTEXT.md`。
+> 修订(#49):控制流算子表补钉两处实施期裁决——branch 无真分支输出空 keyed 对象 `{}`(tip 值不穿透);foreach concurrency 须为正整数,迭代失败后不再开新迭代。
 
 ## 定位
 
@@ -65,8 +66,8 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 | --- | --- | --- |
 | `.then(step)` | 顺序执行;上一步 output(校验后)作为下一步 input | 透传 |
 | `.parallel([a,b])` | `Promise.all` 全并发,无并发上限;任一步失败整块失败;同步点 | `{ [step.id]: output }` |
-| `.branch([[cond,step]...])` | 按定义序求值,第一个真分支执行;各分支 IO schema 一致 | keyed 对象,只有一个 key 有值 |
-| `.foreach(step, {concurrency})` | 输入必须是数组;默认 concurrency=1;>1 用并发闸,保序收集;同步点 | 输出数组 |
+| `.branch([[cond,step]...])` | 按定义序求值,第一个真分支执行;各分支 IO schema 一致;无真分支时输出空 keyed 对象 `{}`(tip 值不穿透) | keyed 对象,只有一个 key 有值 |
+| `.foreach(step, {concurrency})` | 输入必须是数组;默认 concurrency=1(须为正整数);>1 用并发闸,保序收集;同步点;任一次迭代失败整块失败,失败后不再开新迭代(在飞迭代完成) | 输出数组 |
 | `.dowhile` / `.dountil(step, cond)` | 循环至条件不满足/满足;输出 = 最后一次迭代的输出 | 透传 |
 | `.sleep(ms\|fn)` | 进程内 setTimeout + AbortSignal,**非 durable**(进程死即丢);fn 动态算时长 | — |
 
