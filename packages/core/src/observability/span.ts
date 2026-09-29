@@ -4,8 +4,8 @@ import type { FinishReason, Usage } from '../model/chunks.js';
  * The framework's span type constants — kebab-case, one vocabulary with the chunk protocol.
  *
  * `type` is an open string: users name their own spans freely. The framework writes exactly these
- * seven; `workflow-run` / `workflow-step` are exported already, their automatic instrumentation
- * lands with the workflow engine (M3).
+ * seven, each at its documented automatic-instrumentation boundary
+ * (`docs/architecture/observability.md`「自动埋点」).
  */
 export const AGENT_RUN_SPAN = 'agent-run';
 export const AGENT_STEP_SPAN = 'agent-step';
@@ -45,9 +45,11 @@ export type ToolCallAttributes = {
   readonly toolCallId: string;
 };
 
-/** Attributes of a `workflow-run` span. */
+/** Attributes of a `workflow-run` span — one run's segment, start or resume to its terminal state. */
 export type WorkflowRunAttributes = {
   readonly workflowId: string;
+  /** The run's execution identity (the root span carries it so snapshot and span can find each other). */
+  readonly runId?: string;
 };
 
 /**

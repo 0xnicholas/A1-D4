@@ -15,10 +15,12 @@ import { captureError, captureRejection, expectAssignable, expectSuccess } from 
  * walker 语义内核(M3 #48,`docs/architecture/workflows.md`「Run」「IO 校验」「错误、重试与状态
  * 机」):`createRun` / `start` 输出对象骨架、then 主轴 for 循环解释执行、前两处 IO 校验(start 输入、
  * step 边界)、状态机 success / failed(suspend / resume 与第三处 resumeData 校验归
- * workflows-suspend-resume)、`getStepResult`、AbortSignal 沿 execute 传播。
+ * workflows-suspend-resume;输出对象的事件流消费归 workflows-events)、`getStepResult`、
+ * AbortSignal 沿 execute 传播。
  *
  * 接缝 = 公开 `@balsa/core/workflows` 子路径:定义 → `createRun` → `run.start` → `out.result`,
- * 以及 step `execute` / 动态函数收到的 ctx;不触内部模块。
+ * 以及 step `execute` / 动态函数收到的 ctx;不触内部模块(事件流的 for-await 面归
+ * workflows-events,span / trace 面归 workflows-observability)。
  */
 
 const topicInput = z.object({ topic: z.string() });
@@ -547,6 +549,7 @@ describe('createRun / start 约束', () => {
     const forged = {
       id: 'article',
       inputSchema: topicInput,
+      tracer: undefined,
       entries: [{ type: 'then', step: draft }, { type: 'map' }] as unknown as readonly WorkflowEntry[],
     };
 

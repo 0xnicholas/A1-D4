@@ -30,7 +30,8 @@ export interface WorkflowStepResultSnapshot {
 /**
  * One run's JSON-serializable state (`docs/architecture/workflows.md`「suspend/resume 与快照」):
  * the run identity, its status, the input it started with, the per-step results and the flat entry
- * position to re-enter from — the `startIdx` equivalent.
+ * position to re-enter from — the `startIdx` equivalent — plus the trace the run's spans belong to,
+ * so a resumed segment continues the same trace (`docs/architecture/observability.md`).
  */
 export interface WorkflowRunSnapshot {
   /** Identity of the run this snapshot belongs to. */
@@ -43,6 +44,12 @@ export interface WorkflowRunSnapshot {
   readonly stepResults: Readonly<Record<string, WorkflowStepResultSnapshot>>;
   /** Position in the flat entry list to re-enter from on resume. */
   readonly position: number;
+  /**
+   * The trace the run's spans were exported under (32-hex), written whenever a real span exists —
+   * an untraced run, or one whose trace the sampler rejected, carries no id. A resume starts a new
+   * `workflow-run` span in this trace, so a suspension does not break the observation tree.
+   */
+  readonly traceId?: string;
 }
 
 /**

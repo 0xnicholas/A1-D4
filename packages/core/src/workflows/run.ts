@@ -1,21 +1,24 @@
 import type { RequestContext } from '../agent/types.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
+import type { WorkflowEvent } from './events.js';
 import { createInMemorySnapshotStore } from './in-memory-snapshot-store.js';
 import type { WorkflowSnapshotStore, WorkflowStepResultSnapshot } from './snapshot.js';
 import type { Step } from './step.js';
 import { walk } from './walker.js';
-import type { WorkflowDefinition } from './walker.js';
+import type { WalkTraceContinuation, WorkflowDefinition } from './walker.js';
 
 /**
- * The run surface (`docs/architecture/workflows.md`「Run」「suspend/resume 与快照」):
+ * The run surface (`docs/architecture/workflows.md`「Run」「流式事件」「suspend/resume 与快照」):
  * `createRun({ runId? })` gives a run identity, `start({ inputData, requestContext?, signal? })`
  * returns the output object, and `resume({ step, resumeData? })` re-enters a suspended run. This is
- * the workflow's parallel implementation of the agent's mental model (terminal values awaitable on
- * one object; the lifecycle event stream joins `start`'s output object with #52).
+ * the workflow's parallel implementation of the agent's mental model: one execution backs both
+ * consumptions — `result` awaits the terminal outcome, `for await` walks the lifecycle events
+ * (run-start / step-start / step-end / run-end) — so mixing the two always describes the same run.
  *
- * `start` is lazy — the run executes on the first read of `result`, so a run nobody consumes
- * performs no work and cannot reject unhandled. `resume` is eager: it loads the snapshot right away
- * and resolves with the run's outcome (a failed resume rejects with the error that failed it).
+ * `start` is lazy — the run executes on the first read of `result` or the first `next()` of the
+ * event stream, so a run nobody consumes performs no work and cannot reject unhandled. `resume` is
+ * eager: it loads the snapshot right away and resolves with the run's outcome (a failed resume
+ * rejects with the error that failed it).
  */
 
 /** The outcome of a run that completed: the workflow's terminal value and the per-step records. */
@@ -54,6 +57,16 @@ export type WorkflowRunOutcome<TOutput = unknown> =
 export interface WorkflowCreateRunOptions {
   /** Identity of the run (snapshots, spans and `requestContext.runId`); generated when omitted. */
   readonly runId?: string | undefined;
+  /**
+   * The trace the run's first segment continues, for a run that hangs under a trace started
+   * elsewhere (an incoming `traceparent`, a parent run) — the agent's run options' convention
+   * (`docs/architecture/observability.md`「外部 trace 延续」). Empty strings mean "no trace": an
+   * empty `traceId` voids the pair, an empty `parentSpanId` only drops the parent. A resumed
+   * segment continues the trace its snapshot pinned, never this pair.
+   */
+  readonly traceId?: string | undefined;
+  /** The parent span inside that trace; requires `traceId` (the tracer rejects one without it). */
+  readonly parentSpanId?: string | undefined;
 }
 
 /** The `start` options. */
@@ -82,11 +95,12 @@ export interface WorkflowResumeOptions {
 }
 
 /**
- * The output object `start` returns: the run's terminal values, created lazily on first read. The
- * `for await` lifecycle event stream is part of this object's shape (the spec's double
- * consumption) and lands with #52.
+ * The output object `start` returns (`docs/architecture/workflows.md`「Run」「流式事件」): the run's
+ * terminal values and its lifecycle event stream, backed by one execution. `await out.result`
+ * resolves the outcome envelope on success or suspension (rejects when the run fails); `for await`
+ * walks the run / step boundary events as they happen. Reading either starts the run.
  */
-export interface WorkflowRunOutput<TOutput = unknown> {
+export interface WorkflowRunOutput<TOutput = unknown> extends AsyncIterable<WorkflowEvent> {
   /**
    * The run's terminal value: resolves the outcome envelope on success or suspension; rejects with
    * the run's error when it fails (a step's own error, a validation error, or the abort reason).
@@ -134,9 +148,9 @@ const resumeLocks = new Map<string, Promise<WorkflowRunOutcome>>();
  */
 export function createWorkflowRun<TInputSchema extends StandardSchema, TOutput = unknown>(
   workflow: WorkflowDefinition<TInputSchema>,
-  options: WorkflowCreateRunOptions = {},
+  createOptions: WorkflowCreateRunOptions = {},
 ): WorkflowRun<StandardSchemaV1.InferInput<TInputSchema>, TOutput> {
-  const runId = options.runId ?? crypto.randomUUID();
+  const runId = createOptions.runId ?? crypto.randomUUID();
   if (typeof runId !== 'string' || runId === '') {
     throw new Error(`createRun: runId must be a non-empty string, got ${String(runId)}.`);
   }
@@ -167,7 +181,12 @@ export function createWorkflowRun<TInputSchema extends StandardSchema, TOutput =
       }
       started = true;
       startOptions = options;
-      return createRunOutput<TOutput>(workflow, runId, options, persistence());
+      return createRunOutput<TOutput>(workflow, runId, options, persistence(), {
+        ...(createOptions.traceId === undefined ? {} : { traceId: createOptions.traceId }),
+        ...(createOptions.parentSpanId === undefined
+          ? {}
+          : { parentSpanId: createOptions.parentSpanId }),
+      });
     },
     resume(resumeOptions) {
       // Resuming consumes the run's one lifecycle just like starting does: a run cannot be resumed
@@ -255,39 +274,38 @@ async function resumeSnapshot<TOutput>(
       resumeData: options.resumeData,
       position: snapshot.position,
       stepResults: snapshot.stepResults,
+      // The resumed segment continues the trace the suspended run was exported under.
+      ...(snapshot.traceId === undefined ? {} : { traceId: snapshot.traceId }),
     },
   });
-  return (await drain(walker)) as WorkflowRunOutcome<TOutput>;
-}
-
-/** Drains a walk to its outcome: one pump owns the generator (`start` and `resume` share it). */
-async function drain(
-  walker: AsyncGenerator<never, WorkflowRunOutcome, void>,
-): Promise<WorkflowRunOutcome> {
-  for (;;) {
-    const next = await walker.next();
-    if (next.done) return next.value;
-  }
+  return (await walker) as WorkflowRunOutcome<TOutput>;
 }
 
 /**
  * The output object of one run. Exactly one execution pass backs it (the single-path principle of
- * the agent's output object): the walker is drained by one pump, the terminal `result` settles from
- * that pass. The pump is also where #52 delivers the lifecycle events from the walker's yields to
- * the output object's iterator.
+ * the agent's output object): `result` settles from that pass, and the lifecycle events the walker
+ * emits are handed to the iterator or buffered for it. A consumer that leaves the loop early stops
+ * the buffering but not the run — the terminal outcome still settles from the same pass.
  */
 function createRunOutput<TOutput>(
   workflow: WorkflowDefinition,
   runId: string,
   options: WorkflowStartOptions<unknown>,
   persistence: SnapshotPersistence,
+  trace: WalkTraceContinuation,
 ): WorkflowRunOutput<TOutput> {
   let started = false;
+  let settled = false;
+  let abandoned = false;
   let resultPromise: Promise<WorkflowRunOutcome<TOutput>> | undefined;
   let outcome: WorkflowRunOutcome<TOutput> | undefined;
   let failure: { readonly error: unknown } | undefined;
   let settle: ((value: WorkflowRunOutcome<TOutput>) => void) | undefined;
   let reject: ((error: unknown) => void) | undefined;
+  /** Lifecycle events produced but not read yet, in boundary order. */
+  const buffered: WorkflowEvent[] = [];
+  /** Iterators parked in `next()`, waiting for the next event. */
+  const waiting: WaitForEvent[] = [];
 
   /** The run's request context: the user's per-call bag plus framework-written `signal`/`runId`. */
   const requestContext: RequestContext = {
@@ -304,23 +322,60 @@ function createRunOutput<TOutput>(
 
   async function pump(): Promise<void> {
     try {
-      const walker = walk(workflow, {
+      outcome = (await walk(workflow, {
         runId,
         inputData: options.inputData,
         requestContext,
         signal: requestContext.signal,
         storage: persistence.store,
         persistStepBoundaries: persistence.persistStepBoundaries,
-      });
-      outcome = (await drain(walker)) as WorkflowRunOutcome<TOutput>;
+        emit: deliver,
+        trace,
+      })) as WorkflowRunOutcome<TOutput>;
+      settled = true;
+      for (const waiter of waiting.splice(0)) waiter.resolve(DONE_EVENTS);
       settle?.(outcome);
     } catch (error) {
       failure = { error };
+      settled = true;
+      for (const waiter of waiting.splice(0)) waiter.reject(error);
       reject?.(error);
     }
   }
 
+  /** Hand one lifecycle event to the waiting iterator, or buffer it until one asks. */
+  function deliver(event: WorkflowEvent): void {
+    if (abandoned) return; // The consumer left; nothing will read this buffer again.
+    const waiter = waiting.shift();
+    if (waiter === undefined) {
+      buffered.push(event);
+      return;
+    }
+    waiter.resolve({ value: event, done: false });
+  }
+
+  const iterator: AsyncIterator<WorkflowEvent> = {
+    next(): Promise<IteratorResult<WorkflowEvent>> {
+      start();
+      if (abandoned) return Promise.resolve(DONE_EVENTS);
+      // Buffered events first: a failed run still delivers everything it produced before failing.
+      const event = buffered.shift();
+      if (event !== undefined) return Promise.resolve({ value: event, done: false });
+      if (failure !== undefined) return Promise.reject(failure.error);
+      if (settled) return Promise.resolve(DONE_EVENTS);
+      return new Promise<IteratorResult<WorkflowEvent>>((resolve, rejectEvent) => {
+        waiting.push({ resolve, reject: rejectEvent });
+      });
+    },
+    return(): Promise<IteratorResult<WorkflowEvent>> {
+      abandoned = true;
+      buffered.length = 0;
+      return Promise.resolve(DONE_EVENTS);
+    },
+  };
+
   return {
+    [Symbol.asyncIterator]: () => iterator,
     get result(): Promise<WorkflowRunOutcome<TOutput>> {
       start();
       if (resultPromise !== undefined) return resultPromise;
@@ -338,3 +393,10 @@ function createRunOutput<TOutput>(
     },
   };
 }
+
+interface WaitForEvent {
+  resolve(result: IteratorResult<WorkflowEvent>): void;
+  reject(error: unknown): void;
+}
+
+const DONE_EVENTS: IteratorResult<WorkflowEvent> = { value: undefined, done: true };

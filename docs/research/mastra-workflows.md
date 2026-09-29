@@ -202,3 +202,11 @@ mastra 有三个引擎,边界划在 `ExecutionEngine` 抽象类 + DefaultExecuti
 - **resume 去重**:mastra 以 CAS(`expectedStatus: 'suspended'`)做并发 resume 去重、store 不支持时降级为警告;本框架核心只带**进程内锁**(同一 run 的并发 resume 合并为一次调用),跨进程 CAS 是 adapter 的可选扩展(`compareAndSave`),且不退化为静默警告——被中止或校验失败的 resume 不消费挂起快照。
 - **校验点**:mastra 还校验 suspendData / state / requestContext;本框架按 spec 只固定三处(start 输入 / step 边界 / resumeData),`suspendSchema` 只做类型面、不做运行期校验(`suspend(payload)` 原样进 `suspendPayload`)。
 - **重进的 tip**:mastra 恢复 = 重建 `stepResults` 后从 startIdx 重进(本文 §4.2);本框架在重进前把前序条目**按记录回放**重建 tip——不重执行、不重估条件,`resumeData` 只交给挂起的那一个 step,后续条目拿到 `undefined`。
+
+## 附:补记(实施期对照,#52,2026-09-29)
+
+实施 M3 事件流 / span 票([实施:lifecycle 事件流 + 输出对象双消费 + workflow span 埋点](https://github.com/0xnicholas/balsa/issues/52))时,沿本文 §4.1 与 §6 的事实对照了本框架 v1 的落地差异(本次未再核对上游新源码,行号仍以本文快照版本为准):
+
+- **快照里的 trace 身份**:本文记录的 mastra `WorkflowRunState` 带 `tracingContext?`(可序列化的完整追踪上下文);本框架只加一个 `traceId?` 字段(#52 additive)——恢复段需要的全部信息就是「续哪条 trace」,parent 不随快照走,resume 在同一 trace 下开新的 root span(沿 `docs/architecture/harness.md` 对 agent 侧「resume = 同一 traceId 下的新 run span」的已钉模式)。
+- **流式的粒度**:mastra 的 workflow streaming 覆盖 step 边界之外的 token 级透传(`stream` / `observeStream` 一整层),本文 §6 把它记进「不在语义、全在重量」的一栏;本框架 v1 按 spec 只保留 run / step 边界事件(`run-start` / `step-start` / `step-end` / `run-end`),chunk 级透传裁出(step 内用户自行消费 agent 的 stream 输出对象),事件**带边界值**——粒度对齐、载荷复用 chunk 协议的判别联合,但词汇表是本框架自己的。
+- **span 的边界归属**:mastra 的 workflow span 树把 exec 与每个 step 执行各记一层;本框架按 spec 只钉两级(`workflow-run` / `workflow-step`),`workflow-step` **每次执行一个**(foreach 迭代 / 循环迭代 / parallel 臂各自一个同名 span),而 run 的 `stepResults` 仍按块聚合一条——观测是执行视角,快照是块视角。

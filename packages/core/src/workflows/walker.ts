@@ -1,5 +1,7 @@
 import { resolveDynamicArgument } from '../agent/dynamic.js';
 import type { RequestContext } from '../agent/types.js';
+import { WORKFLOW_RUN_SPAN, WORKFLOW_STEP_SPAN } from '../observability/index.js';
+import type { Span, Tracer } from '../observability/index.js';
 import type { StandardSchema } from '../standard-schema.js';
 import { abortableSleep, throwIfAborted } from './abort.js';
 import type {
@@ -11,6 +13,7 @@ import type {
   SleepEntry,
   WorkflowEntry,
 } from './entry.js';
+import type { WorkflowEvent } from './events.js';
 import type {
   WorkflowRunSnapshot,
   WorkflowRunStatus,
@@ -40,15 +43,19 @@ import { executeWithRetries } from './retry.js';
  * `position`. Snapshots are written at fixed points, never through hooks: after every completed entry
  * when storage is attached, at a suspend, and at the terminal state.
  *
- * The walker is an async generator: it currently completes with the run's outcome and yields
- * nothing — the lifecycle events (run-start / step-start / step-end / run-end) are delivered
- * through the yields, landing with #52.
+ * The walk is instrumented at the very boundaries it records: the lifecycle events
+ * (run-start / step-start / step-end / run-end) go to the `emit` sink as the boundaries are
+ * crossed, and the same points open the `workflow-run` / `workflow-step` spans when a tracer is
+ * attached to the definition.
  */
 
-/** What a run reads of its workflow: the identity, the start input schema, the storage slot and the frozen entries. */
+/**
+ * What a run reads of its workflow: the identity, the start input schema, the storage slot, the
+ * tracer slot and the frozen entries.
+ */
 export type WorkflowDefinition<TInputSchema extends StandardSchema = StandardSchema> = Pick<
   Workflow<TInputSchema>,
-  'id' | 'inputSchema' | 'entries'
+  'id' | 'inputSchema' | 'entries' | 'tracer'
 > & {
   /** Snapshot store attached to the definition; absent = the run keeps its snapshots in memory. */
   readonly storage?: WorkflowSnapshotStore | undefined;
@@ -69,6 +76,11 @@ export interface WalkResumePoint {
   readonly position: number;
   /** The snapshot's per-step records: the tip is rebuilt from them, never by re-running entries. */
   readonly stepResults: Readonly<Record<string, WorkflowStepResultSnapshot>>;
+  /**
+   * The trace the suspended run's spans belong to (`WorkflowRunSnapshot.traceId`): the resumed
+   * segment opens a new `workflow-run` span in it, so a suspension does not break the trace.
+   */
+  readonly traceId?: string | undefined;
 }
 
 /** One walk's outer state: the run's identity, its input, the store it writes and the records it keeps. */
@@ -90,6 +102,25 @@ export interface WalkOptions {
   readonly persistStepBoundaries: boolean;
   /** Present on a resumed walk: re-enter at this point instead of starting from the run input. */
   readonly resume?: WalkResumePoint | undefined;
+  /**
+   * Trace the run's first segment continues (`WorkflowCreateRunOptions.traceId` / `parentSpanId`),
+   * when the caller passed one. A resume's continuation comes from the snapshot instead.
+   */
+  readonly trace?: WalkTraceContinuation | undefined;
+  /**
+   * The lifecycle event sink (`docs/architecture/workflows.md`「流式事件」): the output object's
+   * buffer on a start, nothing on a resume (which is a promise, not a stream). Absent = the events
+   * are built and dropped.
+   */
+  readonly emit?: ((event: WorkflowEvent) => void) | undefined;
+}
+
+/** The trace a start continues — the run-level continuation pair of the external-trace option. */
+export interface WalkTraceContinuation {
+  /** The trace to continue; an empty string voids the pair (a span with an empty trace id is broken). */
+  readonly traceId?: string | undefined;
+  /** The parent span inside that trace; requires `traceId`, and an empty string drops the parent. */
+  readonly parentSpanId?: string | undefined;
 }
 
 /**
@@ -117,6 +148,18 @@ interface WalkState {
   resumingStepId: string | undefined;
   /** The validated resume data for `resumingStepId`. */
   resumeData: unknown;
+  /** Where the walk's lifecycle events go — the caller's sink, or the walk's own drop. */
+  readonly emit: (event: WorkflowEvent) => void;
+  /** The run's spans (`undefined` without a tracer — the walk's only zero-overhead branch). */
+  readonly tracing: WorkflowTracing | undefined;
+}
+
+/** The run's observability wiring: the tracer and the root span its step spans hang under. */
+interface WorkflowTracing {
+  /** The tracer the run's spans are started through — the definition's `tracer` slot. */
+  readonly tracer: Tracer;
+  /** The run's root span; `workflow-step` spans pass it as their explicit parent. */
+  readonly runSpan: Span;
 }
 
 /**
@@ -125,10 +168,14 @@ interface WalkState {
  * order. Completes with the run's outcome — `success`, or `suspended` when a step raised the suspend
  * signal; throws when the run fails at any boundary.
  */
-export async function* walk(
+export async function walk(
   workflow: WorkflowDefinition,
   options: WalkOptions,
-): AsyncGenerator<never, WorkflowRunOutcome, void> {
+): Promise<WorkflowRunOutcome> {
+  // Cancellation comes first at the start boundary: a run whose signal is already aborted does
+  // nothing at all — not even a span, not even validation, and not even a snapshot write.
+  throwIfAborted(options.signal);
+
   const state: WalkState = {
     workflow,
     runId: options.runId,
@@ -142,11 +189,87 @@ export async function* walk(
     input: options.inputData,
     resumingStepId: undefined,
     resumeData: undefined,
+    emit: options.emit ?? dropEvent,
+    // The run's root span is opened before the entry boundary so a rejected start is recorded too;
+    // it ends on every exit path below (`docs/architecture/observability.md`「自动埋点」).
+    tracing: toWorkflowTracing(workflow, options),
   };
 
-  // Cancellation comes first at the start boundary: a run whose signal is already aborted does
-  // nothing at all — not even validation, and not even a snapshot write.
-  throwIfAborted(options.signal);
+  try {
+    const outcome = await runWalk(state, options);
+    // The run span's output is the terminal outcome envelope — a suspension reads as one, and a
+    // successful run carries the workflow's terminal value with its per-step records.
+    state.tracing?.runSpan.update({ output: outcome });
+    state.emit(toRunEndEvent(outcome));
+    return outcome;
+  } catch (error) {
+    // The run failed: the root span carries the error; step spans carry it on their own boundary.
+    state.tracing?.runSpan.error(error);
+    throw error;
+  } finally {
+    state.tracing?.runSpan.end();
+  }
+}
+
+/**
+ * The run's observability wiring: `undefined` without a tracer, so the walk's only zero-overhead
+ * branch is one presence check. Name = the workflow id; the attributes carry workflowId and runId,
+ * the execution identity that looks the trace up from its root span.
+ */
+function toWorkflowTracing(
+  workflow: WorkflowDefinition,
+  options: WalkOptions,
+): WorkflowTracing | undefined {
+  const tracer = workflow.tracer;
+  if (tracer === undefined) return undefined;
+  const continuation = toTraceContinuation(options);
+  return {
+    tracer,
+    runSpan: tracer.startSpan({
+      name: workflow.id,
+      type: WORKFLOW_RUN_SPAN,
+      attributes: { workflowId: workflow.id, runId: options.runId },
+      ...(continuation.traceId === undefined ? {} : { traceId: continuation.traceId }),
+      ...(continuation.parentSpanId === undefined
+        ? {}
+        : { parentSpanId: continuation.parentSpanId }),
+    }),
+  };
+}
+
+/**
+ * Resolves the run span's trace continuation: a resume continues the trace its snapshot pinned (the
+ * run's own trace, started before the suspension); a start continues what the caller passed to
+ * `createRun`. Empty strings mean "no trace", the agent run options' convention: an empty `traceId`
+ * voids the whole pair (a parent outside a trace means nothing), an empty `parentSpanId` only drops
+ * the parent. A real parent id without a trace id is left for the tracer to reject loudly.
+ */
+function toTraceContinuation(options: WalkOptions): WalkTraceContinuation {
+  const resuming = options.resume?.traceId;
+  if (resuming !== undefined) return { traceId: resuming };
+  const trace = options.trace;
+  if (trace === undefined || trace.traceId === '') return {};
+  return {
+    ...(trace.traceId === undefined ? {} : { traceId: trace.traceId }),
+    ...(trace.parentSpanId === undefined || trace.parentSpanId === ''
+      ? {}
+      : { parentSpanId: trace.parentSpanId }),
+  };
+}
+
+/** The run-end event of a terminal outcome — the stream's last event. */
+function toRunEndEvent(outcome: WorkflowRunOutcome): WorkflowEvent {
+  return outcome.status === 'success'
+    ? { type: 'run-end', status: 'success', output: outcome.output }
+    : { type: 'run-end', status: 'suspended' };
+}
+
+/** The event sink of a walk nobody streams (`resume`): the events are built and dropped. */
+function dropEvent(_event: WorkflowEvent): void {}
+
+/** The walk's body: the entry boundary (a start input, or a resume point) and then every entry. */
+async function runWalk(state: WalkState, options: WalkOptions): Promise<WorkflowRunOutcome> {
+  const { workflow } = state;
 
   // These two boundaries — the start input, and a resume's position / target / resumeData — sit
   // outside the failure path below: a rejected start means the run never began, and a rejected
@@ -159,8 +282,16 @@ export async function* walk(
     value = await validateRunInput(workflow.id, workflow.inputSchema, options.inputData);
     state.input = value;
     position = 0;
+    // The run has begun: the start boundary accepted the input, so the run-start event carries the
+    // validated value the run consumes (a rejected start emits nothing — it never began), and the
+    // run span records the same value as its input.
+    state.emit({ type: 'run-start', runId: state.runId, workflowId: workflow.id, input: value });
+    state.tracing?.runSpan.update({ input: value });
   } else {
     ({ value, position } = await enterResume(state, options.resume));
+    // A resumed segment is triggered by the validated resumeData, not by the run's start input;
+    // `undefined` (a bare resume of a step without `resumeSchema`) leaves the span's input unset.
+    state.tracing?.runSpan.update({ input: state.resumeData });
   }
 
   try {
@@ -241,12 +372,17 @@ async function runEntry(state: WalkState, entry: WorkflowEntry, value: unknown):
  * enough — with the run's validated input and the entry position to re-enter from.
  */
 async function persist(state: WalkState, status: WorkflowRunStatus, position: number): Promise<void> {
+  const traceId = state.tracing?.runSpan.traceId;
   const snapshot: WorkflowRunSnapshot = {
     runId: state.runId,
     status,
     input: state.input,
     stepResults: { ...state.stepResults },
     position,
+    // The trace rides the snapshot so a resumed segment continues it (`docs/architecture/
+    // observability.md`「suspend/resume」). An untraced run — or a trace the sampler rejected,
+    // whose NoOpSpan carries no id — writes none.
+    ...(traceId === undefined || traceId === '' ? {} : { traceId }),
   };
   await state.storage.save(state.runId, snapshot);
 }
@@ -424,12 +560,49 @@ function recordStep(
  * aggregate record instead of N overwrites.
  */
 async function executeStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
-  const validated = await validateStepInput(state.workflow.id, step, inputData);
-  return executeWithRetries(
-    async () => step.execute(stepContext(state, step, validated)),
-    step.retries ?? 0,
-    state.signal,
-  );
+  // The step boundary's events frame the whole crossing — the arriving value, the validation, the
+  // attempts — and one pair is emitted per execution: a `foreach` iteration is its own crossing,
+  // even though the run's records aggregate the block under one step id. The step's span opens at
+  // the same boundary, so its input is the validated value `execute` actually receives (set as an
+  // update once validation has passed) and a rejected boundary carries no input, only the error.
+  state.emit({ type: 'step-start', stepId: step.id, input: inputData });
+  const span = startStepSpan(state, step);
+  try {
+    const validated = await validateStepInput(state.workflow.id, step, inputData);
+    span?.update({ input: validated });
+    const output = await executeWithRetries(
+      async () => step.execute(stepContext(state, step, validated)),
+      step.retries ?? 0,
+      state.signal,
+    );
+    state.emit({ type: 'step-end', stepId: step.id, status: 'success', output });
+    span?.update({ output });
+    span?.end();
+    return output;
+  } catch (error) {
+    // A suspend is not a failure: the step's boundary closes `suspended` and the signal keeps
+    // travelling; the failing execution's status is `failed` and its span carries the error.
+    const suspended = isSuspendSignal(error);
+    state.emit({ type: 'step-end', stepId: step.id, status: suspended ? 'suspended' : 'failed' });
+    if (!suspended) span?.error(error);
+    span?.end();
+    throw error;
+  }
+}
+
+/**
+ * Starts one step's span (`docs/architecture/observability.md`「自动埋点」): hanging under the run's
+ * root span (explicit propagation, no AsyncLocalStorage). The name is the step id; the table's
+ * `workflow-step` attributes are empty. A run without a tracer creates no span object at all.
+ */
+function startStepSpan(state: WalkState, step: Step): Span | undefined {
+  const tracing = state.tracing;
+  if (tracing === undefined) return undefined;
+  return tracing.tracer.startSpan({
+    name: step.id,
+    type: WORKFLOW_STEP_SPAN,
+    parent: tracing.runSpan,
+  });
 }
 
 /**

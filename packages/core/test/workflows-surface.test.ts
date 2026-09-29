@@ -10,7 +10,8 @@ import { expectAssignable } from './helpers/assertions.js';
  * Workflow 定义表面(M3 #47,`docs/architecture/workflows.md`「定义表面」):`createStep` 配置
  * 对象与 StepContext 参数包——本票只落定义表面与条目列表形状,执行语义归 walker 测试套件
  * (workflows-run / workflows-control-flow / workflows-loop-wait;suspend/resume 归
- * workflows-suspend-resume)。
+ * workflows-suspend-resume;lifecycle 事件流归 workflows-events;span 埋点与 trace 续接归
+ * workflows-observability)。
  */
 describe('createStep:冻结普通对象', () => {
   it('返回冻结的普通对象,配置字段原样(引用不复制)', () => {

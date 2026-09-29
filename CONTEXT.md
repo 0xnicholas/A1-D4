@@ -28,6 +28,10 @@ _Avoid_: 自有 provider SPI、provider 注册表、magic string
 核心自有的流式输出事件词汇(text-delta / tool-call / finish / usage 等最小集合),stream 输出、processors、workflow 快照、observability 共用;与外部格式(AI SDK UI stream 等)的转换只发生在互操作能力包。
 _Avoid_: 透出/复用 AI SDK 流格式
 
+**Lifecycle 事件流 (Lifecycle event stream)**:
+workflow run 输出对象的流式面:run / step 边界事件(run-start / step-start / step-end / run-end),包络复用 chunk 协议;step 内的 token 透传不在其中(用户自行消费 agent 的 stream 输出对象)。
+_Avoid_: 与 chunk 协议混为一物、开第三套流格式
+
 **Agent**:
 框架的核心执行单元:把 name、instructions、model、tools 包装成可 generate()/stream() 的对象;定义表面刻意最小,横切能力一律走 Processor。
 _Avoid_: 模型本身(Agent 是模型+指令+工具的执行包装,不是 LLM 的同义词)、平台对象、上帝类
@@ -49,8 +53,8 @@ _Avoid_: session、conversation(那是 Memory 域的词)
 _Avoid_: iteration、loop iteration(规范统一用 step)
 
 **输出对象 (Output object)**:
-stream() 的返回对象:既可 for-await 消费 chunk 协议流,又可 await 其终值(text / object / usage / steps / finishReason 等);generate() 复用同一代码路径。
-_Avoid_: generate/stream 分离的双实现
+一次执行返回的可双消费对象:`for await` 消费流,`await` 拿终值;两处同一心智。agent 域:`stream()` 的返回对象(chunk 协议流 + text / object / usage / steps / finishReason 等终值;`generate()` 复用同一代码路径);workflow 域:`run.start()` 的返回对象(lifecycle 事件流 + 终态信封)。
+_Avoid_: generate/stream 分离的双实现、两套流协议
 
 **Processor**:
 Agent 的唯一横切扩展点:挂在 `AgentConfig.processors` 上、按声明顺序串行执行的三钩处理器(processInput / processOutputStep / processError),前一个的返回是后一个的输入;guardrails、evals、脱敏、限流等横切能力的唯一合法承载点。

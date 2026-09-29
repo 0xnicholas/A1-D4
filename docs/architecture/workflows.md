@@ -5,6 +5,7 @@
 > 修订(#49):控制流算子表补钉两处实施期裁决——branch 无真分支输出空 keyed 对象 `{}`(tip 值不穿透);foreach concurrency 须为正整数,迭代失败后不再开新迭代。
 > 修订(#50):循环与等待补钉实施期裁决——dowhile 条件在**迭代前**求值(条件在 tip 上为假即可 0 次迭代,块输出 = tip 原样透传)、dountil 在**迭代后**求值(至少一次);两者 `iterationCount` = 已完成迭代数(条件里抛错即最大迭代闸),块按 step id 记一条(记录 = 最后一次迭代的输出)。sleep 的动态时长 fn 收 `RequestContext`(动态参数约定,非 step 参数包;非有限数报错,负值当 0);`retries` = **额外**尝试数(最多 `retries + 1` 次),固定间隔 1000ms、可被中止打断,step 边界校验只做一次不重试,定义期须为非负整数。
 > 修订(#51):suspend/resume 落地时补钉实施期裁决——v1 的 suspend 只成立在**顶层 then 条目**的 step 内,块内(parallel / branch 臂 / foreach / 循环)调用 suspend 显式报错(块内迭代现场不在快照形状内,升级为新 ticket);`position` = 重进下标(suspend 时 = 挂起条目,running 时 = 下一条目,终态 success = 条目数);resume 把前序条目**按记录回放**重建 tip(不重执行、不重估条件),`input` 用快照里已校验的值;持久化粒度 = **条目完成**(块的子 step 随块一起记录,见 #49/#50;sleep 不是 step 但条目完成也写),step 边界写只随真实 storage,无 storage 时只写 suspend 与终态。
+> 修订(#52):事件流与 span 埋点落地时补钉实施期裁决——事件词汇表与载荷(下表「流式事件」)、块内 step 的**每次执行**一对事件 / 一个 `workflow-step` span(stepResults 仍按块聚合)、run span 的 input = 校验后的触发输入(start 的 input / resume 的 resumeData)、output = 终态信封;`createRun` 收 `{ traceId?, parentSpanId? }`(外部 trace 续接,空串语义沿 agent 的 run option),`traceId` 作为**可选字段**进快照(additive),resume 以快照 traceId 开同一 trace 下的新 run span。
 
 ## 定位
 
@@ -52,7 +53,7 @@ const wf = createWorkflow({ id, inputSchema, outputSchema })
 ### Run
 
 ```ts
-const run = wf.createRun({ runId? })
+const run = wf.createRun({ runId?, traceId?, parentSpanId? })
 const out = run.start({ inputData, requestContext?, signal? })
 await out.result                 // 终值
 for await (const ev of out)      // 最小 lifecycle 事件流,见「流式事件」
@@ -61,6 +62,7 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 
 - run 输出对象与 Agent 输出对象同一心智:**await 终值 / for-await 事件流,双消费单路径**。
 - `requestContext` 沿用 Agent 规范的开放袋约定;`signal`(AbortSignal)沿 execute 与动态时长函数传播。
+- `createRun` 另收可选的 `traceId?` / `parentSpanId?`:把本次 run 挂到别处开始的 trace 下(入站 `traceparent`、父 run),空串语义沿 Agent 的 run option(空 `traceId` 整对作废、空 `parentSpanId` 只丢 parent)。**resume 不收取接选项**:恢复段以快照里已持久化的 traceId 续同一 trace。
 
 ## 控制流算子
 
@@ -102,6 +104,8 @@ interface WorkflowSnapshotStore {
 
 核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。基础形状冻结;adapter 家族与 delete / list / CAS 可选扩展见 `docs/architecture/storage.md`。
 
+快照形状在 #51 钉的五字段外,由 #52 additive 加一个可选 `traceId?`(32-hex,`docs/architecture/observability.md`「suspend/resume」):有真实 span 时才写,未挂 tracer 或采样不通过的 run 没有它;resume 用它续同一 trace,故同一次挂起的两段 run span 在一条 trace 里。
+
 ## IO 校验
 
 - 契约 = Standard Schema 双接口(ADR-0003),零适配器。
@@ -112,6 +116,20 @@ interface WorkflowSnapshotStore {
 ## 流式事件
 
 最小 lifecycle 事件流,粒度 = run / step 边界(run-start / step-start / step-end / run-end 量级),事件包络与词汇复用 chunk 协议(模型层已定共用,见 `docs/architecture/model.md`)。**chunk 级透传(step 内 agent 的 token 流)裁出 v1**:step 内用户可自行消费 agent 的 stream 输出对象。
+
+事件是 `start` 输出对象的第二消费(`for await`),与 `result` 共享同一次执行、同一顺序;事件**带边界值**:
+
+| 事件 | 载荷 | 何时 |
+| --- | --- | --- |
+| `run-start` | `{ runId, workflowId, input }`(`input` = 校验后的 start 输入) | start 输入过了边界;被拒的 start 不发事件(运行从未开始) |
+| `step-start` | `{ stepId, input }`(`input` = 到达边界的原值) | 进入一次 step 边界(校验之前) |
+| `step-end` | `{ stepId, status, output? }`(`status` = `success` / `failed` / `suspended`;`output` 只在 success) | 离开一次 step 边界 |
+| `run-end` | `{ status: 'success' \| 'suspended', output? }`(success 带终值) | run 达终态 |
+
+- **块内 step = 每次执行一对**:`foreach` / 循环的每次迭代、`parallel` 的每个臂各自一对(并发下按发生序交错),而 `stepResults` 仍按块聚合一条(#49/#50);事件与 span 是执行视角,记录是块视角。
+- **失败**:失败 step 的 `step-end` 以 `status: 'failed'` 落地,随后**迭代器以 run 的错误 reject**(与 agent 流同一惯例,不设 failed 的 `run-end`);`result` 与迭代器同错、同一次执行。
+- **挂起**:挂起 step 的 `step-end` 为 `suspended`,`run-end` 为 `suspended`;恢复段走 `resume` 的 promise,不是同一条流的续写。
+- 消费者提前 break:停止事件缓冲,run 照跑完(`result` 仍落定);懒启动不变(首个 `next()` 或首次读 `result` 才开始执行)。
 
 ## 错误、重试与状态机
 
@@ -143,7 +161,7 @@ interface WorkflowSnapshotStore {
 - **Agent(#10,已定)**:不复用 agent loop;agent 由用户一行包装进 step;agent 级审批/挂起归 Harness,本规范的快照机制是其底层机器。
 - **存储(#15,已定)**:本规范钉 `WorkflowSnapshotStore` port(两个方法 + JSON-only);adapter 家族与扩展面见 `docs/architecture/storage.md`。
 - **Harness(#18,已定)**:跨进程恢复与 durable timer 明确裁出;durable 重启 = 应用层用 load→重进原语 + `listSnapshots` 自举;agent 侧审批挂起机器与 schedules 见 `docs/architecture/harness.md`。
-- **Observability(#14,已定)**:span 挂在 run / step 边界,lifecycle 事件流是其事件锚点,traceId 随快照持久化;见 `docs/architecture/observability.md`。
+- **Observability(#14,已定)**:span 挂在 run / step 边界(run span 覆盖 start / resume 到终态,step span 每次执行一个、name = step id),lifecycle 事件流是其事件锚点,traceId 随快照持久化(resume 续同一 trace);见 `docs/architecture/observability.md`。
 - **Memory(#12)**:无直接耦合。
 
 ## 依赖预算

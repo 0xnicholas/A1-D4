@@ -9,10 +9,11 @@
  * objects.
  *
  * The run surface: a committed workflow's `createRun` gives a run identity, `start` returns the
- * output object whose `result` resolves the run's outcome envelope (or rejects when the run fails),
- * and `resume({ step, resumeData? })` continues a run that suspended. Start is lazy — the walker
- * executes on the first read; resume is eager and resolves with the same outcome envelope. The
- * walker interprets the flat entry list in order: `then` pipes the previous output on, `parallel`
+ * output object whose `result` resolves the run's outcome envelope (or rejects when the run fails)
+ * and whose `for await` walks the lifecycle events (run-start / step-start / step-end / run-end,
+ * carrying the values that cross each boundary), and `resume({ step, resumeData? })` continues a run
+ * that suspended. Start is lazy — the walker executes on the first read; resume is eager and resolves
+ * with the same outcome envelope. The walker interprets the flat entry list in order: `then` pipes the previous output on, `parallel`
  * runs the steps concurrently and keys the outputs by step id, `branch` runs the first step whose
  * condition is truthy and keys the output the same way, `foreach` maps an array through one step
  * through a concurrency gate and collects an array, `dowhile` / `dountil` fold a step until their
@@ -28,8 +29,12 @@
  * `resumeSchema` and re-enters the walk from the snapshot's position, replaying the completed
  * entries from the records instead of re-running them; concurrent resumes of one run are
  * deduplicated in process. Snapshots are written at fixed points — every completed entry with
- * attached storage, plus suspend and the terminal state — never through hooks. Spec:
- * `docs/architecture/workflows.md`.
+ * attached storage, plus suspend and the terminal state — never through hooks; a run with a tracer
+ * writes the trace it was exported under into the snapshot, so a resumed segment continues the same
+ * trace. A tracer attached to the definition opens `workflow-run` / `workflow-step` spans at the same
+ * boundaries (run span: input = the validated trigger input, output = the outcome envelope; step
+ * span: name = step id, one per execution), and an absent tracer means no span object is ever
+ * created. Spec: `docs/architecture/workflows.md`.
  */
 export { createStep } from './step.js';
 export type { Step, StepConfig, StepContext } from './step.js';
@@ -62,6 +67,14 @@ export type {
   ThenEntry,
   WorkflowEntry,
 } from './entry.js';
+export type {
+  StepStatus,
+  WorkflowEvent,
+  WorkflowRunEndEvent,
+  WorkflowRunStartEvent,
+  WorkflowStepEndEvent,
+  WorkflowStepStartEvent,
+} from './events.js';
 export type {
   WorkflowRunSnapshot,
   WorkflowRunStatus,
