@@ -9,7 +9,7 @@ import type {
   WorkflowRunSnapshot,
   WorkflowSnapshotStore,
 } from '@balsa/core/workflows';
-import { captureRejection, expectAssignable } from './helpers/assertions.js';
+import { captureRejection, expectAssignable, expectSuccess, expectSuspended } from './helpers/assertions.js';
 
 /**
  * suspend/resume(M3 #51,`docs/architecture/workflows.md`「suspend/resume 与快照」):suspend 控制
@@ -107,11 +107,10 @@ describe('suspend:控制信号展开 + 记录 + 终态信封', () => {
     const { workflow, approvalExecute, polishExecute } = approvalWorkflow();
     const before = Date.now();
 
-    const outcome = await workflow.createRun().start({ inputData: { topic: 'ts' } }).result;
+    const outcome = expectSuspended(
+      await workflow.createRun().start({ inputData: { topic: 'ts' } }).result,
+    );
     const after = Date.now();
-
-    expect(outcome.status).toBe('suspended');
-    if (outcome.status !== 'suspended') throw new Error('expected a suspended outcome');
     // 挂起点:信封点名 step,后续条目不再执行
     expect(outcome.stepId).toBe('approval');
     expect(approvalExecute).toHaveBeenCalledTimes(1);
@@ -161,13 +160,13 @@ describe('suspend:控制信号展开 + 记录 + 终态信封', () => {
     const { workflow, approvalExecute } = approvalWorkflow();
 
     const run = workflow.createRun();
-    const suspended = await run.start({ inputData: { topic: 'ts' } }).result;
-    expect(suspended.status).toBe('suspended');
+    const suspended = expectSuspended(await run.start({ inputData: { topic: 'ts' } }).result);
+    expect(suspended.stepId).toBe('approval');
 
-    const outcome = await run.resume({ step: 'approval', resumeData: { approved: true } });
+    const outcome = expectSuccess(
+      await run.resume({ step: 'approval', resumeData: { approved: true } }),
+    );
 
-    expect(outcome.status).toBe('success');
-    if (outcome.status !== 'success') throw new Error('expected a success outcome');
     expect(outcome.output).toEqual({ polished: '«TS:true»' });
     expect(approvalExecute).toHaveBeenCalledTimes(2);
   });
@@ -302,13 +301,13 @@ describe('run.resume:load 快照 → resumeData 校验 → 从 position 重进',
     const run = workflow.createRun({ runId: 'resume-run' });
     await run.start({ inputData: { topic: 'ts' } }).result;
 
-    const outcome = await run.resume({
-      step: 'approval',
-      resumeData: { approved: true },
-    });
+    const outcome = expectSuccess(
+      await run.resume({
+        step: 'approval',
+        resumeData: { approved: true },
+      }),
+    );
 
-    expect(outcome.status).toBe('success');
-    if (outcome.status !== 'success') throw new Error('expected a success outcome');
     expect(outcome.output).toEqual({ polished: '«TS:true»' });
     expect(outcome.stepResults['approval']).toMatchObject({
       status: 'success',
@@ -630,6 +629,18 @@ describe('run.resume:load 快照 → resumeData 校验 → 从 position 重进',
     expect(error.message).toMatch(/position 0/);
   });
 
+  it('无 storage 的内存默认按 run 对象持有:新 run 对象恢复报 no snapshot(跨对象要接真实 storage)', async () => {
+    const { workflow } = approvalWorkflow();
+    const runId = 'memory-only';
+    await workflow.createRun({ runId }).start({ inputData: { topic: 'ts' } }).result;
+
+    const error = await captureRejection(() =>
+      workflow.createRun({ runId }).resume({ step: 'approval', resumeData: { approved: true } }),
+    );
+
+    expect(error.message).toMatch(/no snapshot/);
+  });
+
   it('resume 并发去重:同一 runId 的并发 resume 返回同一 promise,step 只恢复一次', async () => {
     const { workflow, approvalExecute } = approvalWorkflow();
     const run = workflow.createRun({ runId: 'dedupe-run' });
@@ -717,9 +728,9 @@ describe('run.resume:load 快照 → resumeData 校验 → 从 position 重进',
 
     const first = await run.start({ inputData: { draft: 'ts' } }).result;
     expect(first.status).toBe('suspended');
-    const second = await run.resume({ step: 'approval', resumeData: { verdict: 'ok', round: 1 } });
-    expect(second.status).toBe('suspended');
-    if (second.status !== 'suspended') throw new Error('expected a second suspension');
+    const second = expectSuspended(
+      await run.resume({ step: 'approval', resumeData: { verdict: 'ok', round: 1 } }),
+    );
     expect(second.stepResults['approval']?.suspendPayload).toEqual({ round: 2 });
     expect(saves.at(-1)).toMatchObject({ status: 'suspended', position: 0 });
 
@@ -764,7 +775,8 @@ describe('块内 suspend:v1 只放 then 主轴,其余条目显式报错', () => 
     expect(saves.at(-1)?.stepResults['item']).toBeUndefined();
   });
 
-  it('parallel 内 suspend:点名 parallel 与 step id', async () => {
+  it('parallel 内 suspend:点名 parallel 与 step id,且挂起 step 不落记录(挂在失败 run 的快照上)', async () => {
+    const { store, saves } = recordingStore();
     const ok = createStep({
       id: 'ok',
       inputSchema: z.string(),
@@ -775,16 +787,22 @@ describe('块内 suspend:v1 只放 then 主轴,其余条目显式报错', () => 
       id: 'fanout',
       inputSchema: z.string(),
       outputSchema: z.string(),
+      storage: store,
     })
       .parallel([ok, suspendingStep('needs-human')])
       .commit();
 
     const error = await captureRejection(() =>
-      workflow.createRun().start({ inputData: 'x' }).result,
+      workflow.createRun({ runId: 'parallel-suspend' }).start({ inputData: 'x' }).result,
     );
 
     expect(error.message).toMatch(/parallel/);
     expect(error.message).toMatch(/needs-human/);
+    // 挂起只在可恢复条目(then)落 suspended 记录:失败 run 的快照里没有 suspended 记录
+    const failed = saves.at(-1);
+    expect(failed?.status).toBe('failed');
+    expect(failed?.stepResults['needs-human']).toBeUndefined();
+    expect(failed?.stepResults['ok']).toMatchObject({ status: 'success' });
   });
 
   it('dowhile 体内 suspend:点名 dowhile 与 step id;branch 臂同样报错', async () => {

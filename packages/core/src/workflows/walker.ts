@@ -48,8 +48,11 @@ import { executeWithRetries } from './retry.js';
 /** What a run reads of its workflow: the identity, the start input schema, the storage slot and the frozen entries. */
 export type WorkflowDefinition<TInputSchema extends StandardSchema = StandardSchema> = Pick<
   Workflow<TInputSchema>,
-  'id' | 'inputSchema' | 'entries' | 'storage'
->;
+  'id' | 'inputSchema' | 'entries'
+> & {
+  /** Snapshot store attached to the definition; absent = the run keeps its snapshots in memory. */
+  readonly storage?: WorkflowSnapshotStore | undefined;
+};
 
 /**
  * The point a resumed walk re-enters from (`docs/architecture/workflows.md`「suspend/resume 与快照」):
@@ -89,9 +92,23 @@ export interface WalkOptions {
   readonly resume?: WalkResumePoint | undefined;
 }
 
-/** The walk's mutable state, threaded through the helpers below. */
-interface WalkState extends WalkOptions {
+/**
+ * The walk's mutable state, threaded through the helpers below: the definition and run identity the
+ * helpers need, the write policy, and the record table the walk carries (seeded from a resumed
+ * snapshot when there is one).
+ */
+interface WalkState {
   readonly workflow: WorkflowDefinition;
+  /** Identity of the run being walked — snapshots and errors carry it. */
+  readonly runId: string;
+  /** The run's request context — the same object every step receives. */
+  readonly requestContext: RequestContext;
+  /** Cancellation, checked before every entry and propagated into every step. */
+  readonly signal: AbortSignal;
+  /** The snapshot store the walk writes to: the attached one, or the run's in-memory default. */
+  readonly storage: WorkflowSnapshotStore;
+  /** Whether a `running` snapshot follows every completed entry (only worth it with a real store). */
+  readonly persistStepBoundaries: boolean;
   /** Per-step records, keyed by step id — the run's stepResults, and the snapshot's body. */
   readonly stepResults: Record<string, WorkflowStepResultSnapshot>;
   /** The run input as it entered the walk: the validated value (defaults / transforms applied). */
@@ -113,8 +130,12 @@ export async function* walk(
   options: WalkOptions,
 ): AsyncGenerator<never, WorkflowRunOutcome, void> {
   const state: WalkState = {
-    ...options,
     workflow,
+    runId: options.runId,
+    requestContext: options.requestContext,
+    signal: options.signal,
+    storage: options.storage,
+    persistStepBoundaries: options.persistStepBoundaries,
     // A resumed walk continues the suspended run's records: prior steps stay visible to
     // `getStepResult`, and the resumed step replaces its own `suspended` record when it completes.
     stepResults: options.resume === undefined ? {} : { ...options.resume.stepResults },
@@ -153,9 +174,9 @@ export async function* walk(
         if (entry.type !== 'then' || entry.step.id !== error.stepId) {
           throw unsupportedSuspend(workflow.id, entry, error);
         }
-        // `runAndRecordStep` already recorded the step `suspended`; the snapshot pins the entry to
-        // re-enter from (its input is rebuilt from the records around it, never stored), and the
-        // run hands its caller the suspended outcome.
+        // The step's record was written `suspended` by `runAndRecordStep`; the snapshot pins the
+        // entry to re-enter from (its input is rebuilt from the records around it, never stored),
+        // and the run hands its caller the suspended outcome.
         await persist(state, 'suspended', position);
         return { status: 'suspended', stepId: error.stepId, stepResults: state.stepResults };
       }
@@ -190,7 +211,9 @@ export async function* walk(
 async function runEntry(state: WalkState, entry: WorkflowEntry, value: unknown): Promise<unknown> {
   switch (entry.type) {
     case 'then':
-      return runAndRecordStep(state, entry.step, value);
+      // The one entry whose suspend the run can act on: a `then` step's suspend records the step
+      // and suspends the run (every other entry shape drops the record — see `runAndRecordStep`).
+      return runAndRecordStep(state, entry.step, value, true);
     case 'parallel':
       return runParallel(state, entry, value);
     case 'branch':
@@ -239,6 +262,21 @@ async function enterResume(
   resume: WalkResumePoint,
 ): Promise<{ readonly value: unknown; readonly position: number }> {
   const { workflow } = state;
+  // The target first: the snapshot must be suspended at the step `resume` names. Naming a
+  // different step is a caller bug, and the snapshot knows which step is waiting — say so.
+  if (state.stepResults[resume.stepId]?.status !== 'suspended') {
+    const suspended = Object.entries(state.stepResults).find(
+      ([, record]) => record.status === 'suspended',
+    );
+    if (suspended !== undefined) {
+      throw new Error(
+        `run "${state.runId}" suspended at step "${suspended[0]}" — resume() was asked for step "${resume.stepId}".`,
+      );
+    }
+    throw new Error(
+      `workflow "${workflow.id}": the snapshot has no suspended record for step "${resume.stepId}" — it cannot be resumed`,
+    );
+  }
   const entry = workflow.entries[resume.position];
   if (entry === undefined) {
     throw new Error(
@@ -248,11 +286,6 @@ async function enterResume(
   if (entry.type !== 'then' || entry.step.id !== resume.stepId) {
     throw new Error(
       `workflow "${workflow.id}": step "${resume.stepId}" cannot be resumed from position ${resume.position} — suspend/resume supports a step in a top-level then entry only`,
-    );
-  }
-  if (state.stepResults[resume.stepId]?.status !== 'suspended') {
-    throw new Error(
-      `workflow "${workflow.id}": the snapshot has no suspended record for step "${resume.stepId}" — it cannot be resumed`,
     );
   }
   state.resumeData = await validateResumeData(workflow.id, entry.step, resume.resumeData);
@@ -334,17 +367,33 @@ function getStepResult(state: WalkState, stepId: string): unknown {
   return state.stepResults[stepId]?.output;
 }
 
-/** Runs one step and records it: status, output and boundary timestamps, keyed by step id. */
-async function runAndRecordStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
+/**
+ * Runs one step and records it: status, output and boundary timestamps, keyed by step id.
+ * `recordsSuspend` says whether a suspend signal becomes this step's recorded result — true only for
+ * a step in a top-level `then` entry, the one shape `resume` can re-enter. A step that suspends
+ * inside a block leaves no record: the run cannot suspend there (the walker fails it loudly), and
+ * no snapshot may claim a `suspended` step on a failed run.
+ */
+async function runAndRecordStep(
+  state: WalkState,
+  step: Step,
+  inputData: unknown,
+  recordsSuspend: boolean,
+): Promise<unknown> {
   const startedAt = Date.now();
   let output: unknown;
   try {
     output = await executeStep(state, step, inputData);
   } catch (error) {
     // A suspend is not a failure: the step is recorded `suspended` with its payload (never
-    // `failed`), and the signal keeps travelling to the walker's entry loop.
+    // `failed`) where the run can suspend, and the signal keeps travelling to the entry loop.
     if (isSuspendSignal(error)) {
-      recordStep(state, step.id, startedAt, { status: 'suspended', suspendPayload: error.payload });
+      if (recordsSuspend) {
+        recordStep(state, step.id, startedAt, {
+          status: 'suspended',
+          suspendPayload: error.payload,
+        });
+      }
     } else {
       recordStep(state, step.id, startedAt, { status: 'failed' });
     }
@@ -433,7 +482,7 @@ async function runParallel(
   inputData: unknown,
 ): Promise<Record<string, unknown>> {
   const outputs = await Promise.all(
-    entry.steps.map((step) => runAndRecordStep(state, step, inputData)),
+    entry.steps.map((step) => runAndRecordStep(state, step, inputData, false)),
   );
   return Object.fromEntries(entry.steps.map((step, index) => [step.id, outputs[index]] as const));
 }
@@ -454,7 +503,7 @@ async function runBranch(
 ): Promise<Record<string, unknown>> {
   for (const [condition, step] of entry.branches) {
     if (await condition(stepContext(state, undefined, inputData))) {
-      return { [step.id]: await runAndRecordStep(state, step, inputData) };
+      return { [step.id]: await runAndRecordStep(state, step, inputData, false) };
     }
   }
   return {};
@@ -473,7 +522,8 @@ async function runBranch(
  * The step's record is the collected array, written when the block completes (iterations do not
  * record per run): `getStepResult(step.id)` returns the block's output, and inside its own
  * iterations the id stays unrecorded — like any step reading itself. A suspend raised by an
- * iteration unwinds the block and is not a step failure: it leaves no record at all.
+ * iteration unwinds the block and is not a step failure: it leaves no record at all (the walker
+ * fails the run — a block's iteration site is not resumable).
  */
 async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unknown): Promise<unknown[]> {
   if (!Array.isArray(inputData)) {

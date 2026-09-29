@@ -1,4 +1,8 @@
-import type { WorkflowRunOutcome, WorkflowRunSuccessOutcome } from '@balsa/core/workflows';
+import type {
+  WorkflowRunOutcome,
+  WorkflowRunSuccessOutcome,
+  WorkflowRunSuspendedOutcome,
+} from '@balsa/core/workflows';
 
 /**
  * 测试共享断言工具:编译期断言与错误捕获。各测试文件从同一份实现取用,不各自复制。
@@ -46,6 +50,17 @@ export function expectSuccess<TOutput>(
 ): WorkflowRunSuccessOutcome<TOutput> {
   if (outcome.status !== 'success') {
     throw new Error(`expected a successful run outcome, got "${outcome.status}"`);
+  }
+  return outcome;
+}
+
+/**
+ * 收窄 run 的终态信封并断言 suspended:挂起臂带 `stepId`,payload 在
+ * `stepResults[stepId].suspendPayload`。与 `expectSuccess` 同模式。
+ */
+export function expectSuspended(outcome: WorkflowRunOutcome): WorkflowRunSuspendedOutcome {
+  if (outcome.status !== 'suspended') {
+    throw new Error(`expected a suspended run outcome, got "${outcome.status}"`);
   }
   return outcome;
 }

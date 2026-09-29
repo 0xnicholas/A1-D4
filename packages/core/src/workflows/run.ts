@@ -1,11 +1,7 @@
 import type { RequestContext } from '../agent/types.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import { createInMemorySnapshotStore } from './in-memory-snapshot-store.js';
-import type {
-  WorkflowRunSnapshot,
-  WorkflowSnapshotStore,
-  WorkflowStepResultSnapshot,
-} from './snapshot.js';
+import type { WorkflowSnapshotStore, WorkflowStepResultSnapshot } from './snapshot.js';
 import type { Step } from './step.js';
 import { walk } from './walker.js';
 import type { WorkflowDefinition } from './walker.js';
@@ -102,8 +98,9 @@ export interface WorkflowRunOutput<TOutput = unknown> {
 /**
  * One execution lifecycle of a committed workflow (`docs/architecture/workflows.md`「Run」):
  * `createRun` mints its identity, `start` begins the single execution, and `resume` continues a run
- * that suspended. Starting and resuming are mutually exclusive — a resumed run was not started here
- * (the durable path: a fresh run object over the same `runId` and store).
+ * that suspended — the run it was started on, or (the durable path) a fresh run object over the same
+ * `runId` and store. A run executes once: `start` refuses a second call, and `resume` continues the
+ * same execution as often as the run suspends again.
  */
 export interface WorkflowRun<TInputData = unknown, TOutput = unknown> {
   /** Identity of this run — correlation for snapshots, spans and the request context. */
@@ -146,11 +143,19 @@ export function createWorkflowRun<TInputSchema extends StandardSchema, TOutput =
 
   let started = false;
   let startOptions: WorkflowStartOptions<unknown> | undefined;
-  // Without attached storage the run still snapshots — in memory, for this run alone (the default
-  // store is created on first use, so a run that never suspends pays nothing).
-  let defaultStorage: WorkflowSnapshotStore | undefined;
-  const storage = (): WorkflowSnapshotStore =>
-    workflow.storage ?? (defaultStorage ??= createInMemorySnapshotStore());
+  let defaultStore: WorkflowSnapshotStore | undefined;
+  /**
+   * The run's snapshot wiring, resolved on first use: the attached store, or the in-memory default
+   * (a run that never suspends never creates one). The default lives with this run object, so
+   * in-memory snapshots are resumable by the object that made them; a fresh run object — the
+   * durable path — needs a real store attached.
+   */
+  const persistence = (): SnapshotPersistence => ({
+    store: workflow.storage ?? (defaultStore ??= createInMemorySnapshotStore()),
+    // Entry boundaries are only worth persisting with a real store: the in-memory default dies
+    // with the process, so the per-entry writes would serve nobody.
+    persistStepBoundaries: workflow.storage !== undefined,
+  });
 
   return {
     runId,
@@ -162,15 +167,23 @@ export function createWorkflowRun<TInputSchema extends StandardSchema, TOutput =
       }
       started = true;
       startOptions = options;
-      return createRunOutput<TOutput>(workflow, runId, options, storage());
+      return createRunOutput<TOutput>(workflow, runId, options, persistence());
     },
     resume(resumeOptions) {
       // Resuming consumes the run's one lifecycle just like starting does: a run cannot be resumed
       // and then started.
       started = true;
-      return resumeRun<TOutput>(workflow, runId, resumeOptions, startOptions, storage());
+      return resumeRun<TOutput>(workflow, runId, resumeOptions, startOptions, persistence());
     },
   };
+}
+
+/** Where a run's walk reads and writes snapshots, and whether it writes one per completed entry. */
+interface SnapshotPersistence {
+  /** The attached store, or the run's in-memory default. */
+  readonly store: WorkflowSnapshotStore;
+  /** True only with a real store attached — the in-memory default buys no crash recovery. */
+  readonly persistStepBoundaries: boolean;
 }
 
 /**
@@ -183,12 +196,12 @@ function resumeRun<TOutput>(
   runId: string,
   options: WorkflowResumeOptions,
   startOptions: WorkflowStartOptions<unknown> | undefined,
-  storage: WorkflowSnapshotStore,
+  persistence: SnapshotPersistence,
 ): Promise<WorkflowRunOutcome<TOutput>> {
   const inFlight = resumeLocks.get(runId);
   if (inFlight !== undefined) return inFlight as Promise<WorkflowRunOutcome<TOutput>>;
 
-  const running = resumeSnapshot<TOutput>(workflow, runId, options, startOptions, storage);
+  const running = resumeSnapshot<TOutput>(workflow, runId, options, startOptions, persistence);
   let locked: Promise<WorkflowRunOutcome<TOutput>> | undefined;
   locked = running.finally(() => {
     if (locked !== undefined && resumeLocks.get(runId) === locked) resumeLocks.delete(runId);
@@ -203,10 +216,10 @@ async function resumeSnapshot<TOutput>(
   runId: string,
   options: WorkflowResumeOptions,
   startOptions: WorkflowStartOptions<unknown> | undefined,
-  storage: WorkflowSnapshotStore,
+  persistence: SnapshotPersistence,
 ): Promise<WorkflowRunOutcome<TOutput>> {
   const stepId = typeof options.step === 'string' ? options.step : options.step.id;
-  const snapshot = await storage.load(runId);
+  const snapshot = await persistence.store.load(runId);
   if (snapshot === null) {
     throw new Error(
       `run "${runId}" has no snapshot — resume() needs a run that suspended in this store (a workflow without storage keeps its snapshots in process memory, for the run object that made them).`,
@@ -215,12 +228,6 @@ async function resumeSnapshot<TOutput>(
   if (snapshot.status !== 'suspended') {
     throw new Error(
       `run "${runId}" is ${snapshot.status}, not suspended — only a suspended run can be resumed.`,
-    );
-  }
-  const suspended = suspendedStepId(workflow.id, snapshot);
-  if (suspended !== stepId) {
-    throw new Error(
-      `run "${runId}" suspended at step "${suspended}" — resume() was asked for step "${stepId}".`,
     );
   }
 
@@ -238,8 +245,11 @@ async function resumeSnapshot<TOutput>(
     inputData: snapshot.input,
     requestContext,
     signal,
-    storage,
-    persistStepBoundaries: workflow.storage !== undefined,
+    storage: persistence.store,
+    persistStepBoundaries: persistence.persistStepBoundaries,
+    // The target check (is the run suspended at this step?) and the structural check (does the
+    // position still hold that step's `then` entry?) belong to the walker's `enterResume`, which
+    // holds the snapshot's records and the definition side by side.
     resume: {
       stepId,
       resumeData: options.resumeData,
@@ -248,23 +258,6 @@ async function resumeSnapshot<TOutput>(
     },
   });
   return (await drain(walker)) as WorkflowRunOutcome<TOutput>;
-}
-
-/**
- * The step a snapshot is suspended at: its one record marked `suspended` (a snapshot without
- * exactly one is corrupted or foreign — it cannot be resumed).
- */
-function suspendedStepId(workflowId: string, snapshot: WorkflowRunSnapshot): string {
-  const suspended = Object.entries(snapshot.stepResults).filter(
-    ([, record]) => record.status === 'suspended',
-  );
-  const [first] = suspended;
-  if (first === undefined || suspended.length > 1) {
-    throw new Error(
-      `workflow "${workflowId}": the snapshot of run "${snapshot.runId}" is not suspended at exactly one step — it cannot be resumed`,
-    );
-  }
-  return first[0];
 }
 
 /** Drains a walk to its outcome: one pump owns the generator (`start` and `resume` share it). */
@@ -287,7 +280,7 @@ function createRunOutput<TOutput>(
   workflow: WorkflowDefinition,
   runId: string,
   options: WorkflowStartOptions<unknown>,
-  storage: WorkflowSnapshotStore,
+  persistence: SnapshotPersistence,
 ): WorkflowRunOutput<TOutput> {
   let started = false;
   let resultPromise: Promise<WorkflowRunOutcome<TOutput>> | undefined;
@@ -316,8 +309,8 @@ function createRunOutput<TOutput>(
         inputData: options.inputData,
         requestContext,
         signal: requestContext.signal,
-        storage,
-        persistStepBoundaries: workflow.storage !== undefined,
+        storage: persistence.store,
+        persistStepBoundaries: persistence.persistStepBoundaries,
       });
       outcome = (await drain(walker)) as WorkflowRunOutcome<TOutput>;
       settle?.(outcome);
