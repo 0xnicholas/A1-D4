@@ -10,7 +10,7 @@ import type { Step } from './step.js';
  * The workflow definition surface (`docs/architecture/workflows.md`「Workflow 与 builder」):
  * a mutable chainable builder whose seven operators each push one flat `{ type, … }` entry, and
  * `.commit()` freezing the definition. There is no DAG — execution is a `for` loop over the entry
- * list (the walker lands in #48).
+ * list (`walker.ts`).
  *
  * Type safety rides a type-state: `TPrevSchema` is replaced along the chain, strictly on the
  * `then` main axis (the step's input schema must accept the previous output), while `parallel` /

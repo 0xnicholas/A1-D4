@@ -5,7 +5,7 @@ import type { Step, StepContext } from './step.js';
  * The flat entry list (`docs/architecture/workflows.md`「Workflow 与 builder」): every builder
  * operator pushes one `{ type, … }` entry, and the walker is a `for` loop over this array — there
  * is no DAG. The entries carry the definition's child steps; execution semantics live in the
- * walker (#48+), not here.
+ * walker (`walker.ts`), not here.
  *
  * Conditions and dynamic durations are authored against the current chain tip (typed at the
  * builder seam) and erased into these runtime entries; the walker calls them with the live

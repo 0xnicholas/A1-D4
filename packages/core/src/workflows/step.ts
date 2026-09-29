@@ -29,7 +29,10 @@ export interface StepContext<TInputData = unknown, TResumeData = undefined, TSus
   getStepResult(stepId: string): unknown;
   /** `resumeSchema`-validated resume data; `undefined` on a first pass. */
   readonly resumeData: TResumeData | undefined;
-  /** Marks the step suspended with this payload, then unwinds the run — never returns. */
+  /**
+   * Marks the step suspended with this payload, then unwinds the run — never returns (the
+   * snapshot machine it needs lands with #51; calling it before then throws an explicit error).
+   */
   suspend(payload: TSuspendPayload): never;
 }
 
