@@ -8,7 +8,8 @@ import { expectAssignable } from './helpers/assertions.js';
 
 /**
  * Workflow 定义表面(M3 #47,`docs/architecture/workflows.md`「定义表面」):`createStep` 配置
- * 对象与 StepContext 参数包——本票只落定义表面与条目列表形状,无执行语义(walker 归 #48)。
+ * 对象与 StepContext 参数包——本票只落定义表面与条目列表形状,执行语义归 walker 测试套件
+ * (workflows-run / workflows-control-flow)。
  */
 describe('createStep:冻结普通对象', () => {
   it('返回冻结的普通对象,配置字段原样(引用不复制)', () => {
@@ -119,8 +120,8 @@ describe('createStep:类型从 schema 推出(断言在编译期,tsc 阶段生效
 });
 
 /**
- * builder 七算子各 push 一条 `{type, ...}` 条目;`.commit()` 冻结定义(walker 归 #48,本票只验
- * 定义形状)。步骤链用同一 IO 主轴,便于条目形状断言。
+ * builder 七算子各 push 一条 `{type, ...}` 条目;`.commit()` 冻结定义(本票只验定义形状,执行
+ * 语义归 walker 测试套件)。步骤链用同一 IO 主轴,便于条目形状断言。
  */
 describe('createWorkflow:builder 七算子条目化 + commit 冻结', () => {
   const inputSchema = z.object({ topic: z.string() });
