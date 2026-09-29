@@ -2,6 +2,8 @@ import type { Model, ModelCallOptions, ModelMessage, ModelPrompt } from '../mode
 import { assertModelChain } from '../model/fallback.js';
 import { assertModel } from '../model/resolve.js';
 import type { Memory, MemoryThreadRef } from '../memory/index.js';
+import { loadRunWorkingMemory } from '../memory/working-memory.js';
+import type { RunWorkingMemory } from '../memory/working-memory.js';
 import type { Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
@@ -122,19 +124,29 @@ export class Agent {
       const runMemory = toRunMemory(resolvedMemory, options.memory, inputMessages);
       // Message history is recalled once per run, before the input processors run (`memory.md`
       // 「消息历史」时机): the history is part of the prompt the model sees, and of what
-      // `processInput` observes. A run with no memory identity recalls nothing.
-      const history =
+      // `processInput` observes. A run with no memory identity recalls nothing. Working memory is
+      // loaded at the same boundary — it is the other half of what a memory-enabled run injects.
+      const [history, workingMemory] = await Promise.all([
         runMemory === undefined
           ? []
-          : await runMemory.memory.recall({ threadId: runMemory.threadId });
+          : runMemory.memory.recall({ threadId: runMemory.threadId }),
+        runMemory === undefined
+          ? undefined
+          : loadRunWorkingMemory(runMemory.memory, runMemory.resource),
+      ]);
       // Call options are built per run — they are part of the run, not of creating the object.
-      const { prompt, callOptions } = toCallOptions(
+      // The run's tool container carries what the subsystems attach to it (working memory), and it
+      // is the very same container the loop executes against — the model is never offered a tool
+      // the loop does not hold. The prompt is built here too: instructions, working memory, recalled
+      // history, then the run's own input.
+      const runTools = withRunTools(resolvedTools, workingMemory);
+      const prompt = toPrompt(
         resolvedInstructions,
+        workingMemory?.message,
         history,
         inputMessages,
-        resolvedTools,
-        options,
       );
+      const callOptions = toCallOptions(runTools, options);
       // The processors' input hook runs once per run, before the first model call: the prompt it
       // returns is what the model sees (and the run's span records as input).
       return yield* runAgentLoop({
@@ -142,7 +154,7 @@ export class Agent {
         agentName: name,
         prompt: await runProcessInput(processors, prompt, requestContext),
         callOptions,
-        tools: resolvedTools ?? {},
+        tools: runTools ?? {},
         maxSteps: toMaxSteps(options.maxSteps),
         processors,
         requestContext,
@@ -210,19 +222,15 @@ async function resolveModels(model: ModelInput, ctx: RequestContext): Promise<re
 }
 
 /**
- * Builds the model call inputs: the agent's instructions plus the input become the initial prompt,
- * the tool container becomes the provider tool list, and the per-call passthroughs ride along.
- * Framework-owned fields (`prompt` / `abortSignal` / `providerOptions` / `tools`) are written after
- * the `modelSettings` spread, so settings cannot hijack them. An agent without tools sends no
- * `tools` field at all; the loop writes `prompt` for every step.
+ * The run's model call options: the tool container becomes the provider tool list, and the per-call
+ * passthroughs ride along. Framework-owned fields (`abortSignal` / `providerOptions` / `tools`) are
+ * written after the `modelSettings` spread, so settings cannot hijack them. An agent without tools
+ * sends no `tools` field at all; the loop writes `prompt` for every step.
  */
 function toCallOptions(
-  instructions: string,
-  history: readonly ModelMessage[],
-  inputMessages: readonly ModelMessage[],
   tools: Record<string, Tool> | undefined,
   options: AgentRunOptions,
-): { prompt: ModelPrompt; callOptions: Omit<ModelCallOptions, 'prompt'> } {
+): Omit<ModelCallOptions, 'prompt'> {
   const callOptions: Omit<ModelCallOptions, 'prompt'> = { ...options.modelSettings };
   if (tools !== undefined && Object.keys(tools).length > 0) {
     callOptions.tools = toModelTools(tools);
@@ -235,7 +243,7 @@ function toCallOptions(
   }
   if (options.signal !== undefined) callOptions.abortSignal = options.signal;
   if (options.providerOptions !== undefined) callOptions.providerOptions = options.providerOptions;
-  return { prompt: toPrompt(instructions, history, inputMessages), callOptions };
+  return callOptions;
 }
 
 /**
@@ -309,16 +317,45 @@ function toTracing(tracer: Tracer | undefined, options: AgentRunOptions): AgentT
 const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
+ * The run's tool container, with what the memory subsystem attaches to it: when the run has a
+ * memory identity and the instance enables working memory, the container gains the
+ * `updateWorkingMemory` tool (`memory/working-memory.ts`). A name collision is an explicit run-time
+ * error rather than a silent override — either winner would quietly change what the other tool was
+ * for, and the user's container is the only side that can move.
+ */
+function withRunTools(
+  tools: Record<string, Tool> | undefined,
+  workingMemory: RunWorkingMemory | undefined,
+): Record<string, Tool> | undefined {
+  if (workingMemory === undefined) return tools;
+  for (const name of Object.keys(workingMemory.tools)) {
+    if (tools !== undefined && name in tools) {
+      throw new Error(
+        `The agent's tool container already has a tool named '${name}' — working memory attaches its own update tool (AgentConfig.memory with working memory enabled); rename or drop the other one.`,
+      );
+    }
+  }
+  return { ...tools, ...workingMemory.tools };
+}
+
+/**
  * Builds the run's prompt (`docs/architecture/agent.md`「执行语义」): the resolved instructions as
- * the system message, the recalled message history (empty without memory), then the run's own
- * input — the order the model sees and the input processors may rewrite.
+ * the system message, then working memory and the recalled message history — themselves system and
+ * prompt messages — then the run's own input: the order the model sees and the input processors may
+ * rewrite. The instructions are a message of their own and are never folded into another one.
  */
 function toPrompt(
   instructions: string,
+  workingMemory: ModelMessage | undefined,
   history: readonly ModelMessage[],
   inputMessages: readonly ModelMessage[],
 ): ModelPrompt {
-  return [{ role: 'system', content: instructions }, ...history, ...inputMessages];
+  return [
+    { role: 'system', content: instructions },
+    ...(workingMemory === undefined ? [] : [workingMemory]),
+    ...history,
+    ...inputMessages,
+  ];
 }
 
 /**

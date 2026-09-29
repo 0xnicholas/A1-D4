@@ -8,7 +8,7 @@
  *
  * This entry exports the storage port (`MemoryStore`, 6 required + 2 conditional resource
  * methods), the stored-record types, the capability-flag detection convention, the in-memory
- * default store, and the `Memory` class (message history: recall/save).
+ * default store, and the `Memory` class (message history: recall/save; working memory: get/update).
  */
 export { createInMemoryStore } from './in-memory-store.js';
 export { Memory } from './memory.js';

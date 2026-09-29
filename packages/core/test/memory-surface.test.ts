@@ -143,9 +143,10 @@ describe('MemoryStore port 类型表面', () => {
   });
 });
 /**
- * `Memory` 类的公开面(#39):配置表面(docs/architecture/memory.md 配置表面节)与两个实例方法
- * recall / save 的签名逐字钉死;saved messages 与 recall 返回值同形(StoredMessage),可直接喂模型;
- * workingMemory 是留位参数(语义归后续 ticket),接受但惰性。
+ * `Memory` 类的公开面(#39/#41):配置表面(docs/architecture/memory.md 配置表面节)与实例方法
+ * recall / save / getWorkingMemory / updateWorkingMemory 的签名逐字钉死;saved messages 与 recall
+ * 返回值同形(StoredMessage),可直接喂模型;workingMemory 是可选配置(启用语义见
+ * working-memory.test.ts),不改变消息历史行为。
  */
 describe('Memory 类类型表面', () => {
   it('配置表面:storage / lastMessages / workingMemory 全可缺席', () => {
@@ -162,7 +163,7 @@ describe('Memory 类类型表面', () => {
     expect(memory.workingMemory).toBeUndefined();
   });
 
-  it('workingMemory 是留位参数:接受、保留在实例上,不改变消息历史行为', async () => {
+  it('workingMemory 配置:接受、保留在实例上,不改变消息历史行为(两种机制各自独立)', async () => {
     const schema = z.object({ tone: z.string() });
     const memory = new Memory({ workingMemory: { schema } });
 
@@ -174,6 +175,21 @@ describe('Memory 类类型表面', () => {
       messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
     });
     await expect(memory.recall({ threadId: 'thread-1' })).resolves.toEqual(saved);
+  });
+
+  it('工作记忆方法面:getWorkingMemory(resource) 读,updateWorkingMemory({ resource, patch }) 写', async () => {
+    const memory = new Memory({ workingMemory: { schema: z.object({ tone: z.string().optional() }) } });
+
+    const before: unknown = await memory.getWorkingMemory('user-1');
+    expectAssignable<unknown>(before);
+    expect(before).toBeUndefined();
+
+    const merged: unknown = await memory.updateWorkingMemory({
+      resource: 'user-1',
+      patch: { tone: 'terse' },
+    });
+    expectAssignable<unknown>(merged);
+    expect(merged).toEqual({ tone: 'terse' });
   });
 
   it('recall 查询形状与返回值:limit / before / order 可缺席,返回 StoredMessage 数组', async () => {

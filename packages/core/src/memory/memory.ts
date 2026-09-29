@@ -1,17 +1,25 @@
 import type { ModelMessage } from '../model/contract.js';
 import type { StandardSchema } from '../standard-schema.js';
+import { formatIssues, validateSchema } from '../standard-schema-runtime.js';
 import { createInMemoryStore } from './in-memory-store.js';
-import type { MemoryStore } from './store.js';
+import { supportsWorkingMemory } from './store.js';
+import type { MemoryStore, WorkingMemoryStore } from './store.js';
 import type { StoredMessage } from './types.js';
+import { mergeWorkingMemory } from './working-memory.js';
 
 /**
  * The `Memory` class — the memory subsystem's public object on top of the `MemoryStore` port
- * (spec: `docs/architecture/memory.md` 消息历史节 + 配置表面节).
+ * (spec: `docs/architecture/memory.md` 消息历史节 + 工作记忆节 + 配置表面节).
  *
  * Message history is the one mechanism on by default: `save` persists messages for a
  * thread/resource pair and `recall` is the single query entry point, returning messages in the
  * shape the model contract consumes. Threads are created on the write path — a `save` naming an
  * unknown thread creates it, a `recall` for an unknown thread is an empty history, never a write.
+ *
+ * Working memory is the optional second mechanism: resource-scoped, schema-validated structured
+ * data, read through `getWorkingMemory` and merged/persisted through `updateWorkingMemory`. Both
+ * live on the same instance and the same store; enabling working memory requires the store's
+ * conditional resource pair (`docs/architecture/storage.md` 扩展面).
  */
 
 /** `lastMessages` default — the recent-window size of message history (spec 消息历史节). */
@@ -34,10 +42,12 @@ export type MemoryThreadRef =
 export type SaveMessage = ModelMessage & { id?: string; createdAt?: Date };
 
 /**
- * Working-memory configuration — accepted and held here, inert in this ticket: its semantics
- * (schema merge, injection, the `updateWorkingMemory` tool) land with the working-memory ticket.
+ * Working-memory configuration (spec「配置表面」): enabled by its presence, shaped by the schema.
+ * The schema is the contract of the memory's value — a Standard Schema dual interface (ADR-0003),
+ * so the core neither reads nor rewrites it beyond validation and the JSON Schema it emits.
  */
 export interface WorkingMemoryConfig {
+  /** The shape the working memory must have; also what the model sees as the update tool's schema. */
   schema: StandardSchema;
 }
 
@@ -47,7 +57,12 @@ export interface MemoryConfig {
   readonly storage?: MemoryStore | undefined;
   /** The default `recall` window size; absent = 10. */
   readonly lastMessages?: number | undefined;
-  /** Reserved for working memory; inert until its ticket lands. */
+  /**
+   * Enables working memory for this instance (spec「工作记忆」): the schema-only, resource-scoped
+   * block agents maintain through the `updateWorkingMemory` tool. Requires a store that declares
+   * the conditional resource pair (`getResource` / `saveResource`) — enabling it without that
+   * capability throws here, before any run.
+   */
   readonly workingMemory?: WorkingMemoryConfig | undefined;
 }
 
@@ -78,10 +93,13 @@ export class Memory {
   /** The default `recall` window size (spec: message history is truncated by count only). */
   readonly lastMessages: number;
 
-  /** Held for the working-memory ticket; reading it here has no effect in this ticket. */
+  /** The working-memory config; `undefined` = this instance carries message history alone. */
   readonly workingMemory: WorkingMemoryConfig | undefined;
 
   private readonly storage: MemoryStore;
+
+  /** The store when working memory is enabled; the constructor proved its conditional pair. */
+  private readonly workingMemoryStore: WorkingMemoryStore | undefined;
 
   /** The last timestamp this instance issued — the monotonic clock of `nextTimestamp`. */
   private lastStamp = 0;
@@ -93,6 +111,11 @@ export class Memory {
       'Memory: lastMessages',
     );
     this.workingMemory = config.workingMemory;
+    // Capability flag (`docs/architecture/storage.md` 扩展面): the conditional resource pair is the
+    // port's working-memory declaration; a store without it cannot carry the feature, and finding
+    // that out per run (or silently storing nothing) is worse than failing here.
+    this.workingMemoryStore =
+      this.workingMemory === undefined ? undefined : assertWorkingMemoryCapability(this.storage);
   }
 
   /**
@@ -177,6 +200,74 @@ export class Memory {
   }
 
   /**
+   * The working memory currently stored for a resource (spec「工作记忆」) — schema-validated at
+   * write time, so it is returned as stored; `undefined` when the resource has none yet. Working
+   * memory is resource-scoped: unrelated to threads and untouched by `deleteThread`. Reading does
+   * not re-validate: a record written under another schema (or by another writer) is injected as
+   * it was stored — conformity is the write path's promise.
+   */
+  async getWorkingMemory(resource: string): Promise<unknown> {
+    const { storage } = this.requireWorkingMemory();
+    const record = await storage.getResource(resource);
+    return record?.workingMemory;
+  }
+
+  /**
+   * Merges a patch into a resource's working memory, validates the result against the configured
+   * schema and persists it (spec「工作记忆」: objects merge deeply, `null` deletes a field, arrays
+   * are replaced whole). Returns the validated value — what was stored, exactly.
+   *
+   * This is the semantic path behind the `updateWorkingMemory` tool and the programmatic write
+   * entry: a patch that does not make the merged value conform throws (issues included) and writes
+   * nothing — through the tool, that error is the error tool result the model recovers from. The
+   * resource record is an upsert: `metadata` and `createdAt` of an existing record are preserved.
+   *
+   * Read-modify-write is not atomic: concurrent updates of one resource are last-write-wins (the
+   * port's conditional pair has no compare-and-swap; additive-only evolution keeps that seam open).
+   */
+  async updateWorkingMemory(input: {
+    readonly resource: string;
+    readonly patch: unknown;
+  }): Promise<unknown> {
+    const { schema, storage } = this.requireWorkingMemory();
+    const existing = await storage.getResource(input.resource);
+    const validation = await validateSchema(
+      schema,
+      mergeWorkingMemory(existing?.workingMemory, input.patch),
+    );
+    if ('issues' in validation) {
+      throw new Error(
+        `Memory.updateWorkingMemory: the merged working memory for resource '${input.resource}' does not match the schema — ${formatIssues(validation.issues)}`,
+      );
+    }
+    const now = new Date();
+    await storage.saveResource({
+      id: input.resource,
+      ...(existing?.metadata === undefined ? {} : { metadata: existing.metadata }),
+      workingMemory: validation.value,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+    return validation.value;
+  }
+
+  /**
+   * Working memory's capability of this instance, with the explicit error of asking for it when the
+   * feature is off. The store half was settled by the capability check at construction; this reads
+   * both under their narrowed types.
+   */
+  private requireWorkingMemory(): { schema: StandardSchema; storage: WorkingMemoryStore } {
+    const config = this.workingMemory;
+    const storage = this.workingMemoryStore;
+    if (config === undefined || storage === undefined) {
+      throw new Error(
+        'Memory: workingMemory is not configured — pass workingMemory: { schema } to new Memory(...) to use it.',
+      );
+    }
+    return { schema: config.schema, storage };
+  }
+
+  /**
    * Issues the `createdAt` of a message that arrived without one: strictly increasing in save
    * order (never more than a millisecond past the clock), so recall reads back the order the
    * caller saved in — two messages of the same millisecond would otherwise be ordered by id.
@@ -205,4 +296,19 @@ function assertPositiveInteger(value: number, label: string): number {
     throw new Error(`${label} must be a positive integer, got ${value}`);
   }
   return value;
+}
+
+/**
+ * The working-memory capability check (ADR-0010's capability flag): enabling working memory needs a
+ * store that declares the conditional resource pair — a half implementation counts as absent
+ * (`supportsWorkingMemory`). Resolved once, at construction: a store that cannot carry the feature
+ * is a configuration error, not a per-run surprise.
+ */
+function assertWorkingMemoryCapability(store: MemoryStore): WorkingMemoryStore {
+  if (!supportsWorkingMemory(store)) {
+    throw new Error(
+      'Memory: workingMemory is enabled, but the store is missing getResource/saveResource — the MemoryStore conditional pair is the working-memory capability.',
+    );
+  }
+  return store;
 }
