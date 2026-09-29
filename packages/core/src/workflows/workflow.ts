@@ -234,7 +234,7 @@ export function createWorkflow<
       return builder;
     },
     foreach(step, options) {
-      push({ type: 'foreach', step, concurrency: options?.concurrency ?? 1 });
+      push({ type: 'foreach', step, concurrency: normalizeConcurrency(options?.concurrency) });
       return builder;
     },
     dowhile(step, cond) {
@@ -255,6 +255,16 @@ export function createWorkflow<
   // The runtime view is deliberately erased: the fluent type-state is a call-site view over this
   // one mutable object, and no single parameterization expresses every chain position.
   return builder as unknown as WorkflowBuilder<TInputSchema, TOutputSchema, TInputSchema>;
+}
+
+/**
+ * Normalizes a `.foreach` concurrency cap at definition time (the entry carries the number): an
+ * omitted or non-finite cap below `1` becomes `1` (sequential), anything else is floored to an
+ * integer — `0`, negative and `NaN` can never produce a gate that starts no iteration at all.
+ */
+function normalizeConcurrency(concurrency: number | undefined): number {
+  if (concurrency === undefined || !Number.isFinite(concurrency) || concurrency < 1) return 1;
+  return Math.floor(concurrency);
 }
 
 /** Freezes one entry and the arrays it owns, so a committed definition cannot be mutated. */

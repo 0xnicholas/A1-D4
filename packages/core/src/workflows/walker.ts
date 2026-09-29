@@ -1,16 +1,20 @@
 import type { RequestContext } from '../agent/types.js';
 import type { StandardSchema } from '../standard-schema.js';
+import type { BranchEntry, ForeachEntry, ParallelEntry } from './entry.js';
 import type { WorkflowStepResultSnapshot } from './snapshot.js';
-import type { Step } from './step.js';
+import type { Step, StepContext } from './step.js';
 import { validateRunInput, validateStepInput } from './validate.js';
 import type { Workflow } from './workflow.js';
 import type { WorkflowRunOutcome } from './run.js';
 
 /**
- * The semantic kernel (`docs/architecture/workflows.md`「Workflow 与 builder」「Run」): a `for` loop
- * over the workflow's flat entry list, interpreting entry by entry — there is no DAG. Each `then`
- * step receives the previous value (the run's input for the first entry) as `inputData`, and its
- * output becomes the next entry's value.
+ * The semantic kernel (`docs/architecture/workflows.md`「Workflow 与 builder」「Run」「控制流算子」):
+ * a `for` loop over the workflow's flat entry list, interpreting entry by entry — there is no DAG.
+ * Each entry receives the previous entry's output (the run's input for the first one) and its
+ * output becomes the next entry's value: `then` pipes a step's output through, `parallel` runs
+ * every step concurrently and keys the outputs by step id, `branch` runs the first step whose
+ * condition is truthy and keys the output the same way, `foreach` maps an array through one step
+ * and collects an array. The loop entries (dowhile / dountil) and sleep land with #50.
  *
  * The walker is an async generator: it currently completes with the run's outcome and yields
  * nothing — the lifecycle events (run-start / step-start / step-end / run-end) are delivered
@@ -61,12 +65,24 @@ export async function* walk(
 
   for (const entry of workflow.entries) {
     throwIfAborted(options.signal);
-    if (entry.type !== 'then') {
-      throw new Error(
-        `workflow "${workflow.id}": the "${entry.type}" entry has no execution semantics yet`,
-      );
+    switch (entry.type) {
+      case 'then':
+        value = await runStep(state, entry.step, value);
+        break;
+      case 'parallel':
+        value = await runParallel(state, entry, value);
+        break;
+      case 'branch':
+        value = await runBranch(state, entry, value);
+        break;
+      case 'foreach':
+        value = await runForeach(state, entry, value);
+        break;
+      default:
+        throw new Error(
+          `workflow "${workflow.id}": the "${entry.type}" entry has no execution semantics yet`,
+        );
     }
-    value = await runStep(state, entry.step, value);
     // A step that ignored the abort at least cannot let the run succeed: the boundary after it
     // re-checks, so cancellation always lands the run in `failed` (AbortError).
     throwIfAborted(options.signal);
@@ -93,29 +109,125 @@ function getStepResult(state: WalkState, stepId: string): unknown {
   return state.stepResults[stepId]?.output;
 }
 
-/** Runs one step: the input value it is handed, its record's timestamps and the framework context. */
+/** Runs one step and records it: status, output and boundary timestamps, keyed by step id. */
 async function runStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
   const startedAt = Date.now();
   let output: unknown;
   try {
-    // The step boundary: the upstream output is validated by this step's input schema, and the
-    // validated value is what `execute` receives. A rejection fails this step, and the run.
-    const validated = await validateStepInput(state.workflow.id, step, inputData);
-    output = await step.execute({
-      inputData: validated,
-      runId: state.runId,
-      signal: state.signal,
-      requestContext: state.requestContext,
-      getStepResult: (stepId) => getStepResult(state, stepId),
-      resumeData: undefined,
-      suspend: suspendNotImplemented,
-    });
+    output = await executeStep(state, step, inputData);
   } catch (error) {
     state.stepResults[step.id] = { status: 'failed', startedAt, endedAt: Date.now() };
     throw error;
   }
   state.stepResults[step.id] = { status: 'success', output, startedAt, endedAt: Date.now() };
   return output;
+}
+
+/**
+ * Executes one step without recording it: the step boundary validation happens here (the upstream
+ * value through this step's input schema), and the validated value is what `execute` receives.
+ * `foreach` calls this per iteration, so N runs of one step id become one aggregate record instead
+ * of N overwrites.
+ */
+async function executeStep(state: WalkState, step: Step, inputData: unknown): Promise<unknown> {
+  const validated = await validateStepInput(state.workflow.id, step, inputData);
+  return step.execute(stepContext(state, validated));
+}
+
+/** The context bag every step `execute` — and every branch condition — receives. */
+function stepContext(state: WalkState, inputData: unknown): StepContext {
+  return {
+    inputData,
+    runId: state.runId,
+    signal: state.signal,
+    requestContext: state.requestContext,
+    getStepResult: (stepId) => getStepResult(state, stepId),
+    resumeData: undefined,
+    suspend: suspendNotImplemented,
+  };
+}
+
+/**
+ * `.parallel([a, b])` (`docs/architecture/workflows.md`「控制流算子」): every step receives the same
+ * value (the previous entry's output) and runs concurrently — `Promise.all`, no concurrency cap.
+ * The block is a synchronization point: it completes only once every step has; the first rejection
+ * fails the whole block (steps already in flight keep running, as with `Promise.all`). Output =
+ * `{ [step.id]: output }`, keyed in definition order.
+ *
+ * Each step records its own result under its id, so `getStepResult` finds them downstream; the
+ * keyed object itself only flows on as the next entry's value (entries have no id of their own).
+ */
+async function runParallel(
+  state: WalkState,
+  entry: ParallelEntry,
+  inputData: unknown,
+): Promise<Record<string, unknown>> {
+  const outputs = await Promise.all(entry.steps.map((step) => runStep(state, step, inputData)));
+  return Object.fromEntries(entry.steps.map((step, index) => [step.id, outputs[index]] as const));
+}
+
+/**
+ * `.branch([[cond, step], …])`: conditions are evaluated in definition order with the same context
+ * bag a step receives (`inputData` = the previous entry's output), and the first truthy one runs
+ * its step — later conditions are not evaluated at all. Output = a keyed object whose only key is
+ * the executed step's id; when no condition is truthy the output is `{}` (the tip value is
+ * consumed by the block, never passed through). Branch arms are expected to share their IO
+ * schemas; each arm still validates the tip value at its own step boundary.
+ */
+async function runBranch(
+  state: WalkState,
+  entry: BranchEntry,
+  inputData: unknown,
+): Promise<Record<string, unknown>> {
+  for (const [condition, step] of entry.branches) {
+    if (await condition(stepContext(state, inputData))) {
+      return { [step.id]: await runStep(state, step, inputData) };
+    }
+  }
+  return {};
+}
+
+/**
+ * `.foreach(step, { concurrency })`: the previous entry's output must be an array; every element is
+ * one iteration of the same step (validated at the step boundary like any other input) and the
+ * outputs are collected in index order. `concurrency` (normalized at definition time) is the gate
+ * width: `1` runs the iterations one after another, `>1` keeps exactly that many in flight and
+ * starts the next element as soon as a slot frees — a self-written streaming gate, never a batch
+ * of `Promise.all`s. The block is a synchronization point; the first failing iteration fails it
+ * and no further iteration starts (in-flight ones finish), as with `Promise.all`.
+ *
+ * The step's record is the collected array, written when the block completes (iterations do not
+ * record per run): `getStepResult(step.id)` returns the block's output, and inside its own
+ * iterations the id stays unrecorded — like any step reading itself.
+ */
+async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unknown): Promise<unknown[]> {
+  if (!Array.isArray(inputData)) {
+    throw new Error(
+      `workflow "${state.workflow.id}": the input of the foreach step "${entry.step.id}" must be an array (the previous entry's output), got ${inputData === null ? 'null' : typeof inputData}`,
+    );
+  }
+
+  const startedAt = Date.now();
+  const outputs = new Array<unknown>(inputData.length);
+  let failed = false;
+  let next = 0;
+  /** One gate slot: pulls the next unconsumed index whenever it frees up, until an iteration fails. */
+  const worker = async (): Promise<void> => {
+    while (!failed && next < inputData.length) {
+      const index = next++;
+      outputs[index] = await executeStep(state, entry.step, inputData[index]);
+    }
+  };
+
+  try {
+    await Promise.all(Array.from({ length: Math.min(entry.concurrency, inputData.length) }, worker));
+  } catch (error) {
+    failed = true;
+    state.stepResults[entry.step.id] = { status: 'failed', startedAt, endedAt: Date.now() };
+    throw error;
+  }
+  state.stepResults[entry.step.id] = { status: 'success', output: outputs, startedAt, endedAt: Date.now() };
+  return outputs;
 }
 
 /**

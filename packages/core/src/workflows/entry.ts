@@ -61,7 +61,10 @@ export interface BranchEntry {
 export interface ForeachEntry {
   readonly type: 'foreach';
   readonly step: Step;
-  /** Concurrency cap, normalized at definition time — `1` when the options were omitted. */
+  /**
+   * Concurrency cap (gate width), normalized at definition time — `1` when the options were
+   * omitted or the given cap was not a finite number ≥ 1, floored to an integer otherwise.
+   */
   readonly concurrency: number;
 }
 

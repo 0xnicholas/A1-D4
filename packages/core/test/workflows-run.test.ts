@@ -546,14 +546,15 @@ describe('createRun / start 约束', () => {
       outputSchema: topicInput,
     })
       .then(draft)
-      .parallel([draft])
+      // 循环与 sleep 条目归 #50;本票后仍未实现的算子用它钉住「报错不静默」语义
+      .sleep(0)
       .commit();
 
     const error = await captureRejection(async () =>
       workflow.createRun().start({ inputData: { topic: 'ts' } }).result.then(() => undefined),
     );
 
-    expect(error.message).toMatch(/parallel/);
+    expect(error.message).toMatch(/sleep/);
     expect(error.message).toMatch(/article/);
     // then 条目先执行(报错发生在执行到未实现条目的时刻)
     expect(draftExecute).toHaveBeenCalledTimes(1);
