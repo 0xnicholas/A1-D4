@@ -21,4 +21,6 @@
 - OTel bridge 与 metrics 均为后加位:bridge 待路线图阶段判断(雾区),metrics 真要做时 exporter 加回调是向后兼容。
 - **修订(M2-05 #42)**:自动埋点由五边界增为七边界——memory recall / save 各成一个普通 span(新常量 `memory-recall` / `memory-save`,additive,归 minor):recall 挂 `agent-run` 下(每 run 一次)、save 挂 `agent-step` 下(每 step 一次)。run span 相应先于 recall 创建,其 input(处理器处理后的 prompt)以一次 `span_updated` 落定。细节见 `docs/architecture/observability.md`。
 
+- **修订(M5 #73)**: OTLP 能力包设计冻结(`@balsa/otlp`)——依赖路线 = 官方 exporter 双协议包(HTTP/protobuf + HTTP/JSON,精确钉)+ `sdk-trace` 的 `BatchSpanProcessor`,不自研序列化 / 传输 / 批处理;桥法 = 只取 `span_ended` 重建结构满足 `ReadableSpan` 的普通对象(`span_started` / `span_updated` 不进 OTLP),`isEvent` → 零时长 span;七类 span 的 semconv 映射表、`balsa.*` 键表、值域兜底与不截断口径见 `docs/architecture/observability.md`「OTLP 能力包(M5 设计冻结)」。`gen_ai.*` 键名字符串直写、不 import `semantic-conventions`(传递树里存在非本包引入);安装树 12 包 / ≈18.42 MiB 是 opt-in 能力包的已知代价(不装不付)。
+
 (来源:wayfinder ticket #14)
