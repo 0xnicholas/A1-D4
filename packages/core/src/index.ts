@@ -6,4 +6,4 @@
  * Specs: `docs/architecture/`.
  */
 export { createApp } from './app.js';
-export type { App, AppConfig } from './app.js';
+export type { App, AppConfig, AppStorageConfig } from './app.js';
