@@ -141,5 +141,5 @@ thread 导向的交互原语:向活跃 run 注入、唤醒空闲 thread 开新 r
 _Avoid_: 跨实例 PubSub/租约(归能力包)、notification inbox(已裁出)
 
 **调度 (Schedule)**:
-未来触发 agent 的记录 + `tick` 原语(给定时刻返回到期项并触发);触发执行交给平台 cron 或可选进程内 ticker,核心不做轮询调度器。
+未来触发 agent 的记录 + `tick` 原语(给定时刻返回到期项并触发);记录是到期缓存,不含 cron 表达式——表达式由宿主侧调度定义持有、构建 `next` 注入(`next` 函数不序列化);触发执行交给平台 cron 或可选进程内 ticker,核心不做轮询调度器。
 _Avoid_: 内建调度轮询循环、存储 CAS 认领(多实例安全归平台/部署方)

@@ -65,7 +65,7 @@ schedules.startTicker({ intervalMs })               // 可选进程内便利件,
 
 - **target 两形态**:threadless = `agent.generate(input)`;threaded = `sendSignal` 注入(复用基础 signals,要求 thread + resource)。
 - **平台 cron 一等形态**:Cloudflare Cron Triggers / Vercel Cron 打暴露 `tick` 的 HTTP endpoint;mastra 式轮询调度器 + 存储 CAS 认领**不做**(多实例安全交平台 cron 的恰好一次语义或部署方)。
-- cron 字符串解析不进核心(零依赖红线);能力包封装 croner 提供 `next` helper。
+- cron 字符串解析不进核心(零依赖红线);能力包封装 croner 提供 `next` helper(包面/错误面/预算见本节「croner 封装能力包」)。
 - **裁单**:触发记录(trigger history / runId 关联)——observability 的 span 已覆盖追责。
 
 ### ScheduleStore
@@ -81,6 +81,26 @@ interface ScheduleStore {
 ```
 
 内存默认实现进核心;统一 adapter 家族,additive-only 演化纪律同其余 port。
+
+### croner 封装能力包(`@balsa/croner`)
+
+核心零依赖、cron 解析不进核心(上节),`next` 由宿主构建注入;本能力包把 croner 封装为 save 输入片段——单工厂,无 facade 包装,不 re-export croner。
+
+```ts
+import { cron } from '@balsa/croner'
+
+schedules.save({
+  id: 'daily-report',
+  ...cron('0 9 * * *', { timezone: 'Asia/Shanghai' }),
+  target: { agent: 'reporter', input: 'write the daily report' },
+})
+```
+
+- **包面**:`cron(expression, options?) → { next: (from: Date) => Date | null; timezone?: string }`——结构上即 `ScheduleSaveInput` 的 `next` + `timezone` 子集(展开或解构皆可;`timezone` 缺席时返回对象不含该键)。`options` 仅 `{ timezone?: string }`,子集封闭:croner 其余构造选项(startAt / stopAt / utcOffset / mode / domAndDow 等)不透出——钳制类需求可解构 `next` 自行包层,解析类需求按重开条件再议。表达式语法即 croner 全量(5/6/7 段、6 段秒在前、`@daily` 类昵称)。
+- **校验与错误面**:构建即全部校验——表达式结构/数值错误由 croner 构造期同步抛出(`TypeError`/`RangeError`),非法 IANA 时区由构建期探针(构造后以当前时刻调用一次 `nextRun`)一并提前到调用点;错误一律原样透出、不包装。`next(from)` 此后为纯计算。
+- **表达式落点**:表达式不落记录——`ScheduleRecord` 只带 `timezone?`,无表达式字段(SQLite 参考 adapter 表结构同,零改动);真相源在宿主侧调度定义(配置/代码),持久记录是到期缓存、与 `next` 按 id 进程内配对。重启重锚 = 宿主按定义逐个 `save()`(`save` 以 now 重锚 `nextFireAt`,定义即权威);不设 `metadata` 约定、无 rehydrate helper。
+- **DST 语义**:原样透传,本包不补偿。实测(v10.0.1,`Europe/Stockholm` 2026-03-29 缺口日):`30 2 * * *` 返回本地 **03:30 CEST**,与 `30 3 * * *` 撞同一时刻——是偏移映射,与 croner README「gaps are skipped」措辞矛盾,以上游行为为准并如实入文(重叠日与 README 一致:只跑第一次出现)。
+- **依赖预算**:croner 精确钉 `10.0.1`(MIT、零运行时依赖、engines `>=18`;`deps-budget.json` 基线 = 1 包 / 154,686 B 解包——registry `unpackedSize`,dist 27,551 B / gzip 8,059 B 为记录面)。对 core 无 peer——片段类型自含、结构兼容;`@balsa/core` 仅 devDep,接线单测(save→tick 走 croner `next`)进 verify,core 契约漂移在该单测的类型检查暴露。清单与发布口径沿 ADR-0002 M5 修订(engines `>=22.13.0`、锁步 `0.5.0`)。
 
 ## Observability 锚点
 
