@@ -4,6 +4,7 @@ import * as agentEntry from '@balsa/core/agent';
 import * as memoryEntry from '@balsa/core/memory';
 import * as modelEntry from '@balsa/core/model';
 import * as observabilityEntry from '@balsa/core/observability';
+import * as signalsEntry from '@balsa/core/signals';
 import * as toolsEntry from '@balsa/core/tools';
 import * as workflowsEntry from '@balsa/core/workflows';
 
@@ -19,6 +20,7 @@ const ENTRIES = [
   ['@balsa/core/observability', observabilityEntry],
   ['@balsa/core/workflows', workflowsEntry],
   ['@balsa/core/memory', memoryEntry],
+  ['@balsa/core/signals', signalsEntry],
 ] as const;
 
 describe('子路径入口可加载', () => {

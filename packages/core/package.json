@@ -36,6 +36,10 @@
     "./memory": {
       "types": "./dist/memory/index.d.ts",
       "default": "./dist/memory/index.js"
+    },
+    "./signals": {
+      "types": "./dist/signals/index.d.ts",
+      "default": "./dist/signals/index.js"
     }
   },
   "files": [
