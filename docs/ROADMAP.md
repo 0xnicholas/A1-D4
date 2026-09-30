@@ -78,13 +78,47 @@
 
 ## 延后清单(post-v1,需求信号触发)
 
-以下能力经路线图裁决**延后**,不进 v1 任一里程碑;触发条件满足时再单独评估:
+以下能力经路线图裁决**延后或出域**,不进 v1 任一里程碑。**本清单是「重开条件」的单一真相源**(术语见 `CONTEXT.md`):重开条件必须外部可观察、可累计;满足即单独评估,**不自动进入路线图**。缺口与差异的完整对账见 `docs/research/mastra-gap-analysis.md`(对比视图,不复制条件)。M5 能力包(OTLP exporter / MCP server + client / SQLite adapter / AI SDK 互操作 / bunfold 桥)已在路线图内,不属本清单。
 
-- **Supervisor 能力包**(createSupervisor 类):as-tool 组合的语法糖;触发 = as-tool 模式的真实重复痛点(见 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsa-framework/issues/19) 演化门)
-- **RAG / Evals / 字符串路由(models.dev)能力包 / OTel bridge 能力包**:需求驱动
-- **Background tasks**:v1 以「工具 ack + sendSignal 唤醒」组合承载(harness.md 文档范式)
-- **Goals / State signals**:可被 working memory + Processor 组合覆盖
-- **跨实例 signals / durable 增强能力包**(共享 PubSub + 租约、resumable stream、外部 runner 适配):多实例需求出现时再判断
+> 修订(2026-09-30,对比 ticket [#63](https://github.com/0xnicholas/balsa-framework/issues/63)):清单升级为四列表,重开条件统一为可观察、可累计的判定信号。
+
+### 延后档(触发式)
+
+| 缺口 | 重开条件(可观察) | 承载缝 |
+| --- | --- | --- |
+| Supervisor 能力包(createSupervisor 类) | as-tool 组合的真实重复痛点 ≥3 次复述,或 ≥1 个真实项目因包装样板 / 传播遗漏 / 嵌套审批受阻 | 能力包优先;核心字段须重开 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsa-framework/issues/19) 的演化门 |
+| RAG / 语义召回 | ≥1 个真实用例要求跨会话语义检索(外部用户或自身产品场景) | memory 落库 hook + 能力包(复用模型契约的 embedding 模式) |
+| Evals / scorers | ≥1 个用例要求在 CI 或线上做断言式评估 | Processor,或独立包消费 run 结果 |
+| 字符串路由(models.dev 类) | ≥1 个真实用例要求按名切模型 / provider 目录(而非照搬 mastra 形态) | 能力包(不引入 core magic string) |
+| OTel bridge 能力包 | ≥1 个用户已有 OTel 采集管线、要求原生接入(与 M5 的 OTLP 导出分属两件事) | 能力包 |
+| Background tasks | 「工具 ack + sendSignal 唤醒」文档范式的失效报告 ≥1:`untilIdle` 式自动续跑 / 并发限额 / 结果自动回灌任一成为硬需求 | 文档范式先行,能力包其次 |
+| Goals / State signals | WM + Processor 组合被证明不够:≥1 个用例需要 judge 判定 + 预算语义 | 能力包;前置 = thread 状态域 |
+| 跨实例 signals | ≥1 个部署要求 >1 进程共享同一 thread | 能力包(共享 PubSub + 租约) |
+| resumable stream | ≥1 个断连重连 / 迟到订阅的真实诉求(用户报告,非推测) | 能力包(事件缓存) |
+| 外部 runner 适配 | ≥1 个用户在 Inngest / Temporal 类平台上要求跑 workflow | 能力包(引擎接缝已留) |
+| 每步检查点 + 崩溃重放 | ≥1 个用户明确接受重发 LLM 与幂等成本、并要求自动恢复 | 能力包 / 部署方(ADR-0011 已裁) |
+| time-travel / restart | ≥1 个调试或审计场景要求从任意步重跑 | load→重进原语上的薄变种,无 port 变更 |
+
+### 出域档(定位改变才重开)
+
+| 缺口 | 重开条件(可观察) | 承载缝 |
+| --- | --- | --- |
+| Studio / editor / stored agents | 定位裁决改变 = 做托管产品或协作面(ADR 级) | — |
+| channels / voice / workspaces & sandboxes | 同上,或社区出现可用实现 | 生态 |
+| 托管平台 | 商业决策(非技术触发) | — |
+| OM 类后台压缩 | ≥1 个用例要求跨会话长期记忆、且接受后台 LLM 成本 | bunfold 类外部记忆桥 |
+| notification inbox | ≥1 个用例要求持久化收件箱 / 优先级投递 | 应用层或能力包 |
+| signal providers(webhook / poll 入口) | ≥1 个用例要求 webhook 接入且示例模式不可复用 | 示例模式 |
+| AgentController / session | ≥1 个用例要做交互式编码 agent 产品 | 应用层自组装 |
+
+### 现实差距(非功能)
+
+| 差距 | 条件 / 状态 | 承载缝 |
+| --- | --- | --- |
+| 发布 0.1.0 | 已在 [#45](https://github.com/0xnicholas/balsa-framework/issues/45)(owner 手工),非技术触发 | — |
+| 公开上手面(文档站、对外 quick start) | 0.1.0 发布后 | README 已有 quick start |
+| 适配器生态 | ≥1 个真实第二后端诉求 | 社区 + 作者指南(`docs/architecture/storage.md`) |
+| 公开可检验性(轻量主张的外部证据) | 发布 0.1.0 时专项裁决:字节数字是否对外(ADR-0001 立场:不作对外定义) | 待裁决 |
 
 ## 本图不覆盖
 
