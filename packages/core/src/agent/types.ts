@@ -377,7 +377,8 @@ export interface AgentGenerateResult<TObject = unknown> {
   readonly toolResults: readonly ToolResultChunk[];
   /** Usage accumulated over the whole run. */
   readonly usage: Usage;
-  /** Why the model stopped: `'stop'` / `'length'` / `'tool-calls'` / `'error'`. */
+  /** Why the model stopped: `'stop'` / `'length'` / `'tool-calls'` / `'error'`; `'suspended'` only
+   *  when a `stepBoundary` gate suspended the run (the durable approval gate — bare runs never). */
   readonly finishReason: FinishReason;
   /** Per-step records: text, tool calls, tool results and usage of each model call. */
   readonly steps: readonly AgentStep[];
