@@ -44,6 +44,10 @@
     "./durable-agent": {
       "types": "./dist/durable-agent/index.d.ts",
       "default": "./dist/durable-agent/index.js"
+    },
+    "./schedules": {
+      "types": "./dist/schedules/index.d.ts",
+      "default": "./dist/schedules/index.js"
     }
   },
   "files": [

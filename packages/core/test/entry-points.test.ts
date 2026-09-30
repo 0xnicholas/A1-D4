@@ -5,6 +5,7 @@ import * as durableAgentEntry from '@balsa/core/durable-agent';
 import * as memoryEntry from '@balsa/core/memory';
 import * as modelEntry from '@balsa/core/model';
 import * as observabilityEntry from '@balsa/core/observability';
+import * as schedulesEntry from '@balsa/core/schedules';
 import * as signalsEntry from '@balsa/core/signals';
 import * as toolsEntry from '@balsa/core/tools';
 import * as workflowsEntry from '@balsa/core/workflows';
@@ -23,6 +24,7 @@ const ENTRIES = [
   ['@balsa/core/memory', memoryEntry],
   ['@balsa/core/signals', signalsEntry],
   ['@balsa/core/durable-agent', durableAgentEntry],
+  ['@balsa/core/schedules', schedulesEntry],
 ] as const;
 
 describe('子路径入口可加载', () => {
