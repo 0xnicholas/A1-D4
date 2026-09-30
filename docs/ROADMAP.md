@@ -61,7 +61,7 @@
 - **MCP server 包 / MCP client 包**:同一份 Tool 双向流通,桥接 schema 直通零适配(依赖 M1 工具)
 - **SQLite 参考 adapter**:实现全部四个存储 port;驱动选型留实现期,默认 `node:sqlite`(Node ≥22 基线,见 [决策:存储适配策略](https://github.com/0xnicholas/balsa-framework/issues/15))(依赖 M2–M4 的 ports)
 - **AI SDK 互操作包**:chunk 协议 ↔ AI SDK 流格式等外部格式转换(依赖 M1)
-- **bunfold 桥接包(按需可裁)**:外部记忆系统桥接参考实现,价值在验证 memory seam 设计(依赖 M2)
+- **bunfold 桥接包(按需可裁)**:外部记忆系统桥接参考实现,价值在验证 memory seam 设计(依赖 M2)——**M5 裁定:裁**(不产桥接包;重开条件见延后清单「外部记忆引擎桥接」)
 
 **验证**:OTLP → 本地 collector example;MCP server/client 对打 example;SQLite 跨进程挂起恢复 example。
 **依赖**:各包分别挂 M1–M4 对应接缝,包间可并行。
@@ -79,7 +79,7 @@
 
 ## 延后清单(post-v1,需求信号触发)
 
-以下能力经路线图裁决**延后或出域**,不进 v1 任一里程碑。**本清单是「重开条件」的单一真相源**(术语见 `CONTEXT.md`):重开条件必须外部可观察、可累计;满足即单独评估,**不自动进入路线图**。缺口与差异的完整对账见 `docs/research/mastra-gap-analysis.md`(对比视图,不复制条件)。M5 能力包(OTLP exporter / MCP server + client / SQLite adapter / AI SDK 互操作 / bunfold 桥)已在路线图内,不属本清单。
+以下能力经路线图裁决**延后或出域**,不进 v1 任一里程碑。**本清单是「重开条件」的单一真相源**(术语见 `CONTEXT.md`):重开条件必须外部可观察、可累计;满足即单独评估,**不自动进入路线图**。缺口与差异的完整对账见 `docs/research/mastra-gap-analysis.md`(对比视图,不复制条件)。M5 能力包(OTLP exporter / MCP server + client / SQLite adapter / AI SDK 互操作)已在路线图内,不属本清单。
 
 > 修订(2026-09-30,对比 ticket [#63](https://github.com/0xnicholas/balsa-framework/issues/63)):清单升级为四列表,重开条件统一为可观察、可累计的判定信号。
 
@@ -89,6 +89,7 @@
 | --- | --- | --- |
 | Supervisor 能力包(createSupervisor 类) | as-tool 组合的真实重复痛点 ≥3 次复述,或 ≥1 个真实项目因包装样板 / 传播遗漏 / 嵌套审批受阻 | 能力包优先;核心字段须重开 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsa-framework/issues/19) 的演化门 |
 | RAG / 语义召回 | ≥1 个真实用例要求跨会话语义检索(外部用户或自身产品场景) | memory 落库 hook + 能力包(复用模型契约的 embedding 模式) |
+| 外部记忆引擎桥接(bunfold 类) | ≥1 个真实用例要求框架侧提供桥接包(而非宿主侧自组装),且接受外部常驻服务依赖(独立服务 + 其 LLM 抽取管线 + 数据落盘);或此类引擎出现可嵌入(库)形态(无需常驻服务) | 能力包;缝 = memory 落库 hook / recall 增强(实施期裁决) |
 | Evals / scorers | ≥1 个用例要求在 CI 或线上做断言式评估 | Processor,或独立包消费 run 结果 |
 | 字符串路由(models.dev 类) | ≥1 个真实用例要求按名切模型 / provider 目录(而非照搬 mastra 形态) | 能力包(不引入 core magic string) |
 | OTel bridge 能力包 | ≥1 个用户已有 OTel 采集管线、要求原生接入(与 M5 的 OTLP 导出分属两件事) | 能力包 |

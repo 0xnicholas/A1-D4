@@ -5,7 +5,7 @@
 
 ## 定位
 
-Memory 是框架的记忆子系统:**语义层薄自研**——thread/resource 身份 + 消息历史 + 可选工作记忆,存储走 port、默认内存实现、核心零依赖。重机制不进核心:语义召回(向量 RAG)延后、留 seam;OM 类后台压缩出本地图范围;外部记忆系统经能力包桥接,**bunfold**(TencentDB-Agent-Memory fork,MIT)为头号桥接候选,归路线图阶段判断。供给策略与模型层同构(核心零依赖契约 + 生态直通 + 能力包);依据是候选开源记忆系统(mem0/Zep/Letta/bunfold)全是 server 形态或 hosted API,而语义层薄到没有更轻的可采用对象(调研 #5;#12 决议评论中的 bunfold 探查)。
+Memory 是框架的记忆子系统:**语义层薄自研**——thread/resource 身份 + 消息历史 + 可选工作记忆,存储走 port、默认内存实现、核心零依赖。重机制不进核心:语义召回(向量 RAG)延后、留 seam;OM 类后台压缩出本地图范围;外部记忆系统经能力包桥接,**bunfold**(TencentDB-Agent-Memory fork,MIT)为头号桥接候选,M5 裁定:**裁**(不产桥接包;重开条件见 `docs/ROADMAP.md` 延后清单「外部记忆引擎桥接」,seam 对账与结论见下「外部记忆引擎」节)。供给策略与模型层同构(核心零依赖契约 + 生态直通 + 能力包);依据是候选开源记忆系统(mem0/Zep/Letta/bunfold)全是 server 形态或 hosted API,而语义层薄到没有更轻的可采用对象(调研 #5;#12 决议评论中的 bunfold 探查)。
 
 ## 身份模型:thread / resource 双标识
 
@@ -60,6 +60,10 @@ interface MemoryStore {
 - 裁单(对照 mastra 10 必备 + 3 可选):`updateMessages`(消息不可变)、`listMessagesById`(语义召回延后连带裁)、`updateThread`(并入 upsert)、`cloneThread` / `copyThread`(延后)、`listMessagesByResourceId`(OM 遗物)。
 - 核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。adapter 家族见 `docs/architecture/storage.md`(#15 已定),本清单是其输入。
 
+### 外部记忆引擎(M5 裁定:不产桥接包)
+
+bunfold 类外部记忆引擎不落在 `MemoryStore` 缝上——服务形态(常驻进程)+ 写入即后台异步蒸馏 + L0 原文可删 + 消息面仅 user/assistant 纯文本 / 身份强 team+agent+user 三元组,与本节钉子(无后台写、消息不可变可回读、库语义)正面冲突;忠实 port adapter 不存在。裁定与重开条件见 `docs/ROADMAP.md` 延后清单「外部记忆引擎桥接」;本 port 首个真实后端 = SQLite 参考 adapter(`storage.md`)。需要外部引擎的宿主走上游零代码路径(MemoryProxy 改 base URL)或宿主侧组装,不经本框架包。
+
 ## 配置表面
 
 ```ts
@@ -78,7 +82,7 @@ new Memory({
 | 砍单项 | 承载缝 |
 | --- | --- |
 | semantic recall(向量 RAG) | seam:消息落库 hook + embedder 走模型契约模式;能力包方向入雾,归路线图 |
-| OM 类后台压缩管线 | 出本地图范围;bunfold 桥接(路线图);summarize-and-truncate = Processor 模式(文档范式) |
+| OM 类后台压缩管线 | 出本地图范围;bunfold 桥接(已裁,#79;重开条件见 ROADMAP 延后清单);summarize-and-truncate = Processor 模式(文档范式) |
 | thread cloning | 后加 minor |
 | 单条消息 update/delete | `deleteThread` 级联兜底 |
 | thread title 生成 | 应用层职责;title 只是 metadata 字段 |
