@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as rootEntry from '@balsa/core';
 import * as agentEntry from '@balsa/core/agent';
+import * as durableAgentEntry from '@balsa/core/durable-agent';
 import * as memoryEntry from '@balsa/core/memory';
 import * as modelEntry from '@balsa/core/model';
 import * as observabilityEntry from '@balsa/core/observability';
@@ -21,6 +22,7 @@ const ENTRIES = [
   ['@balsa/core/workflows', workflowsEntry],
   ['@balsa/core/memory', memoryEntry],
   ['@balsa/core/signals', signalsEntry],
+  ['@balsa/core/durable-agent', durableAgentEntry],
 ] as const;
 
 describe('子路径入口可加载', () => {

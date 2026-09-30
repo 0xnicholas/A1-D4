@@ -184,6 +184,15 @@ export interface AgentRunOptions {
    * execution wiring, kept out of the context bag the tools see.
    */
   readonly stepBoundary?: AgentStepBoundary | undefined;
+  /**
+   * Continue a suspended run from its snapshot — the harness wrappers' re-entry (`AgentRunResume`,
+   * `docs/architecture/harness.md`「Durable agents」). With it, `input` is the suspended run's own
+   * message list: the resumed run's prompt, used verbatim, so prompt assembly is skipped — no
+   * instructions, no memory recall, no working memory, no `processInput` (the list already carries
+   * what the suspended run saw, the input processors included). A resumed run's memory identity
+   * therefore only records the continued step; nothing is recalled and no history is re-saved.
+   */
+  readonly resume?: AgentRunResume | undefined;
   /** User per-call request context properties. */
   readonly [key: string]: unknown;
 }
@@ -272,6 +281,39 @@ export interface AgentToolCallsBoundaryEvent extends AgentStepBoundaryEvent {
 export interface AgentStepBoundaryDecision {
   /** Ends the run at this boundary with `finishReason: 'suspended'`. */
   readonly suspend: true;
+}
+
+/**
+ * The continue-from-snapshot seed (`AgentRunOptions.resume`): how a harness wrapper re-enters a
+ * suspended run (`docs/architecture/harness.md`「Durable agents」— the durable wrapper's `resume`).
+ * The run's message list carries everything the suspended run saw; this seed replays the one thing
+ * a message list cannot reconstruct — the calls the suspended step held back, and how each of them
+ * is answered.
+ *
+ * Step numbering continues across a resume: `stepCount` is where the suspended run stopped, so the
+ * resumed segment's steps, the `maxSteps` cap and every seam event that reports a step index all
+ * keep counting one run. The resumed step itself makes no model call — its output already streamed
+ * in the suspended run (its `finish` chunk reached that run's caller) — so it contributes its held
+ * calls' results, not a second round trip.
+ */
+export interface AgentRunResume {
+  /**
+   * How many steps the suspended run had completed when it suspended (`AgentRunSnapshot.stepCount`).
+   * The resumed run's prompt must end with that step's own assistant message — the held calls' text
+   * and calls — which is also where the step's recorded output is read back from.
+   */
+  readonly stepCount: number;
+  /**
+   * The calls the suspended step held back, in call order (at least one). They execute exactly as
+   * the loop's own calls do — same validation, error tool results, spans — except that the prompt
+   * already ends with their assistant message, so only the resulting `tool` message is appended.
+   */
+  readonly toolCalls: readonly ToolCallChunk[];
+  /**
+   * Pre-supplied answers: a call whose id appears here is answered with the given result instead of
+   * executing — the approval gate's「用户拒绝」path. Calls without an answer execute.
+   */
+  readonly answers?: readonly ToolResultChunk[] | undefined;
 }
 
 /**

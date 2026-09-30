@@ -22,7 +22,7 @@ import { missingFinishError } from './stream.js';
 import { runProcessError, runProcessOutputStep } from './processors.js';
 import type { Processor } from './processors.js';
 import { toStructuredObject } from './structured-output.js';
-import type { AgentGenerateResult, AgentStep, AgentStepBoundary, AgentStepBoundaryEvent, RequestContext, StructuredOutputConfig } from './types.js';
+import type { AgentGenerateResult, AgentRunResume, AgentStep, AgentStepBoundary, AgentStepBoundaryEvent, RequestContext, StructuredOutputConfig } from './types.js';
 
 /** How many model calls one run may make when the caller pins no `maxSteps` (`agent.md`「执行语义」). */
 export const DEFAULT_MAX_STEPS = 5;
@@ -58,6 +58,14 @@ export interface AgentLoopOptions {
    * before: the zero-overhead guarantee the harness spec pins on the bare agent.
    */
   readonly boundary?: AgentStepBoundary | undefined;
+  /**
+   * The run's resume seed (`AgentRunOptions.resume`, the harness wrappers' re-entry): the calls the
+   * suspended step held back, replayed as the run's first step without a model call. The prompt the
+   * run was handed already ends with that step's own assistant message — the loop reads its text,
+   * calls and provider-executed echoes back from there. Step numbering starts at the seed's
+   * `stepCount`, so a resumed segment is one run's continuation, not a fresh count.
+   */
+  readonly resume?: AgentRunResume | undefined;
   /**
    * The run's structured-output option (`AgentRunOptions.structuredOutput`), present only when the
    * run asked for one: the run's terminal text is parsed as JSON and validated against the schema,
@@ -173,144 +181,204 @@ export async function* runAgentLoop(
    */
   let settled: FinishReason | undefined;
 
-  for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
-    // The injection half of the step-boundary seam (`docs/architecture/harness.md`「Signals」): the
-    // queue check every step boundary — before each model call of the run, the first included
-    // (活跃 = 注入当前 run,下一 step 生效). Absent seam = no call, no copy, no spread: the bare
-    // loop's behavior is untouched. The messages a hook returns ride at the end of the prompt —
-    // after the event's snapshot — so they take part in the model call this step is about to make,
-    // and in the step span's recorded input, which copies the prompt below.
-    const beforeNextStep = options.boundary?.beforeNextStep;
-    if (beforeNextStep !== undefined) {
-      const injected = await beforeNextStep(stepBoundaryEvent(prompt, stepIndex, runSpan));
-      if (injected !== undefined) prompt.push(...injected);
-    }
-    const stepStartedAt = Date.now();
-    let timeToFirstChunk: number | undefined;
-    let finish: FinishChunk | undefined;
-    const stepText: string[] = [];
-    const toolCalls: ToolCallChunk[] = [];
+  // The resume seed (`AgentRunOptions.resume`): present only when this run continues a suspended
+  // run, and then consumed by its first step — the suspended step's held calls, replayed in the
+  // prompt whose tail is their own assistant message. Step numbering continues at the suspended
+  // run's `stepCount`, so indices, the `maxSteps` cap and seam events count one run across a
+  // resume; a run that does not resume starts at 0 and forgets the seed entirely.
+  const resume = options.resume;
+  /**
+   * The pre-supplied answers of the held calls, by tool call id — a call with one never executes.
+   * Built only for a resume: an ordinary run allocates nothing and the loop's lookup is a single
+   * presence check against `undefined` (the seam's absent-cost discipline).
+   */
+  const answers =
+    resume?.answers === undefined
+      ? undefined
+      : new Map(resume.answers.map((result) => [result.toolCallId, result]));
+
+  for (let stepIndex = resume?.stepCount ?? 0; stepIndex < maxSteps; stepIndex += 1) {
+    // The resumed step: the suspended run's held calls, replayed. Its model output — and with it
+    // its `finish` chunk — already streamed in the suspended run, so this step makes no model call
+    // and consults no injection hook (`beforeNextStep` is defined as the check before a model
+    // call). Its record is read back from the prompt's tail, the step's own assistant message: its
+    // text, its calls, and the results the provider had already executed itself.
+    const resuming = resume !== undefined && stepIndex === resume.stepCount;
+    /** The step's model output — from the model call below, or the resumed step's assistant message. */
+    let stepSpan: Span | undefined;
+    /** The step's text before the processors see it (the record's), `raw` marking that. */
+    let rawText: string;
+    /** The step's calls, in stream order — the resumed step's held calls. */
+    let rawCalls: readonly ToolCallChunk[];
     /** Tool call ids that already have a result in this step (provider-executed). */
-    const answered = new Set<string>();
-    /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
-    const providerResults: ToolResultChunk[] = [];
-    /** The candidates that failed before producing a chunk, in chain order. */
-    const failures: ModelFallbackFailure[] = [];
-    /**
-     * The candidate that served this step, with its finish chunk. Set when a candidate completes
-     * (its stream ended with a finish part); its span stays open until the step's tools have run.
-     */
-    let served: { readonly span: Span | undefined; readonly finish: FinishChunk } | undefined;
+    let rawAnswered: ReadonlySet<string>;
+    /** Results the provider executed itself, in stream order — echoed in the step's assistant message. */
+    let rawProviderResults: readonly ToolResultChunk[];
+    /** The step's finish — the model's own, or the synthesized one of a resumed step. */
+    let finishChunk: FinishChunk;
+    let firstChunkMs: number | undefined;
 
-    // The step boundary: one span per model call, hanging under the run's root span — a fallback
-    // chain's failed attempts get their own spans, so a switch is visible in the trace, and the
-    // attempt that serves the step carries its usage / finishReason. Every attempt walks the
-    // chain in array order. Tool calls of the step hang under the serving attempt's span, so that
-    // span stays open until they are done too.
-    for (const candidate of models) {
-      const candidateSpan = startStepSpan(options, prompt, candidate);
-      let producedChunk = false;
-
-      try {
-        const { stream } = await candidate.doStream({ ...callOptions, prompt });
-
-        for await (const chunk of normalizeStream(stream)) {
-          // Point of no return for this step: a chunk is on its way to the caller, so a later
-          // failure must propagate — the next candidate would continue someone else's answer.
-          producedChunk = true;
-          if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
-          switch (chunk.type) {
-            case 'text-delta':
-              stepText.push(chunk.textDelta);
-              yield chunk;
-              break;
-            case 'tool-call':
-              toolCalls.push(chunk);
-              yield chunk;
-              break;
-            case 'tool-result':
-              // A result already in the step's stream is provider-executed: it is echoed in the
-              // assistant message and never executed by the framework.
-              answered.add(chunk.toolCallId);
-              providerResults.push(chunk);
-              yield chunk;
-              break;
-            case 'finish':
-              // The step ends here, but the decision needs the whole step: yield it below.
-              finish = chunk;
-              break;
-          }
-        }
-
-        if (finish === undefined) {
-          // A step's model stream without a finish part is a contract violation; failing here also
-          // covers later steps, which must not settle the run on a previous step's finish chunk.
-          throw missingFinishError();
-        }
-
-        served = { span: candidateSpan, finish };
-        break;
-      } catch (error) {
-        // Cancellation is the run's outcome, not a chain failure and not a processor's business:
-        // an aborted run surfaces its own reason untouched (`processError` is for provider errors).
-        if (requestContext.signal.aborted) {
-          candidateSpan?.error(error);
-          throw error;
-        }
-        // A mid-stream failure cannot fall back — partial output has already reached the caller:
-        // it surfaces through `processError`, which may replace the error the run ends with.
-        if (producedChunk) {
-          const surfaced = await runProcessError(
-            processors,
-            error,
-            { source: 'model', stepIndex },
-            requestContext,
-          );
-          candidateSpan?.error(surfaced);
-          throw surfaced;
-        }
-        candidateSpan?.error(error);
-        failures.push({ model: candidate, error });
-      } finally {
-        // A candidate that did not serve the step is over here: its span carries the failure (or
-        // the abandoned attempt) and closes. The serving candidate's span stays open for its
-        // tools, which hang under it.
-        if (served === undefined) candidateSpan?.end();
+    if (resuming) {
+      const assistant = prompt.at(-1);
+      // The agent validated this at the run's boundary; the check is the loop's own contract.
+      if (assistant === undefined || assistant.role !== 'assistant') {
+        throw new Error(
+          "A resumed run must carry the suspended step's assistant message as the last message of its prompt.",
+        );
       }
-    }
+      rawText = textOfAssistantMessage(assistant);
+      rawCalls = resume === undefined ? [] : resume.toolCalls;
+      rawAnswered = idsOfProviderResults(assistant);
+      rawProviderResults = providerResultsOf(assistant);
+      finishChunk = RESUMED_STEP_FINISH;
+      // The resumed step makes no model call, so it has no step span: its tool calls hang under the
+      // run span (see `startToolCallSpan` below).
+      stepSpan = undefined;
+    } else {
+      // The injection half of the step-boundary seam (`docs/architecture/harness.md`「Signals」): the
+      // queue check every step boundary — before each model call of the run, the first included
+      // (活跃 = 注入当前 run,下一 step 生效). Absent seam = no call, no copy, no spread: the bare
+      // loop's behavior is untouched. The messages a hook returns ride at the end of the prompt —
+      // after the event's snapshot — so they take part in the model call this step is about to make,
+      // and in the step span's recorded input, which copies the prompt below.
+      const beforeNextStep = options.boundary?.beforeNextStep;
+      if (beforeNextStep !== undefined) {
+        const injected = await beforeNextStep(stepBoundaryEvent(prompt, stepIndex, runSpan));
+        if (injected !== undefined) prompt.push(...injected);
+      }
+      const stepStartedAt = Date.now();
+      let timeToFirstChunk: number | undefined;
+      let finish: FinishChunk | undefined;
+      const stepText: string[] = [];
+      const toolCalls: ToolCallChunk[] = [];
+      /** Tool call ids that already have a result in this step (provider-executed). */
+      const answered = new Set<string>();
+      /** Results the provider executed itself, in stream order — echoed in the step's prompt message. */
+      const providerResults: ToolResultChunk[] = [];
+      /** The candidates that failed before producing a chunk, in chain order. */
+      const failures: ModelFallbackFailure[] = [];
+      /**
+       * The candidate that served this step, with its finish chunk. Set when a candidate completes
+       * (its stream ended with a finish part); its span stays open until the step's tools have run.
+       */
+      let served: { readonly span: Span | undefined; readonly finish: FinishChunk } | undefined;
 
-    if (served === undefined) {
-      // Every candidate failed before producing a chunk: the run ends here — with the original
-      // error when there was nothing to fall back to, with the chain's context when there was.
-      // The surfaced error walks the processors' error chain before it becomes the run's error.
-      throw await runProcessError(
-        processors,
-        modelChainExhausted(failures),
-        { source: 'model', stepIndex },
-        requestContext,
-      );
-    }
+      // The step boundary: one span per model call, hanging under the run's root span — a fallback
+      // chain's failed attempts get their own spans, so a switch is visible in the trace, and the
+      // attempt that serves the step carries its usage / finishReason. Every attempt walks the
+      // chain in array order. Tool calls of the step hang under the serving attempt's span, so that
+      // span stays open until they are done too.
+      for (const candidate of models) {
+        const candidateSpan = startStepSpan(options, prompt, candidate);
+        let producedChunk = false;
 
-    const { span: stepSpan, finish: stepFinish } = served;
+        try {
+          const { stream } = await candidate.doStream({ ...callOptions, prompt });
+
+          for await (const chunk of normalizeStream(stream)) {
+            // Point of no return for this step: a chunk is on its way to the caller, so a later
+            // failure must propagate — the next candidate would continue someone else's answer.
+            producedChunk = true;
+            if (timeToFirstChunk === undefined) timeToFirstChunk = Date.now() - stepStartedAt;
+            switch (chunk.type) {
+              case 'text-delta':
+                stepText.push(chunk.textDelta);
+                yield chunk;
+                break;
+              case 'tool-call':
+                toolCalls.push(chunk);
+                yield chunk;
+                break;
+              case 'tool-result':
+                // A result already in the step's stream is provider-executed: it is echoed in the
+                // assistant message and never executed by the framework.
+                answered.add(chunk.toolCallId);
+                providerResults.push(chunk);
+                yield chunk;
+                break;
+              case 'finish':
+                // The step ends here, but the decision needs the whole step: yield it below.
+                finish = chunk;
+                break;
+            }
+          }
+
+          if (finish === undefined) {
+            // A step's model stream without a finish part is a contract violation; failing here also
+            // covers later steps, which must not settle the run on a previous step's finish chunk.
+            throw missingFinishError();
+          }
+
+          served = { span: candidateSpan, finish };
+          break;
+        } catch (error) {
+          // Cancellation is the run's outcome, not a chain failure and not a processor's business:
+          // an aborted run surfaces its own reason untouched (`processError` is for provider errors).
+          if (requestContext.signal.aborted) {
+            candidateSpan?.error(error);
+            throw error;
+          }
+          // A mid-stream failure cannot fall back — partial output has already reached the caller:
+          // it surfaces through `processError`, which may replace the error the run ends with.
+          if (producedChunk) {
+            const surfaced = await runProcessError(
+              processors,
+              error,
+              { source: 'model', stepIndex },
+              requestContext,
+            );
+            candidateSpan?.error(surfaced);
+            throw surfaced;
+          }
+          candidateSpan?.error(error);
+          failures.push({ model: candidate, error });
+        } finally {
+          // A candidate that did not serve the step is over here: its span carries the failure (or
+          // the abandoned attempt) and closes. The serving candidate's span stays open for its
+          // tools, which hang under it.
+          if (served === undefined) candidateSpan?.end();
+        }
+      }
+
+      if (served === undefined) {
+        // Every candidate failed before producing a chunk: the run ends here — with the original
+        // error when there was nothing to fall back to, with the chain's context when there was.
+        // The surfaced error walks the processors' error chain before it becomes the run's error.
+        throw await runProcessError(
+          processors,
+          modelChainExhausted(failures),
+          { source: 'model', stepIndex },
+          requestContext,
+        );
+      }
+
+      stepSpan = served.span;
+      rawText = stepText.join('');
+      rawCalls = toolCalls;
+      rawAnswered = answered;
+      rawProviderResults = providerResults;
+      finishChunk = served.finish;
+      firstChunkMs = timeToFirstChunk;
+    }
 
     try {
       // The step is complete: its text is the run's output so far (the last step's text settles
       // the run's output — `stream()`'s `text` reads the same rule).
       stepSpan?.update({
-        output: stepText.join(''),
+        output: rawText,
         attributes: {
-          usage: stepFinish.usage,
-          finishReason: stepFinish.finishReason,
-          ...(timeToFirstChunk === undefined ? {} : { timeToFirstChunk }),
+          usage: finishChunk.usage,
+          finishReason: finishChunk.finishReason,
+          ...(firstChunkMs === undefined ? {} : { timeToFirstChunk: firstChunkMs }),
         },
       });
 
-      const pending = toolCalls.filter((call) => !answered.has(call.toolCallId));
+      const pending = rawCalls.filter((call) => !rawAnswered.has(call.toolCallId));
       const lastStep = stepIndex + 1 >= maxSteps;
       // The step boundary comes before the framework-executed results: consumers see the model's
       // finish, then the results that answer the step's calls (results belong to that step).
       const terminalFinish: FinishChunk =
-        pending.length > 0 && lastStep ? { ...stepFinish, finishReason: 'tool-calls' } : stepFinish;
+        pending.length > 0 && lastStep ? { ...finishChunk, finishReason: 'tool-calls' } : finishChunk;
       yield terminalFinish;
 
       // The approval half of the step-boundary seam (`docs/architecture/harness.md`「Durable
@@ -320,21 +388,23 @@ export async function* runAgentLoop(
       // durable wrapper persists: the prompt plus this step's own vendor-shaped assistant message
       // (its text, its calls, any provider-executed results) — the same composition rule as a
       // completed step's messages, from the raw record: `processOutputStep` has not run, the step
-      // is not authoritative yet.
+      // is not authoritative yet. A resumed step consults no gate: the held calls were let through
+      // (or answered) by the decision a resume carried, and re-deciding them would suspend the run
+      // on the very calls it was resumed for.
       const beforeToolCalls = options.boundary?.beforeToolCalls;
-      if (pending.length > 0 && beforeToolCalls !== undefined) {
+      if (!resuming && pending.length > 0 && beforeToolCalls !== undefined) {
         const decision = await beforeToolCalls({
           ...stepBoundaryEvent(
             [
               ...prompt,
               ...toStepMessages(
                 {
-                  text: stepText.join(''),
-                  toolCalls,
-                  toolResults: providerResults,
-                  usage: stepFinish.usage,
+                  text: rawText,
+                  toolCalls: rawCalls,
+                  toolResults: rawProviderResults,
+                  usage: finishChunk.usage,
                 },
-                answered,
+                rawAnswered,
               ),
             ],
             stepIndex,
@@ -358,7 +428,18 @@ export async function* runAgentLoop(
 
       const results: ToolResultChunk[] = [];
       for (const call of pending) {
-        const toolSpan = startToolCallSpan(options, stepSpan, call);
+        const preAnswered = answers?.get(call.toolCallId);
+        if (preAnswered !== undefined) {
+          // Answered by a resume's decision instead of executing — the approval gate's「用户拒绝」
+          // path. The result is the wrapper's, the loop only carries it into the record, the model
+          // feedback and memory; nothing ran, so no tool span is created for it.
+          results.push(preAnswered);
+          yield preAnswered;
+          continue;
+        }
+        // A resumed step has no step span (it made no model call): its tool calls hang under the
+        // run span of the resumed segment, the same `agent-run` span the rest of it reports to.
+        const toolSpan = startToolCallSpan(options, stepSpan ?? runSpan, call);
         const outcome = await executeToolCall(tools, call, requestContext, toolSpan);
         let result: ToolResultChunk;
         if ('result' in outcome) {
@@ -387,10 +468,10 @@ export async function* runAgentLoop(
       const record = await runProcessOutputStep(
         processors,
         {
-          text: stepText.join(''),
-          toolCalls,
-          toolResults: [...providerResults, ...results],
-          usage: stepFinish.usage,
+          text: rawText,
+          toolCalls: rawCalls,
+          toolResults: [...rawProviderResults, ...results],
+          usage: finishChunk.usage,
         },
         stepIndex,
         requestContext,
@@ -406,7 +487,7 @@ export async function* runAgentLoop(
       // wiring does no I/O here at all; with one, the save gets its own `memory-save` span under
       // the step's span (`observability.md`「自动埋点」).
       if (loopMemory !== undefined) {
-        const stepMessages = toStepMessages(record, answered);
+        const stepMessages = toStepMessages(record, rawAnswered);
         await saveStepMessages(
           loopMemory,
           stepIndex === 0 ? [...loopMemory.inputMessages, ...stepMessages] : stepMessages,
@@ -422,8 +503,15 @@ export async function* runAgentLoop(
 
       // Provider-executed results stay paired with their calls inside the assistant message;
       // framework-executed ones follow in the `tool` message (the vendor-shaped split, from the
-      // processed record — a processor's rewrite is what the next model call sees).
-      prompt.push(...toStepMessages(record, answered));
+      // processed record — a processor's rewrite is what the next model call sees). The prompt of a
+      // resumed run already ends with the step's assistant message — it came from the snapshot — so
+      // only the results are new there; every later step appends its whole pair as usual.
+      if (resuming) {
+        const feedback = toToolMessage(record, rawAnswered);
+        if (feedback !== undefined) prompt.push(feedback);
+      } else {
+        prompt.push(...toStepMessages(record, rawAnswered));
+      }
     } catch (error) {
       stepSpan?.error(error);
       throw error;
@@ -675,14 +763,78 @@ function toolResult(call: ToolCallChunk, output: unknown, isError: boolean): Too
  */
 function toStepMessages(record: AgentStep, answered: ReadonlySet<string>): ModelMessage[] {
   const echoes = record.toolResults.filter((entry) => answered.has(entry.toolCallId));
-  const feedback = record.toolResults.filter((entry) => !answered.has(entry.toolCallId));
   const messages: ModelMessage[] = [];
   const assistant = toAssistantMessage(record.text, record.toolCalls, echoes);
   if (assistant.content.length > 0) messages.push(assistant);
-  if (feedback.length > 0) {
-    messages.push({ role: 'tool', content: feedback.map(toModelToolResultPart) });
-  }
+  const feedback = toToolMessage(record, answered);
+  if (feedback !== undefined) messages.push(feedback);
   return messages;
+}
+
+/**
+ * The `tool` message of a step's framework-executed results — the second half of `toStepMessages`,
+ * on its own for a resumed step (`AgentRunResume`): its prompt already ends with the assistant
+ * message, so only the results are new. `undefined` when every result was provider-executed (the
+ * framework has nothing to feed back).
+ */
+function toToolMessage(record: AgentStep, answered: ReadonlySet<string>): ModelMessage | undefined {
+  const feedback = record.toolResults.filter((entry) => !answered.has(entry.toolCallId));
+  return feedback.length === 0
+    ? undefined
+    : { role: 'tool', content: feedback.map(toModelToolResultPart) };
+}
+
+/**
+ * The text of a step's own assistant message — a resumed step's model output, read back from the
+ * snapshot's prompt tail (`AgentRunResume`): its text parts concatenated, the same reading the loop
+ * performs while streaming.
+ */
+function textOfAssistantMessage(message: ModelMessage): string {
+  if (message.role !== 'assistant') return '';
+  return message.content
+    .filter((part): part is ModelTextPart => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
+}
+
+/** Tool call ids an assistant message already carries provider-executed results for. */
+function idsOfProviderResults(message: ModelMessage): ReadonlySet<string> {
+  return new Set(providerResultsOf(message).map((result) => result.toolCallId));
+}
+
+/**
+ * The provider-executed results a step's assistant message echoes, back in chunk shape — a resumed
+ * step's record carries them exactly like a streamed step's does. The value forms the loop itself
+ * writes round-trip (`toModelToolResultOutput`); any other output shape a caller's own message
+ * carried passes through as it is.
+ */
+function providerResultsOf(message: ModelMessage): ToolResultChunk[] {
+  if (message.role !== 'assistant') return [];
+  const results: ToolResultChunk[] = [];
+  for (const part of message.content) {
+    if (part.type !== 'tool-result') continue;
+    results.push({
+      type: 'tool-result',
+      toolCallId: part.toolCallId,
+      toolName: part.toolName,
+      output: toChunkOutput(part.output),
+      isError: part.output.type === 'error-text' || part.output.type === 'error-json',
+    });
+  }
+  return results;
+}
+
+/** A message part's result output back in chunk shape: the value forms, or the output as given. */
+function toChunkOutput(output: ModelToolResultOutput): unknown {
+  switch (output.type) {
+    case 'text':
+    case 'json':
+    case 'error-text':
+    case 'error-json':
+      return output.value;
+    default:
+      return output;
+  }
 }
 
 /**
@@ -775,6 +927,17 @@ const UNKNOWN_USAGE: Usage = {
   inputTokens: undefined,
   outputTokens: undefined,
   totalTokens: undefined,
+};
+
+/**
+ * The synthesized finish of a resumed step (`AgentRunResume`): its model output — and with it its
+ * real finish chunk — already streamed in the suspended run, so what remains to report is the step's
+ * own reason (`'tool-calls'`: the calls it contributes) with usage the resumed segment never saw.
+ */
+const RESUMED_STEP_FINISH: FinishChunk = {
+  type: 'finish',
+  finishReason: 'tool-calls',
+  usage: UNKNOWN_USAGE,
 };
 
 /**

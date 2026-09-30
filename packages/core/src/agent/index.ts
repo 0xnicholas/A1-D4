@@ -22,6 +22,7 @@ export type {
   AgentGenerateResult,
   AgentMemoryOptions,
   AgentRunOptions,
+  AgentRunResume,
   AgentStep,
   AgentStepBoundary,
   AgentStepBoundaryDecision,

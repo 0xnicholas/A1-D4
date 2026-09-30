@@ -40,6 +40,10 @@
     "./signals": {
       "types": "./dist/signals/index.d.ts",
       "default": "./dist/signals/index.js"
+    },
+    "./durable-agent": {
+      "types": "./dist/durable-agent/index.d.ts",
+      "default": "./dist/durable-agent/index.js"
     }
   },
   "files": [

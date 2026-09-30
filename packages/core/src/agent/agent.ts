@@ -21,6 +21,7 @@ import type {
   AgentGenerateResult,
   AgentMemoryOptions,
   AgentRunOptions,
+  AgentRunResume,
   AgentStreamResult,
   DynamicArgument,
   ModelInput,
@@ -122,7 +123,27 @@ export class Agent {
           resolveDynamicArgument(memory, requestContext),
         ]);
       const inputMessages = toInputMessages(input);
-      const runMemory = toRunMemory(resolvedMemory, options.memory, inputMessages);
+      // A resumed run's prompt is the list it was handed — the suspended run's own messages — so
+      // nothing is assembled and nothing is recalled (see `toResumedPrompt`); its memory identity,
+      // when it has one, carries no input messages: the suspended run's history was already saved.
+      const resumedPrompt =
+        options.resume === undefined ? undefined : toResumedPrompt(inputMessages, options.resume);
+      // The run's step cap — an ordinary run's `maxSteps`, and a resumed run's as passed to the
+      // resume: the cap is not part of the snapshot (its shape is frozen), so a caller that continues
+      // a run whose steps already reached it is told here, rather than getting a run that cannot take
+      // the step it was resumed for.
+      const maxSteps = toMaxSteps(options.maxSteps);
+      if (options.resume !== undefined && options.resume.stepCount >= maxSteps) {
+        throw new Error(
+          `maxSteps ${String(maxSteps)} is already reached at the suspended run's step count ` +
+            `(${String(options.resume.stepCount)}) — resume with a higher maxSteps.`,
+        );
+      }
+      const runMemory = toRunMemory(
+        resolvedMemory,
+        options.memory,
+        resumedPrompt === undefined ? inputMessages : [],
+      );
       // The run's root span is created before memory recall
       // (`docs/architecture/observability.md`「自动埋点」): the recall span hangs under it, so the
       // boundary has to exist first. The run owns the span's lifecycle from here — including the
@@ -136,8 +157,10 @@ export class Agent {
         // `processInput` observes. A run with no memory identity recalls nothing. Working memory is
         // loaded at the same boundary — it is the other half of what a memory-enabled run injects.
         const [history, workingMemory] = await Promise.all([
-          runMemory === undefined ? [] : recallWithSpan(runMemory, tracing),
-          runMemory === undefined
+          resumedPrompt !== undefined || runMemory === undefined
+            ? []
+            : recallWithSpan(runMemory, tracing),
+          resumedPrompt !== undefined || runMemory === undefined
             ? undefined
             : loadRunWorkingMemory(runMemory.memory, runMemory.resource),
         ]);
@@ -147,24 +170,24 @@ export class Agent {
         // the loop does not hold. The prompt is built here too: instructions, working memory, recalled
         // history, then the run's own input.
         const runTools = withRunTools(resolvedTools, workingMemory);
-        const prompt = toPrompt(
-          resolvedInstructions,
-          workingMemory?.message,
-          history,
-          inputMessages,
-        );
+        const prompt =
+          resumedPrompt ??
+          toPrompt(resolvedInstructions, workingMemory?.message, history, inputMessages);
         const callOptions = toCallOptions(runTools, options);
         // The processors' input hook runs once per run, before the first model call: the prompt it
         // returns is what the model sees. The root span records that prompt as its input — the span
-        // existed before the recall, so the processed prompt lands as an update.
-        const processedPrompt = await runProcessInput(processors, prompt, requestContext);
+        // existed before the recall, so the processed prompt lands as an update. A resumed run's
+        // prompt is already the processed one (it is what the suspended run's loop held), so the
+        // hook is not run a second time over it.
+        const processedPrompt =
+          resumedPrompt ?? (await runProcessInput(processors, prompt, requestContext));
         runSpan?.update({ input: processedPrompt });
         return yield* runAgentLoop({
           models: resolvedModels,
           prompt: processedPrompt,
           callOptions,
           tools: runTools ?? {},
-          maxSteps: toMaxSteps(options.maxSteps),
+          maxSteps,
           processors,
           requestContext,
           // The run's memory wiring: the loop saves once per step (the first save carries the run's
@@ -173,6 +196,9 @@ export class Agent {
           // The run's step-boundary wiring (harness wrappers' loop seam) — kept out of the request
           // context bag above; `undefined` = the loop runs untouched.
           boundary: options.stepBoundary,
+          // The resume seed, when this run continues a suspended one — the harness wrapper's
+          // re-entry (`AgentRunOptions.resume`); `undefined` = an ordinary run.
+          resume: options.resume,
           tracing,
           // The user's model call settings are recorded on the step span under this name.
           parameters: options.modelSettings,
@@ -273,9 +299,9 @@ function toCallOptions(
  * The request context of one run (`docs/architecture/agent.md`「定义表面」): the user's per-call
  * properties plus framework-written `signal` / `runId`, which are written last so a per-call
  * property cannot hijack them. The framework-owned run options (`maxSteps` / `modelSettings` /
- * `providerOptions`) are execution controls, not context, and are left out of the bag. The run id is
- * generated per run; without a per-call `signal` the context carries a never-aborting one, so tools
- * always receive an `AbortSignal`.
+ * `providerOptions` / `stepBoundary` / `resume`) are execution controls, not context, and are left
+ * out of the bag. The run id is generated per run; without a per-call `signal` the context carries a
+ * never-aborting one, so tools always receive an `AbortSignal`.
  *
  * One object per run serves both readers: every dynamic argument resolves against it, and tools
  * receive it as `ctx.requestContext`.
@@ -292,6 +318,7 @@ function toRequestContext(options: AgentRunOptions): RequestContext {
     structuredOutput: _structuredOutput,
     memory: _memory,
     stepBoundary: _stepBoundary,
+    resume: _resume,
     signal,
     ...bag
   } = options;
@@ -408,6 +435,27 @@ function toInputMessages(input: string | ModelMessage[]): ModelMessage[] {
   return typeof input === 'string'
     ? [{ role: 'user', content: [{ type: 'text', text: input }] }]
     : [...input];
+}
+
+/**
+ * The prompt of a resumed run (`AgentRunOptions.resume`): the message list the suspended run
+ * stopped at, used verbatim. It already carries everything prompt assembly would rebuild — the
+ * instructions, the recalled history, every completed step's messages and the suspended step's own
+ * assistant message, which the loop reads back as that step's output. Validated here, at the run's
+ * boundary, so a malformed resume fails loudly instead of inside the loop.
+ */
+function toResumedPrompt(
+  inputMessages: readonly ModelMessage[],
+  resume: AgentRunResume,
+): ModelMessage[] {
+  const tail = inputMessages.at(-1);
+  if (tail === undefined || tail.role !== 'assistant' || resume.toolCalls.length === 0) {
+    throw new Error(
+      "A resumed run takes the suspended run's message list as its input — non-empty, ending " +
+        "with that step's assistant message — plus that step's held tool calls.",
+    );
+  }
+  return [...inputMessages];
 }
 
 /**
