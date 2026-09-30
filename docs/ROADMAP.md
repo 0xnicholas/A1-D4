@@ -1,13 +1,13 @@
 # 实施路线图
 
-极致轻量 TypeScript/Node agent 框架的粗粒度实施路线图:**只讲顺序、依赖与可验证产出,不含排期**。规范本体见 `docs/architecture/`(入口:`docs/architecture/README.md`),术语见 `CONTEXT.md`,决策依据见 `docs/adr/`。本图由 [决策:粗粒度实施路线图](https://github.com/0xnicholas/balsa/issues/16) 产出。
+极致轻量 TypeScript/Node agent 框架的粗粒度实施路线图:**只讲顺序、依赖与可验证产出,不含排期**。规范本体见 `docs/architecture/`(入口:`docs/architecture/README.md`),术语见 `CONTEXT.md`,决策依据见 `docs/adr/`。本图由 [决策:粗粒度实施路线图](https://github.com/0xnicholas/balsa-framework/issues/16) 产出。
 
 ## 切分原则
 
 - **垂直切片(walking skeleton)**:每个里程碑都是一条可跑的细流,可独立验证、可提前叫停;不按子系统水平分层。
 - **Instrumentation-first**:观测内核(span 模型 / tracer / NoOpSpan)与各边界自动埋点随各子系统落地时就建进去;exporter 与 OTLP 能力包后置,永不对已完成子系统开膛回补。
 - **可验证产出两件套**:每个里程碑 = 可运行 example(`examples/`)+ 覆盖该范围的测试套件。
-- **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/balsa/issues/6))。
+- **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/balsa-framework/issues/6))。
 - **串行默认**:小团队单线推进;各里程碑「依赖」行标注可并行项,不排双轨。
 
 ## 里程碑
@@ -59,7 +59,7 @@
 
 - **OTLP exporter 包**:GenAI semconv 映射,HTTP only(依赖 M1 观测内核)
 - **MCP server 包 / MCP client 包**:同一份 Tool 双向流通,桥接 schema 直通零适配(依赖 M1 工具)
-- **SQLite 参考 adapter**:实现全部四个存储 port;驱动选型留实现期,默认 `node:sqlite`(Node ≥22 基线,见 [决策:存储适配策略](https://github.com/0xnicholas/balsa/issues/15))(依赖 M2–M4 的 ports)
+- **SQLite 参考 adapter**:实现全部四个存储 port;驱动选型留实现期,默认 `node:sqlite`(Node ≥22 基线,见 [决策:存储适配策略](https://github.com/0xnicholas/balsa-framework/issues/15))(依赖 M2–M4 的 ports)
 - **AI SDK 互操作包**:chunk 协议 ↔ AI SDK 流格式等外部格式转换(依赖 M1)
 - **bunfold 桥接包(按需可裁)**:外部记忆系统桥接参考实现,价值在验证 memory seam 设计(依赖 M2)
 
@@ -68,19 +68,19 @@
 
 ## 发布节奏与 v1.0 门槛
 
-- **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsa/issues/20)。
+- **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsa-framework/issues/20)。
 - 之后每个里程碑一个 0.x;0.x 阶段允许跨里程碑破型。
 - **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
-- **修订(M2 收尾,2026-09-29)**:M1 末未执行发布(定名门已过,版本仍 0.0.0);首个公开版本拍板为 **0.1.0**——含 M1+M2 全部内容、不跳号;changelog = GitHub Release notes(tag + Release,仓库不新增 `CHANGELOG.md`);凭证 = owner 手动发布(前置:创建 npm org `@balsa`,registry 查实仍 FREE);此后 M3→0.2、M4→0.3、M5→1.0。依据 [实施:M2 收尾——字节预算、导出核对、verify 全绿](https://github.com/0xnicholas/balsa/issues/44) 决议评论。
-- **修订(M3 收尾,2026-09-29)**:M3 编排交付并核验——`./workflows` 13,958 B(字节预算 7/7 内)、导出三面一致(export-map / entry-points 测试 + `check:dist` 7 子路径)、`pnpm verify` 全绿(569 例 38 文件)、`examples/workflow-approval` 以本地 OpenAI-compatible mock 端到端跑通;0.2 = M1+M2+M3 全部内容,流程沿 0.1 结论(tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 与 0.2 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含 0.1.0 / 0.2 的先后)归 owner 手工前置。依据 [实施:examples/workflow-approval + M3 收尾](https://github.com/0xnicholas/balsa/issues/53) 决议评论。
-- **修订(M3 收线,2026-09-30)**:[#54](https://github.com/0xnicholas/balsa/issues/54)(块内 suspend——迭代现场快照 + 块内 resume)后 M3 全表面终态:`./workflows` 16,817 B(预算 7/7,基线随 #54 更新,+2,859 B)、`pnpm verify` 全绿(579 例 38 文件)、`examples/workflow-approval` 本地 mock 复跑通过(挂起/回放/记录自断言);M3 wayfinder 地图 [#46](https://github.com/0xnicholas/balsa/issues/46) 关账(七张实施票 #47–#54 全关)。发布结论沿上条不变。
-- **修订(M4 收尾,2026-09-30)**:Harness 三件套(durable 审批闸 / signals / schedules)交付并核验——三个新子路径 `./signals` 5,509 B、`./durable-agent` 4,573 B、`./schedules` 3,037 B(字节预算 10/10,全部零超支;组合根 `.` 50,708 B,gzip 15,749 B)、导出三面一致(export-map / entry-points 测试 + `check:dist` 10 子路径)、`pnpm verify` 全绿(**659 例 42 文件**;零运行时依赖 58 模块 0 处外部导入)、两个新 example 以本地 OpenAI-compatible mock 端到端跑通——`examples/durable-approval`(挂起 → 快照 → 批准/拒绝两路 resume,拒绝不终止 run)与 `examples/signals-desk`(空闲唤醒 / 活跃注入 / 排队保序 / 类型化 sendSignal / subscribeToThread / schedules tick),负例均 exit 1。0.3 = M1–M4 全部内容,流程沿 0.1 结论(tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 / 0.2 / 0.3 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含先后)归 owner 手工前置。依据 [实施:examples + M4 收尾——双 example + 字节预算三层 + 导出核对 + verify 全绿 + ROADMAP 修订](https://github.com/0xnicholas/balsa/issues/61) 决议评论。
+- **修订(M2 收尾,2026-09-29)**:M1 末未执行发布(定名门已过,版本仍 0.0.0);首个公开版本拍板为 **0.1.0**——含 M1+M2 全部内容、不跳号;changelog = GitHub Release notes(tag + Release,仓库不新增 `CHANGELOG.md`);凭证 = owner 手动发布(前置:创建 npm org `@balsa`,registry 查实仍 FREE);此后 M3→0.2、M4→0.3、M5→1.0。依据 [实施:M2 收尾——字节预算、导出核对、verify 全绿](https://github.com/0xnicholas/balsa-framework/issues/44) 决议评论。
+- **修订(M3 收尾,2026-09-29)**:M3 编排交付并核验——`./workflows` 13,958 B(字节预算 7/7 内)、导出三面一致(export-map / entry-points 测试 + `check:dist` 7 子路径)、`pnpm verify` 全绿(569 例 38 文件)、`examples/workflow-approval` 以本地 OpenAI-compatible mock 端到端跑通;0.2 = M1+M2+M3 全部内容,流程沿 0.1 结论(tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 与 0.2 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含 0.1.0 / 0.2 的先后)归 owner 手工前置。依据 [实施:examples/workflow-approval + M3 收尾](https://github.com/0xnicholas/balsa-framework/issues/53) 决议评论。
+- **修订(M3 收线,2026-09-30)**:[#54](https://github.com/0xnicholas/balsa-framework/issues/54)(块内 suspend——迭代现场快照 + 块内 resume)后 M3 全表面终态:`./workflows` 16,817 B(预算 7/7,基线随 #54 更新,+2,859 B)、`pnpm verify` 全绿(579 例 38 文件)、`examples/workflow-approval` 本地 mock 复跑通过(挂起/回放/记录自断言);M3 wayfinder 地图 [#46](https://github.com/0xnicholas/balsa-framework/issues/46) 关账(七张实施票 #47–#54 全关)。发布结论沿上条不变。
+- **修订(M4 收尾,2026-09-30)**:Harness 三件套(durable 审批闸 / signals / schedules)交付并核验——三个新子路径 `./signals` 5,509 B、`./durable-agent` 4,573 B、`./schedules` 3,037 B(字节预算 10/10,全部零超支;组合根 `.` 50,708 B,gzip 15,749 B)、导出三面一致(export-map / entry-points 测试 + `check:dist` 10 子路径)、`pnpm verify` 全绿(**659 例 42 文件**;零运行时依赖 58 模块 0 处外部导入)、两个新 example 以本地 OpenAI-compatible mock 端到端跑通——`examples/durable-approval`(挂起 → 快照 → 批准/拒绝两路 resume,拒绝不终止 run)与 `examples/signals-desk`(空闲唤醒 / 活跃注入 / 排队保序 / 类型化 sendSignal / subscribeToThread / schedules tick),负例均 exit 1。0.3 = M1–M4 全部内容,流程沿 0.1 结论(tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 / 0.2 / 0.3 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含先后)归 owner 手工前置。依据 [实施:examples + M4 收尾——双 example + 字节预算三层 + 导出核对 + verify 全绿 + ROADMAP 修订](https://github.com/0xnicholas/balsa-framework/issues/61) 决议评论。
 
 ## 延后清单(post-v1,需求信号触发)
 
 以下能力经路线图裁决**延后**,不进 v1 任一里程碑;触发条件满足时再单独评估:
 
-- **Supervisor 能力包**(createSupervisor 类):as-tool 组合的语法糖;触发 = as-tool 模式的真实重复痛点(见 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsa/issues/19) 演化门)
+- **Supervisor 能力包**(createSupervisor 类):as-tool 组合的语法糖;触发 = as-tool 模式的真实重复痛点(见 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsa-framework/issues/19) 演化门)
 - **RAG / Evals / 字符串路由(models.dev)能力包 / OTel bridge 能力包**:需求驱动
 - **Background tasks**:v1 以「工具 ack + sendSignal 唤醒」组合承载(harness.md 文档范式)
 - **Goals / State signals**:可被 working memory + Processor 组合覆盖

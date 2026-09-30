@@ -2,6 +2,10 @@
 
 Ultralight TypeScript agent framework. Compose only what you use — run anywhere, no runtime baggage.
 
+> **Balsa** is the umbrella brand; this repository — **balsa-framework** — is its framework
+> subproject. Packages publish under the `@balsa/*` scope (starting with `@balsa/core`), and future
+> subprojects live alongside it.
+
 > **Status:** pre-1.0. Agents, memory, workflows and the harness trio — durable agents, signals,
 > schedules — are complete ([roadmap](docs/ROADMAP.md)). The first public npm release (0.1.0) has not
 > been published yet — until then, run Balsa from this repo (see
