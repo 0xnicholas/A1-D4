@@ -7,9 +7,11 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 > subprojects live alongside it.
 
 > **Status:** pre-1.0. Agents, memory, workflows and the harness trio — durable agents, signals,
-> schedules — are complete ([roadmap](docs/ROADMAP.md)). The first public npm release (0.1.0) has not
-> been published yet — until then, run Balsa from this repo (see
-> [Development](#development)).
+> schedules — are implemented and verified ([roadmap](docs/ROADMAP.md)). **No npm release exists
+> yet**: the package version is still `0.0.0` and the registry has nothing under `@balsa`. The
+> planned versions are 0.1.0 = M1+M2, 0.2 = M1–M3 and 0.3 = M1–M4 (everything this README
+> describes), all currently pending a manual owner publish — until then, use Balsa from this repo
+> (see [Development](#development)).
 
 ## Why Balsa
 
@@ -30,7 +32,8 @@ from the AI SDK provider ecosystem — no adapters, no registries.
 ## Requirements
 
 - Node.js ≥ 22.12
-- An AI SDK provider package for your model (e.g. `@ai-sdk/openai`)
+- An AI SDK provider package for your model (e.g. `@ai-sdk/openai`), plus a schema library such as
+  `zod` for tool input/output — the core itself has zero dependencies
 
 ## Install
 
@@ -38,7 +41,8 @@ from the AI SDK provider ecosystem — no adapters, no registries.
 npm install @balsa/core zod @ai-sdk/openai
 ```
 
-(The package is not on npm yet — see Status above.)
+Not on npm yet — see [Status](#status). Until then, clone this repo and follow
+[Development](#development).
 
 ## Quick start
 
@@ -87,9 +91,12 @@ Every configuration field is a **dynamic argument**: it accepts either a value `
 `(ctx: RequestContext) => T | Promise<T>`, resolved per execution against the request context
 (`signal`, `runId`, plus your own per-call properties).
 
-## The subsystems
+## What's in the box
 
-### Agents
+Each subsystem lives behind its own subpath export — pull in only the ones you use. The
+[package surface](#package-surface) table below is the full import map.
+
+### Agents — `@balsa/core/agent`
 
 `Agent` wraps a model, instructions, and tools into something you can `generate()` / `stream()`.
 Cross-cutting concerns — guardrails, redaction, rate limiting, evals — live in exactly one place:
@@ -98,7 +105,7 @@ declaration order. Multi-agent collaboration is **as-tool composition**: wrap on
 tool and hang it on another; delegation is an ordinary tool call, and there is no supervisor
 protocol or sub-agent concept in the core.
 
-### Memory
+### Memory — `@balsa/core/memory`
 
 ```ts
 import { Memory, createInMemoryStore } from '@balsa/core/memory';
@@ -121,7 +128,7 @@ next conversation of that user, in any thread, starts already knowing their prof
 through a port with an in-memory default; swapping in a persistent adapter changes nothing above
 the port.
 
-### Workflows
+### Workflows — `@balsa/core/workflows`
 
 ```ts
 import { createStep, createWorkflow } from '@balsa/core/workflows';
@@ -154,7 +161,7 @@ boundary (start input, step input, resume data) is validated against its Standar
 `suspend` / `resume` rest on JSON snapshots at step boundaries, persisted through a storage port
 (in-memory by default).
 
-### Observability
+### Observability — `@balsa/core/observability`
 
 ```ts
 import { createApp } from '@balsa/core';
@@ -172,14 +179,13 @@ run/step, and memory recall/save is traced, with console and memory exporters bu
 `new Agent({ … })` with no app and no tracer stays fully first-class — zero overhead, no span
 objects.
 
-### Signals
+### Signals — `@balsa/core/signals`
 
-`createSignals()` (from `@balsa/core/signals`) is the thread-directed interaction primitive:
-inject user input into an active run, wake an idle thread into a new run, or queue in order —
-injected content lands in the message history. Single-process semantics; cross-instance
-distribution belongs to capability packages.
+`createSignals()` is the thread-directed interaction primitive: inject user input into an active
+run, wake an idle thread into a new run, or queue in order — injected content lands in the message
+history. Single-process semantics; cross-instance distribution belongs to capability packages.
 
-### Durable agents
+### Durable agents — `@balsa/core/durable-agent`
 
 ```ts
 import { createDurableAgent } from '@balsa/core/durable-agent';
@@ -198,7 +204,7 @@ core stays permission-free. Snapshots are JSON-only and go through `AgentRunSnap
 one human interaction stays one trace. Crash recovery, multi-replica leases and a resumable stream
 are deliberately not core.
 
-### Schedules
+### Schedules — `@balsa/core/schedules`
 
 ```ts
 import { createSchedules } from '@balsa/core/schedules';
@@ -259,17 +265,18 @@ Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
 - [`CONTEXT.md`](CONTEXT.md) — the project glossary: every domain term, defined once
 - [`docs/architecture/`](docs/architecture/README.md) — the architecture specs, one per subsystem
 - [`docs/adr/`](docs/adr/) — the decisions behind the specs
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — milestone plan and the v1.0 gate
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — milestone plan, release cadence and the v1.0 gate
 
 ## Development
 
 ```bash
 pnpm install
-pnpm verify    # typecheck + build + tests + dist / runtime-deps / byte-budget checks
+pnpm verify    # typecheck + build + tests + dist / runtime-deps checks
 ```
 
-The byte budget is enforced in CI from day one — "lightweight" is a checked property, not a
-slogan.
+The byte budget (minified size per export path) is checked in CI on every PR — "lightweight" is a
+checked property, not a slogan — and it is a warning, not a merge blocker
+([ADR-0001](docs/adr/0001-lightweight-definition.md)).
 
 ## License
 
