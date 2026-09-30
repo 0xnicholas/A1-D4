@@ -96,6 +96,21 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  examples/sqlite-resume:
+    dependencies:
+      '@ai-sdk/openai':
+        specifier: ^4.0.78
+        version: 4.0.78(zod@4.6.5)
+      '@balsa/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@balsa/sqlite':
+        specifier: workspace:*
+        version: link:../../packages/sqlite
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
   examples/workflow-approval:
     dependencies:
       '@ai-sdk/openai':
@@ -128,6 +143,12 @@ importers:
       '@modelcontextprotocol/server':
         specifier: ^2.2.0
         version: 2.2.0
+    devDependencies:
+      '@balsa/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/sqlite:
     devDependencies:
       '@balsa/core':
         specifier: workspace:*
