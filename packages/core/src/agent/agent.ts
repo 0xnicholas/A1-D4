@@ -170,6 +170,9 @@ export class Agent {
           // The run's memory wiring: the loop saves once per step (the first save carries the run's
           // input messages). `undefined` = no memory I/O.
           memory: runMemory,
+          // The run's step-boundary wiring (harness wrappers' loop seam) — kept out of the request
+          // context bag above; `undefined` = the loop runs untouched.
+          boundary: options.stepBoundary,
           tracing,
           // The user's model call settings are recorded on the step span under this name.
           parameters: options.modelSettings,
@@ -288,6 +291,7 @@ function toRequestContext(options: AgentRunOptions): RequestContext {
     hideOutput: _hideOutput,
     structuredOutput: _structuredOutput,
     memory: _memory,
+    stepBoundary: _stepBoundary,
     signal,
     ...bag
   } = options;

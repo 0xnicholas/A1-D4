@@ -22,7 +22,7 @@ import { missingFinishError } from './stream.js';
 import { runProcessError, runProcessOutputStep } from './processors.js';
 import type { Processor } from './processors.js';
 import { toStructuredObject } from './structured-output.js';
-import type { AgentGenerateResult, AgentStep, RequestContext, StructuredOutputConfig } from './types.js';
+import type { AgentGenerateResult, AgentStep, AgentStepBoundary, AgentStepBoundaryEvent, RequestContext, StructuredOutputConfig } from './types.js';
 
 /** How many model calls one run may make when the caller pins no `maxSteps` (`agent.md`「执行语义」). */
 export const DEFAULT_MAX_STEPS = 5;
@@ -52,6 +52,12 @@ export interface AgentLoopOptions {
   readonly memory?: AgentRunMemory | undefined;
   /** The run's request context — framework-written `signal` / `runId` plus the user's bag. */
   readonly requestContext: RequestContext;
+  /**
+   * The run's step-boundary seam (`AgentRunOptions.stepBoundary`) — the harness wrappers' single
+   * loop extension point (`docs/architecture/harness.md`). Absent = the loop runs exactly as
+   * before: the zero-overhead guarantee the harness spec pins on the bare agent.
+   */
+  readonly boundary?: AgentStepBoundary | undefined;
   /**
    * The run's structured-output option (`AgentRunOptions.structuredOutput`), present only when the
    * run asked for one: the run's terminal text is parsed as JSON and validated against the schema,
@@ -168,6 +174,17 @@ export async function* runAgentLoop(
   let settled: FinishReason | undefined;
 
   for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
+    // The injection half of the step-boundary seam (`docs/architecture/harness.md`「Signals」): the
+    // queue check every step boundary — before each model call of the run, the first included
+    // (活跃 = 注入当前 run,下一 step 生效). Absent seam = no call, no copy, no spread: the bare
+    // loop's behavior is untouched. The messages a hook returns ride at the end of the prompt —
+    // after the event's snapshot — so they take part in the model call this step is about to make,
+    // and in the step span's recorded input, which copies the prompt below.
+    const beforeNextStep = options.boundary?.beforeNextStep;
+    if (beforeNextStep !== undefined) {
+      const injected = await beforeNextStep(stepBoundaryEvent(prompt, stepIndex, runSpan));
+      if (injected !== undefined) prompt.push(...injected);
+    }
     const stepStartedAt = Date.now();
     let timeToFirstChunk: number | undefined;
     let finish: FinishChunk | undefined;
@@ -295,6 +312,49 @@ export async function* runAgentLoop(
       const terminalFinish: FinishChunk =
         pending.length > 0 && lastStep ? { ...stepFinish, finishReason: 'tool-calls' } : stepFinish;
       yield terminalFinish;
+
+      // The approval half of the step-boundary seam (`docs/architecture/harness.md`「Durable
+      // agents」): after the step's model output has fully streamed and before the framework
+      // executes its pending calls — the only point where a gate can still hold them back. Absent
+      // seam = the calls run exactly as before. The event's `messages` are the snapshot surface the
+      // durable wrapper persists: the prompt plus this step's own vendor-shaped assistant message
+      // (its text, its calls, any provider-executed results) — the same composition rule as a
+      // completed step's messages, from the raw record: `processOutputStep` has not run, the step
+      // is not authoritative yet.
+      const beforeToolCalls = options.boundary?.beforeToolCalls;
+      if (pending.length > 0 && beforeToolCalls !== undefined) {
+        const decision = await beforeToolCalls({
+          ...stepBoundaryEvent(
+            [
+              ...prompt,
+              ...toStepMessages(
+                {
+                  text: stepText.join(''),
+                  toolCalls,
+                  toolResults: providerResults,
+                  usage: stepFinish.usage,
+                },
+                answered,
+              ),
+            ],
+            stepIndex,
+            runSpan,
+          ),
+          pendingCalls: pending,
+        });
+        if (decision?.suspend === true) {
+          // Suspension is a normal terminal outcome, never an error (harness.md「Observability
+          // 锚点」): the pending calls do not execute, the step never completes — no processor hook,
+          // no memory save, nothing appended to the prompt — and the run settles with the pre-wired
+          // `'suspended'` reason (`chunks.ts`), its root span ending normal under a status
+          // attribute. The snapshot itself is the wrapper's to build and persist; the loop keeps
+          // none. The chunk stream above already carried the model's own finish for this step; the
+          // run-level reason reports what the run did.
+          runSpan?.update({ attributes: { status: 'suspended' } });
+          settled = 'suspended';
+          break;
+        }
+      }
 
       const results: ToolResultChunk[] = [];
       for (const call of pending) {
@@ -424,6 +484,25 @@ async function saveStepMessages(
   } finally {
     span.end();
   }
+}
+
+/**
+ * The shared event surface of a step boundary (`AgentStepBoundaryEvent`): the prompt copied (the
+ * event must not hand out the loop's own array), the boundary's step index, and the run's trace
+ * continuation — the root span's ids when a tracer is attached, empty strings otherwise (the same
+ * encoding the tool context carries).
+ */
+function stepBoundaryEvent(
+  prompt: readonly ModelMessage[],
+  stepIndex: number,
+  runSpan: Span | undefined,
+): AgentStepBoundaryEvent {
+  return {
+    messages: [...prompt],
+    stepIndex,
+    traceId: runSpan?.traceId ?? '',
+    spanId: runSpan?.id ?? '',
+  };
 }
 
 /**

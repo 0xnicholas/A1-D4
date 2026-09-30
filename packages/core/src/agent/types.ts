@@ -5,7 +5,7 @@ import type {
   ToolResultChunk,
   Usage,
 } from '../model/chunks.js';
-import type { Model, ModelCallOptions, ModelProviderOptions } from '../model/contract.js';
+import type { Model, ModelCallOptions, ModelMessage, ModelProviderOptions } from '../model/contract.js';
 import type { Memory, MemoryThreadRef } from '../memory/index.js';
 import type { Tracer } from '../observability/index.js';
 import type { StandardSchema } from '../standard-schema.js';
@@ -175,8 +175,103 @@ export interface AgentRunOptions {
    * is omitting either field — the identity is explicit, never defaulted.
    */
   readonly memory?: AgentMemoryOptions | undefined;
+  /**
+   * The run's step-boundary wiring (`docs/architecture/harness.md`「与其它子系统的关系」): the agent
+   * loop's only harness extension point — the hook surface the durable approval gate
+   * (`beforeToolCalls`) and the signals injector (`beforeNextStep`) hang on. Absent = the loop
+   * runs untouched: no hook is consulted, nothing is copied, the bare agent's behavior is
+   * unchanged (the harness spec's zero-overhead guarantee). Not request context — it is per-run
+   * execution wiring, kept out of the context bag the tools see.
+   */
+  readonly stepBoundary?: AgentStepBoundary | undefined;
   /** User per-call request context properties. */
   readonly [key: string]: unknown;
+}
+
+/**
+ * The agent loop's step-boundary seam (`docs/architecture/harness.md`「Signals」+「与其它子系统的
+ * 关系」): the one loop change the harness spec allows — per-run wiring the harness wrappers
+ * (`createDurableAgent` / `createSignals`) pass as `AgentRunOptions.stepBoundary`. Absent = the loop
+ * runs exactly as before: no hook is consulted, nothing is copied, the bare agent's behavior is
+ * unchanged (the harness spec's「无 signals 挂接时零开销」guarantee, verbatim for the approval gate).
+ *
+ * One seam, two phases, because both harness consumers hang the same region of the loop and no
+ * earlier extension point reaches it: the processors' hooks all run after a step's tools have
+ * executed, and wrapping `tool.execute` can only turn a suspension into an error tool result fed
+ * back to the model — a gate has to hold the calls before they execute, an injector has to land
+ * its messages before the next model call.
+ *
+ * - `beforeToolCalls` — after the step's model output has fully streamed (the caller has seen its
+ *   finish chunk), before the framework executes the step's pending tool calls. The durable
+ *   approval gate decides here. The event carries the snapshot surface the wrapper persists
+ *   (messages + stepIndex + trace continuation); a suspend decision ends the run at this boundary
+ *   — a normal terminal outcome, never an error. The loop itself keeps no snapshot
+ *   (`docs/architecture/agent.md`:核心 loop 保持无快照) — the wrapper builds one from the event.
+ * - `beforeNextStep` — before every model call of the run, the first included. The signals
+ *   injector drains its queue here; the messages it returns are appended to the prompt and take
+ *   part in that model call (活跃 = 注入当前 run,下一 step 生效).
+ */
+export interface AgentStepBoundary {
+  /**
+   * The approval point: after the step's tool calls are known, before any of them executes.
+   * Called only for steps with at least one pending (framework-executed) call. Returning a
+   * suspend decision ends the run with `finishReason: 'suspended'`; returning nothing lets the
+   * calls execute exactly as before. May be synchronous or asynchronous.
+   */
+  beforeToolCalls?(
+    event: AgentToolCallsBoundaryEvent,
+  ): AgentStepBoundaryDecision | Promise<AgentStepBoundaryDecision | void> | void;
+  /**
+   * The injection point: before every model call of the run, the first included. The messages
+   * returned are appended to the prompt — after the event's `messages` snapshot — and are what
+   * that model call sees (and what the step span records as its input). Returning nothing injects
+   * nothing. May be synchronous or asynchronous.
+   */
+  beforeNextStep?(
+    event: AgentStepBoundaryEvent,
+  ): readonly ModelMessage[] | Promise<readonly ModelMessage[] | void> | void;
+}
+
+/**
+ * What both step-boundary phases observe: the run's message list at the boundary (a copy —
+ * mutating it does not touch the run), the 0-based index of the step the boundary belongs to (=
+ * the count of completed steps at that moment), and the run's trace continuation — the
+ * `agent-run` span's ids, empty strings when the run is untraced (the same encoding `ToolContext`
+ * carries: no tracer / `NoOpSpan`). The durable snapshot persists `traceId`; an injector hangs its
+ * `isEvent` span under the live run span through the `traceId` + `spanId` pair.
+ */
+export interface AgentStepBoundaryEvent {
+  /** The run's vendor-shaped message list at the boundary — pre-injection for `beforeNextStep`. */
+  readonly messages: readonly ModelMessage[];
+  /** The 0-based index of the step the boundary belongs to. */
+  readonly stepIndex: number;
+  /** The run's trace id — the `agent-run` span's, or `''` when the run is untraced. */
+  readonly traceId: string;
+  /** The `agent-run` span's id — where an injected event span hangs — or `''` when untraced. */
+  readonly spanId: string;
+}
+
+/** The `beforeToolCalls` event: the boundary snapshot plus the calls the loop is about to execute. */
+export interface AgentToolCallsBoundaryEvent extends AgentStepBoundaryEvent {
+  /**
+   * The step's pending tool calls — the ones the framework is about to execute, in call order.
+   * Provider-executed calls are not here: they already carry their results in `messages`.
+   */
+  readonly pendingCalls: readonly ToolCallChunk[];
+}
+
+/**
+ * The decision a `beforeToolCalls` hook returns to end the run at that boundary: the pending calls
+ * do not execute, the step never completes (no processor hook, no memory save, nothing appended to
+ * the prompt), and the run settles normally with `finishReason: 'suspended'` — suspension is a
+ * terminal outcome, not an error (`docs/architecture/harness.md`「Durable agents」+「Observability
+ * 锚点」: the `agent-run` span ends normal under a `status: 'suspended'` attribute). What is
+ * persisted alongside — the snapshot, its `suspendPayload` — is the wrapper's own state: the hook
+ * and the wrapper share a closure, and the loop keeps no snapshot of its own.
+ */
+export interface AgentStepBoundaryDecision {
+  /** Ends the run at this boundary with `finishReason: 'suspended'`. */
+  readonly suspend: true;
 }
 
 /**
