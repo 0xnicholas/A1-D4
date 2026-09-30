@@ -9,6 +9,7 @@
     "./workflows": 16652,
     "./memory": 5193,
     "./signals": 5509,
-    "./durable-agent": 4573
+    "./durable-agent": 4573,
+    "./schedules": 3037
   }
 }
