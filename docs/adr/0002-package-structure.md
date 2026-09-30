@@ -11,5 +11,6 @@ pnpm monorepo。**核心单包**以子路径导出各子系统入口(如 `core/a
 ## Consequences
 
 - **修订(M1-15 #36)**:组合根落地为 `createApp({ tracer })` + `app.agent(config)` 工厂——经工厂建出的 Agent 被动接受分发的 tracer(配置自带 tracer 时显式优先),不经工厂的独立 `new Agent(...)` 照旧一等;M1 只分发 tracer,`logger` / `storage` 的位留给后续里程碑。
+- **修订(M4 #60)**:组合根补齐到 Harness 终态——`createApp({ tracer, storage })` 的 `storage` 槽 = 四个存储 port 各一(`memory` / `workflow` / `durableAgent` / `schedules`,各自缺省 = 对应内存实现、互不耦合),`App` 加 `workflow` / `durableAgent` / `signals` / `schedules` 四工厂(沿 `App.agent` 的显式优先先例);`logger` 仍无槽(规范未定)。**memory 槽取代 M2 charting「组合根不加 memory 分发槽」的结论**:分工单位从 Memory 实例改为 `MemoryStore` 槽,组合根从槽建出一个共享 `Memory` 并分发给 `app.agent` 与 `app.signals`——signals 契约要求两侧同一实例,共享实例是 `app.signals({ agent })` 开箱即用的前提;自备实例(工作记忆等)仍显式传入、不被接管。子系统不挂组合根独立使用不回归。
 
 (来源:wayfinder ticket #8)
