@@ -2,9 +2,9 @@
 
 Ultralight TypeScript agent framework. Compose only what you use — run anywhere, no runtime baggage.
 
-> **Status:** pre-1.0. Agents, memory, and workflows are complete; signals have landed; durable
-> agents and schedules are next ([roadmap](docs/ROADMAP.md)). The first public npm release (0.1.0)
-> has not been published yet — until then, run Balsa from this repo (see
+> **Status:** pre-1.0. Agents, memory, workflows and the harness trio — durable agents, signals,
+> schedules — are complete ([roadmap](docs/ROADMAP.md)). The first public npm release (0.1.0) has not
+> been published yet — until then, run Balsa from this repo (see
 > [Development](#development)).
 
 ## Why Balsa
@@ -175,6 +175,41 @@ inject user input into an active run, wake an idle thread into a new run, or que
 injected content lands in the message history. Single-process semantics; cross-instance
 distribution belongs to capability packages.
 
+### Durable agents
+
+```ts
+import { createDurableAgent } from '@balsa/core/durable-agent';
+
+// The agent wrapped so a run can stop and wait for a human: a tool call whose name is on the
+// approval list does not execute — the run suspends with its loop snapshot written to a port.
+const durable = app.durableAgent({ agent, approval: { tools: ['issueRefund'] } });
+const out = durable.stream('Please refund order A-4471.');
+// out.finishReason === 'suspended' → out.suspendPayload says what was held
+await durable.resume(out.runId, { approved: true }); // executes it... or false: the model replans
+```
+
+The approval declaration lives on the wrapper, never on the tool — a tool stays four fields and the
+core stays permission-free. Snapshots are JSON-only and go through `AgentRunSnapshotStore`
+(`load` / `save`, in-memory by default); a resume opens a new `agent-run` span in the same trace, so
+one human interaction stays one trace. Crash recovery, multi-replica leases and a resumable stream
+are deliberately not core.
+
+### Schedules
+
+```ts
+import { createSchedules } from '@balsa/core/schedules';
+
+const schedules = createSchedules({ agents: { desk: agent }, signals });
+await schedules.save({ id: 'morning-sweep', next: (from) => nextDailyAt(9, from), target: { … } });
+await schedules.tick(); // list what is due → fire it → advance nextFireAt
+```
+
+`tick` is the whole runtime: a platform cron hitting an endpoint that calls it is the first-class
+shape, and `startTicker` is only an in-process convenience. Records are JSON-only through
+`ScheduleStore`; the occurrence function is **injected** (`next(from) → Date | null`), so cron
+parsing never enters the core. A trigger is either threadless (`agent.generate`) or threaded (a
+`sendSignal` into a conversation — schedules reusing signals).
+
 ## Package surface
 
 | Import path | What it gives you |
@@ -186,7 +221,9 @@ distribution belongs to capability packages.
 | `@balsa/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
 | `@balsa/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
 | `@balsa/core/observability` | `createTracer`, console / memory exporters, span types |
-| `@balsa/core/signals` | `createSignals` |
+| `@balsa/core/signals` | `createSignals` — inject / wake / queue on a thread |
+| `@balsa/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
+| `@balsa/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
 
 External-dependency capabilities (MCP server/client, OTLP exporter, SQLite storage adapter,
 AI SDK interop) ship as separate `@balsa/<capability>` packages — install only what you use
@@ -210,6 +247,8 @@ Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
 | [`minimal-agent`](examples/minimal-agent/) | one agent, one tool, streaming, the composition root, console tracing |
 | [`memory-chat`](examples/memory-chat/) | two threads on one resource, message history, `recall()`, working memory |
 | [`workflow-approval`](examples/workflow-approval/) | `foreach` / `parallel` / `branch`, an agent step, suspend → snapshot → resume |
+| [`durable-approval`](examples/durable-approval/) | the approval gate: a tool call held at the step boundary, `finishReason: 'suspended'`, `resume({ approved })` two ways |
+| [`signals-desk`](examples/signals-desk/) | one thread: wake / inject / queue in order, a typed `sendSignal`, `subscribeToThread`, a scheduled `tick` |
 
 ## Documentation
 
