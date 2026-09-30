@@ -312,14 +312,17 @@ describe('schedules:tick 健壮性', () => {
       target: { agent: 'working', input: 'Go!' },
     });
 
-    await expect(
-      schedules.tick({ now: new Date(broken.nextFireAt!) }),
-    ).resolves.toBeUndefined();
+    // Both records must be due at the tick. The two saves anchor `nextFireAt` at their own
+    // wall-clock `new Date()` and may straddle a millisecond, so the tick's now is the later of
+    // the two — and both advance from that same now (tick's contract: advance from its `now`).
+    const due = Math.max(broken.nextFireAt!, healthy.nextFireAt!);
+
+    await expect(schedules.tick({ now: new Date(due) })).resolves.toBeUndefined();
 
     expect(failing.streamCalls).toHaveLength(1); // 失败也算本次到期已花出
     expect(working.streamCalls).toHaveLength(1); // 坏目标不阻塞后续记录
-    expect((await storage.get(broken.id))?.nextFireAt).toBe(broken.nextFireAt! + 60_000);
-    expect((await storage.get(healthy.id))?.nextFireAt).toBe(healthy.nextFireAt! + 60_000);
+    expect((await storage.get(broken.id))?.nextFireAt).toBe(due + 60_000);
+    expect((await storage.get(healthy.id))?.nextFireAt).toBe(due + 60_000);
   });
 
   it('进程内无 next 登记的到期记录被跳过:不触发、不推进(不能重排就不重发)', async () => {

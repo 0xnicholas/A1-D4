@@ -1,0 +1,9 @@
+{
+  "metric": "npm-install-closure-packages-and-unpacked-bytes",
+  "dependencies": {
+    "@modelcontextprotocol/server": {
+      "packages": 3,
+      "bytes": 13898836
+    }
+  }
+}

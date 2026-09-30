@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@balsa/core": ["../../packages/core/src/index.ts"],
+      "@balsa/core/*": ["../../packages/core/src/*/index.ts"],
+      "@balsa/mcp-server": ["./src/index.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}
