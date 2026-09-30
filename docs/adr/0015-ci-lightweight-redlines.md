@@ -27,5 +27,11 @@ CI 单 job,两段:硬闸门 `pnpm verify`(typecheck / build / test / check:dist 
 - esbuild 进根 devDependencies(ADR-0014 预告的路径);零运行时依赖红线不受影响——dev 依赖不进用户依赖树,且 `check:runtime-deps` 会挡住 devDependency 经静态导入泄漏进产物的情形(扫描边界见上)。
 - `check:runtime-deps` 需要先 build(扫 dist);`pnpm verify` 的顺序保证这一点,单独调用而产物缺失时会以明确报错退出。
 - 黄灯只保证「超预算可见」,不保证「基线被及时收紧」:压低数字靠 review 时的习惯,不设机制。
+- **修订(M5 基建政策,2026-09-30)**:能力包(带依赖包)红线口径冻结——白名单硬闸门 + 数字黄灯,依据 [决策:M5 能力包基建政策](https://github.com/0xnicholas/balsa-framework/issues/72) 决议评论:
+  - **硬闸门推广为「仅声明依赖」**:产物导入扫描的合法集从「零」推广为 Node 内置 ∪ 相对路径 ∪ 本包 manifest 运行时字段(`dependencies ∪ optionalDependencies ∪ peerDependencies`)的包名——名字精确匹配、含子路径(`pkg/sub`);其余说明符照旧即红。core 的合法集恒为空集(三字段非空即红,原语义不变);传递依赖不进导入扫描(重量由下方数字承载);`devDependencies` 不在合法集——源码误引 devDependency 照旧被挡。
+  - **依赖数字 = 新黄灯**:每包 `deps-budget.json`(metric 字段沿本 ADR 先例,口径不符即退出码 2),条目 = 每个声明运行时依赖一条实测(传递包数 `packages` + 解包体积 `bytes` 合计;peer `@balsa/core` 豁免——核心重量由核心自身预算承载,其余 peer 如 `ai` 照记);`pnpm deps-budget:update` 用实测值重写(基线调整与代码同 PR);缺基线/超基线 = 退出码 1(黄灯),「声明但产物零引用」追加一行黄灯记录;CI 步骤与字节黄灯并列:`pnpm check:deps-budget || test $? -eq 1`。
+  - **字节预算口径分形**:能力包测量把非相对导入一律 external,数字只反映第一方代码(供应商重量由 deps-budget 数字承载);对零依赖的 core 无差异;gzip 照旧记录、不设闸门。
+  - **脚本落位**:共享实现移入根 `scripts/`(check-dist / check-runtime-deps / check-byte-budget / check-deps-budget),各包 `package.json` 留同名薄脚本指回根实现,`pnpm -r --if-present` 编排与 0/1/2 退出码契约不变;core 包内 `scripts/` 副本删除。脚本实现归实施图(本票只冻位置与挂法)。
+  - **verify 内测试硬约束**:能力包单测必须无网络/外部服务(传输层 mock/fake;`node:sqlite` 等内置可用临时文件),保 CI 单 job 裸跑;需要真实服务/跨进程的验证落 `examples/`(不进 verify)。
 
 (来源:M1-02 ticket #23;度量口径由 ADR-0014 留给本票决定)

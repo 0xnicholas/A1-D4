@@ -12,3 +12,5 @@
 6. [observability.md](observability.md) — Observability 形态:自有 span 模型、三事件、exporter 最小面、七边界埋点
 7. [storage.md](storage.md) — 存储适配策略:port 集合 + adapter 家族(非子系统)、additive-only 演化纪律
 8. [harness.md](harness.md) — Harness 语义集:durable 审批闸、signals、schedules(文档分类,非模块)
+
+> **能力包(M5)口径**:目录与构建沿 [ADR-0002](../adr/0002-package-structure.md) 的 M5 修订记(平铺 `packages/<短名>`、清单字段沿核心、对核心走 peer);依赖红线与黄灯数字口径沿 [ADR-0015](../adr/0015-ci-lightweight-redlines.md) 的 M5 修订记。各包的定义表面仍归对应篇章:MCP server/client → tools.md、OTLP exporter → observability.md、SQLite adapter → storage.md、AI SDK 互操作 → model.md、croner 封装 → harness.md、bunfold 桥 → memory.md。
