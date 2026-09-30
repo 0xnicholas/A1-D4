@@ -112,7 +112,12 @@ async function measureClosure(name, range) {
   }
 }
 
-/** registry 元数据取单包解包体积;失败即硬错误(测量失败,退出码 2)。 */
+/**
+ * registry 元数据取单包解包体积;获取失败即硬错误(测量失败,退出码 2)。
+ * 老包元数据可能缺 dist.unpackedSize(如 isexe@2.0.0,2014 年发布)——沿 #6 事实底座口径
+ * (docs/research/lightweight-benchmarks-mcp.md 方法学:「体积为下界」):计包数、字节计 0、
+ * 黄灯注记下界;不硬错误。
+ */
 async function fetchUnpackedSize(name, version) {
   let document;
   try {
@@ -130,7 +135,10 @@ async function fetchUnpackedSize(name, version) {
   }
   const size = document?.dist?.unpackedSize;
   if (typeof size !== 'number') {
-    hardError(`${manifest.name}:${name}@${version} 的 registry 元数据缺 dist.unpackedSize`);
+    console.warn(
+      `${manifest.name}:${name}@${version} 的 registry 元数据缺 dist.unpackedSize——计 0 B,合计为下界(#6 口径)`,
+    );
+    return 0;
   }
   return size;
 }

@@ -1,0 +1,21 @@
+{
+  "name": "@balsa/example-mcp-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Balsa MCP paired example: serve a tool container with @balsa/mcp-server, bridge it back with @balsa/mcp-client, assert the round-trip.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@balsa/core": "workspace:*",
+    "@balsa/mcp-client": "workspace:*",
+    "@balsa/mcp-server": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}
