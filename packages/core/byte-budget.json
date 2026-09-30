@@ -7,6 +7,7 @@
     "./tools": 224,
     "./observability": 5341,
     "./workflows": 16652,
-    "./memory": 5193
+    "./memory": 5193,
+    "./signals": 5509
   }
 }
