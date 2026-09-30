@@ -19,5 +19,12 @@ Tool 收敛为四字段普通对象(`description` + 可选 `inputSchema`/`output
 - 无参工具的 `input` 类型为 `undefined`,provider 侧收空 object schema;桥接工具的 inputSchema 是 JSON Schema 直通包装(validate 直通、jsonSchema 原文),远端校验失败经 execute 错误回喂。
 - MCP server 包暴露期校验工具名合法字符集 `[a-zA-Z0-9_-]{1,64}`,非法即报错(agent 域合法不代表 MCP 域合法)。
 - prompts / resources 原语、OAuth 助手、listChanged 订阅均为 minor 后加位,不进 v1。
+- **修订(M5 MCP server 设计冻结,2026-09-30)**:`@balsa/mcp-server` 设计冻结(包面 / era 姿态 / ToolContext 合成 / 结果与错误投影 / 工具名口径 / 依赖与绑定),依据 [决策:MCP server 能力包](https://github.com/0xnicholas/balsa-framework/issues/74) 决议评论与 `docs/architecture/tools.md`「MCP server 能力包」节:
+  - **包面**:`createMcpServer({ name, version, tools }, { http?: { legacy } })` 返回单对象——`server.fetch(request, opts?)`(HTTP,web-standard handler)、`server.serveStdio({ legacy?, transport? })`(stdio)、`server.close()`(闭合已开入口、中止在途);SDK 的 `notify` / `bus` 不暴露。
+  - **era 姿态**:默认双代全服务(HTTP `legacy: 'stateless'`、stdio `'serve'`),两处可切 `'reject'`;legacy sessionful 不做,需要者用官方 SDK 自布线。
+  - **依赖与绑定**:直连仅 `@modelcontextprotocol/server@^2.2.0`(传递闭包 3 包:server / core / zod;数字口径归 `deps-budget.json`,实施图落基线);Node `node:http` 绑定与 Host/Origin 防护归用户侧(官方 `@modelcontextprotocol/node`),不绑 web 框架、旧 SSE 不做。
+  - **ToolContext 合成**:`signal ← ctx.mcpReq.signal`;`toolCallId ← String(ctx.mcpReq.id)`;`runId` / `traceId` / `spanId` 空串(无 run、不注入 tracer);`requestContext` 冻结空袋(仅框架写的 `signal` / `runId: ''`)。
+  - **结果与错误投影**:`outputSchema` 存在 → `structuredContent` = output 原文 + text 渲染(`string` 原样 / 其余 `JSON.stringify`);三线错误(输入校验 / execute 抛错 / 输出校验)全交 SDK 归一为 `isError` 结果,未知 / 禁用工具为协议错误(wire 错误还原归 client 包)。
+  - **工具名口径改写**:暴露期校验由上文 `[a-zA-Z0-9_-]{1,64}` 改为对齐 MCP 规范 SHOULD 的 `[A-Za-z0-9_.-]{1,128}`(含点、上限 128),在 `createMcpServer()` 构造期逐键校验;上文 Consequences 相应行为本修订取代。
 
 (来源:wayfinder ticket #13)

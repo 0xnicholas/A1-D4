@@ -82,16 +82,27 @@ createStep({
 
 ## MCP server 能力包
 
-独立 npm 包(名待「项目命名与品牌」决策),依赖 `@modelcontextprotocol/server` + `@modelcontextprotocol/node`——边际约 2–3 个包,复用 zod@4(#6 实测)。v1 单包 `@modelcontextprotocol/sdk`(92 安装包、硬拉 express+hono)为过时路径,明确排除。
+独立 npm 包 `@balsa/mcp-server`(ADR-0002 M5 修订;`@balsa/core` 走 peer,清单三件套沿能力包先例)。直连依赖仅 `@modelcontextprotocol/server@^2.2.0`——传递闭包 server / core / zod 3 包;Node `node:http` 绑定与 Host/Origin 防护归用户侧(官方 `@modelcontextprotocol/node`,文档钉接线),不直连。v1 单包 `@modelcontextprotocol/sdk`(92 安装包、硬拉 express+hono)为过时路径,明确排除。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
 
 ```ts
-createMcpServer({ name, version, tools: Record<string, Tool> })
+const server = createMcpServer(
+  { name, version, tools: Record<string, Tool> },
+  { http?: { legacy?: 'stateless' | 'reject' } }, // 创建期选项;省略 = SDK 默认
+)
+
+server.fetch                                // web-standard handler:(Request, opts?) => Promise<Response>
+server.serveStdio({ legacy?, transport? })  // → { close } — 起 stdin/stdout 服务
+await server.close()                        // 闭合已开入口、中止在途
 ```
 
-- **transport**:stdio + Streamable HTTP;HTTP 经官方 node thin middleware 接入——不绑任何 web 框架,不自实现传输;旧 SSE 传输已废弃,不做。
+- **传输接入面**:HTTP = `server.fetch`,可直接 `export default { fetch }` 或挂任意 web 框架/运行时,`opts` 透传 SDK 的 `{ authInfo?, parsedBody? }`(v1 不消费 `authInfo`;`parsedBody` 给预解析 body 的框架);Node `node:http` 宿主自装官方 `@modelcontextprotocol/node`(`toNodeHandler` + `localhostHostValidation` / `localhostOriginValidation`,文档给片段)——不绑 web 框架、不自实现传输;旧 SSE 传输已废弃,不做。stdio = `server.serveStdio()`,options 里的 `transport` 是 in-process 接缝(`InMemoryTransport` 仅连 2025 代;modern 的 in-process 入口就是 `server.fetch`);v1 只收 `legacy` / `transport` 两项,其余沿 SDK 默认。`close()` 沿 SDK 语义:modern 在途交换被中止、闭合后 `fetch` 拒绝,legacy stateless 交换不被追踪。SDK 的 `notify` / `bus` 不暴露(静态工具无 listChanged;跨节点分发出 v1)。
+- **era 姿态**:默认双代全服务(HTTP `legacy: 'stateless'`、stdio `legacy: 'serve'`);可切 `'reject'` 只服务 modern。legacy sessionful 不做——需要者用官方 SDK 自布线(`McpServer.connect(transport)`;更底层的 `Server` 类已 deprecated)。
 - **原语范围**:v1 仅 tools;prompts / resources 后加(minor)。
-- **工具名合法性**:MCP 字符集 `[a-zA-Z0-9_-]{1,64}`(provider 侧大致相同);Record 键是任意字符串,暴露期校验、非法名即报错——agent 域合法不代表 MCP 域合法。
-- Tool 的 inputSchema/outputSchema 本就是 Standard Schema,MCP v2 SDK 原生讲 Standard Schema(ADR-0003),映射零适配层。
+- **ToolContext 合成**:`signal ← ctx.mcpReq.signal`;`toolCallId ← String(ctx.mcpReq.id)`(JSON-RPC 请求身份,跨连接不保证稳定);`runId` / `traceId` / `spanId` 为空串——MCP 无 run、v1 不注入 tracer,与 NoOpSpan / 手动直调语义对齐;`requestContext` 冻结空袋(框架只写 `signal` 与 `runId: ''`,不塞 `authInfo` / `era` 等 MCP 事实;授权归传输层中间件,需要 per-request 工具集的宿主走官方 SDK 自布线)。
+- **结果与错误投影**:`outputSchema` 存在 → `structuredContent = output` 原文 + `content = [{ type: 'text', text: render(output) }]`;无 `outputSchema` → 仅 content。`render` = `string` 原样、其余 `JSON.stringify`(`undefined` 退化 `String`)。输入校验 / execute 抛错 / 输出校验三线全由 SDK 归一为 `{ content: […], isError: true }` 结果——Balsa 不加层、不改消息;未知 / 禁用工具沿 SDK 的协议错误(JSON-RPC error),wire 错误还原为本框架语义是 client 包的职责。
+- **工具名合法性**:`[A-Za-z0-9_.-]{1,128}`(对齐 MCP 规范 SHOULD,ADR-0008 修订);`createMcpServer()` 构造期逐键校验,非法即抛——agent 域合法不代表 MCP 域合法。
+- **每请求实例**:SDK 工厂模型——HTTP 每请求、stdio 每连接(含 discover 探测重进)新建实例;桥接层按次整组注册全部工具(工具 Record 本身不改),工厂须廉价、无副作用。
+- **schema 零适配**:Tool 的 inputSchema/outputSchema 是 `StandardSchemaV1 & StandardJSONSchemaV1`(ADR-0003);SDK 以 `~standard.validate()` 校验(输入/输出,transform 生效)、以 `~standard.jsonSchema` 目标 `draft-2020-12` 出 JSON Schema(与发 provider 的 draft-07 目标同源不同出口);inputSchema 需 object 根。执行输入是 SDK 校验后的值——校验职责整体移交 SDK,与 agent loop 的框架侧校验同义。
 
 ## MCP client 能力包
 
@@ -120,4 +131,4 @@ const client = await createMcpClient({ transport: … })
 
 ## 依赖预算
 
-核心(含 tools 子路径)运行时依赖 = 0(ADR-0001 红线,内部 CI 回归参考);MCP 两能力包各自隔离,不装不付(server ≈ 2–3 包;client 13 包 / 14.1 MiB)。
+核心(含 tools 子路径)运行时依赖 = 0(ADR-0001 红线,内部 CI 回归参考);MCP 两能力包各自隔离,不装不付(server = server / core / zod 3 包,node 绑定归用户侧;client 13 包 / 14.1 MiB)。

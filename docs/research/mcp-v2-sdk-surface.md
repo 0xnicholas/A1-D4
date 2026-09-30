@@ -2,13 +2,14 @@
 
 > Issue: #68 · 日期: 2026-09-30 · 分支: `research/mcp-v2-sdk-surface` · 性质: 事实收集,不做决策。
 > 事实基线:sdk 仓 `modelcontextprotocol/typescript-sdk` main 本地克隆(含 `docs/` 一手文档与 `packages/*/src` 源码)· npm registry 实测 2026-09-30 · MCP 规范 2026-07-28。包数/体积沿 #6 实测(server 2.1.0 / client 2.1.0),本票不重抓,只补版本漂移与 API 面。
+> **勘误(2026-09-30,#74 事实核查,核查 commit `7f4c12a`)**:两处已改入正文——(1) v2 里「低层」类名是 `Server`(deprecated),`McpServer` 是高层注册器,手布线用法两者皆可;(2) `InMemoryTransport` 仅连 2025 代,modern(2026-07-28)的 in-process 入口是 `handler.fetch`。另补 §4.2 转换目标与校验路径的精确事实。
 
 ## TL;DR
 
 - **版本线**:v2 稳定线 = `@modelcontextprotocol/server@2.2.0` + `@modelcontextprotocol/client@2.2.0`(2026-09-28 同日发布,实现 **2026-07-28 规范**;v2.0.0 于 2026-07-27 与规范同发)。配套 `@modelcontextprotocol/core@2.2.0`、`@modelcontextprotocol/node@2.1.0`;v1 `@modelcontextprotocol/sdk@1.31.0` 仍在维护(2026-09-28,2025-11-25 规范线,至少 6 个月 bug/安全修复窗口)。
 - **zod v4 是直接运行时依赖,不是 peer**:`core` / `server` / `client` 都声明 `zod: ^4.2.0`(core 用 zod 定义全部协议 schema)。工具 schema 面接受任意 **Standard Schema 且能产出 JSON Schema**(Zod v4、ArkType 直用;Valibot 需 `@valibot/to-json-schema` 包装),类型名 `StandardSchemaWithJSON`。**「Standard Schema 原生」成立,但安装树仍带 zod**。
 - **两个协议代(era)**:`modern` = `2026-07-28`(无 `initialize`、无 session、每请求 `_meta` envelope);`legacy` = `2024-10-07`…`2025-11-25`(`initialize` 握手 + `Mcp-Session-Id`)。同一入口默认两代都服务;服务端工厂能读到当前请求的 era。
-- **服务端两个入口**:HTTP = `createMcpHandler(factory, opts)` → `{ fetch, close, notify, bus }`,工厂**每请求**建一个新实例(默认无状态、无 session);stdio = `serveStdio(factory, opts)` → `{ close }`(每连接一个实例)。裸 `McpServer` + `server.connect(transport)` 仍是低层/自布线用法(legacy sessionful、自定义 transport)。
+- **服务端两个入口**:HTTP = `createMcpHandler(factory, opts)` → `{ fetch, close, notify, bus }`,工厂**每请求**建一个新实例(默认无状态、无 session);stdio = `serveStdio(factory, opts)` → `{ close }`(每连接一个实例)。裸 `McpServer`(高层注册器)+ `server.connect(transport)` 是自布线用法(legacy sessionful、自定义 transport);更底层的 `Server` 类(经 `server.server` 暴露)已 deprecated。
 - **工具注册**:`server.registerTool(name, config, handler)`;handler 签名 `(args, ctx)`,**无 `inputSchema` 时是 `(ctx)`**;输入校验在 handler 之前由 schema 库执行,`tools/list` 广告由 schema 派生的 **2020-12** JSON Schema。
 - **错误二分**:协议错误(JSON-RPC error)vs 工具错误(`isError: true` 结果)。`tools/call` 路径**未知工具 / 工具被禁用 → 协议错误**;**输入校验失败 / execute 抛错 / 输出校验失败 → 一律 `{ content:[{type:'text',text:message}], isError:true }`**;唯一例外是 `UrlElicitationRequiredError`(-32042)透传为协议错误。
 - **handler 上下文**:请求面在 `ctx.mcpReq`(`signal` / `_meta` / `notify` / `log` / `id` / `envelope` / `requestState()` / `elicitInput` / `requestSampling`),HTTP 面在 `ctx.http`(`authInfo` / `req` / close 流句柄),另有 `ctx.sessionId`(legacy)。
@@ -86,10 +87,11 @@ const handle = serveStdio(factory, { legacy? }); // → StdioServerHandle { clos
 - stdin EOF → transport 自行关闭、连接拆除;**在途请求被中止且永不回答**(stdout 是 JSON-RPC 通道,日志必须走 stderr);`server.server.onclose` 可挂清理(如释放 keep-alive 句柄)。
 - MCP Inspector:`npx @modelcontextprotocol/inspector node ./build/server.js`。
 
-### 3.3 低层:`McpServer` + `connect(transport)`
+### 3.3 自布线:`McpServer` + `connect(transport)`
 
-- `new McpServer({ name, version }, { capabilities?, jsonSchemaValidator? })`;`server.server` 暴露低层 `Server`(clé `server.server.onclose`);`await server.connect(transport)`;`await server.close()`。
-- `connect` 后 server 接管 transport(替换既有回调),不得多方共用同一 transport 实例。
+- `new McpServer({ name, version }, { capabilities?, jsonSchemaValidator? })`;`server.server` 暴露更底层的 `Server` 类(**已 deprecated**,仅高级用例);`await server.connect(transport)`;`await server.close()`。
+- `connect` 后 server 接管 transport(替换既有回调),不得多方共用同一 transport 实例;`registerCapabilities` 在 connect 后抛 `AlreadyConnected`。
+- 自定义 transport 走这条(含公开导出的 `InMemoryTransport.createLinkedPair()`,**仅连 2025 代**);modern 的 in-process 入口是 `handler.fetch`(官方 `docs/testing.md`)。
 
 ### 3.4 中间件/框架接线(server 侧)
 
@@ -138,6 +140,7 @@ server.registerTool(
 - 一个 schema 派生三件事:发给模型的 JSON Schema、handler 之前的入参校验、handler 参数类型推断;**校验在 handler 之前**。
 - `registerTool` 的 **raw-shape 重载已 deprecated**(`inputSchema: { name: z.string() }`,内部 `z.object()` 自动包装)。
 - JSON Schema 口径:**2020-12**(`tools/list` 广告里带 `$schema: https://json-schema.org/draft/2020-12/schema`);SDK 内 `standardSchemaToJsonSchema(input, 'input')` 转换;无参工具发 `{ type:'object', properties:{} }`(规范推荐 `{ type:'object', additionalProperties:false }`,SDK 未采用)。
+- **核查补记(2026-09-30,#74 事实核查,核查 commit `7f4c12a`)**:`standardSchemaToJsonSchema`(core-internal 内部函数)向 `~standard.jsonSchema[io]({ target: 'draft-2020-12' })` 请求转换,**不重戳 `$schema`、不做 definitions↔$defs 变换**,只做根对象归一(input 侧显式非 object `type` 抛错、否则 `{ type:'object', … }`);入参/输出校验都直接调 `~standard.validate()`(zod transform/coercion 生效),JSON Schema 验证器(Ajv / cf-worker)只在 `fromJsonSchema` 包装与 elicitation 表单路径。
 - **JSON Schema 验证器**只用于两处:`fromJsonSchema` 的入参、elicitation 表单响应;Node 默认 Ajv、workerd/浏览器用 `@cfworker/json-schema`,可用 `server/validators/ajv` 或 `/validators/cf-worker` 子路径钉死。
 - `x-mcp-header`(SEP-2243):生成 `Mcp-Param-{name}` HTTP 头;服务端列工具时扫描并 warn,客户端 **MUST** 剔除非法声明工具(源码 `scanXMcpHeaderDeclarations`,core-internal/server/client 均有)。
 
@@ -199,7 +202,7 @@ await client.connect(new StreamableHTTPClientTransport(new URL(url), {
 }));
 ```
 
-- transport 家族:`StreamableHTTPClientTransport`(现代)、`StdioClientTransport`(`@modelcontextprotocol/client/stdio`,子进程)、`SSEClientTransport`(老 SSE 服务端回退)、`InMemoryTransport.createLinkedPair()`(同进程对打,**Balsa 的 MCP server/client 对打 example 可直接用**)。
+- transport 家族:`StreamableHTTPClientTransport`(现代)、`StdioClientTransport`(`@modelcontextprotocol/client/stdio`,子进程)、`SSEClientTransport`(老 SSE 服务端回退)、`InMemoryTransport.createLinkedPair()`(同进程对打,**但仅连 2025 代**;modern 对打的 in-process 入口 = 服务端 `handler.fetch`,客户端侧可把 transport 的 `fetch` 注向它)。
 - `await client.connect(transport)` 完成握手;默认 legacy `initialize`(`versionNegotiation: { mode:'auto' }` 先 `server/discover` 探测、失败回退;`{ pin:'2026-07-28' }` 不回退、失败抛 `SdkError(ERA_NEGOTIATION_FAILED)`);`client.getProtocolEra()` 读 era;`getServerVersion()` / `getServerCapabilities()` / `getInstructions()` / `getDiscoverResult()`(有值 = modern,可缓存作 `prior` 跳过探测)。
 - **关闭**:`await transport.terminateSession()`(Streamable HTTP,server 未发 session id 时不发请求)→ `await client.close()`;`close()` 拆 transport 并以 `CONNECTION_CLOSED` 拒绝所有在途请求。**`StdioClientTransport.close()` 顺序 = 关 stdin → SIGTERM → SIGKILL**(客户端拥有子进程;服务端子进程归属在客户端侧)。
 - 客户端中间件:`createMiddleware` / `applyMiddlewares` / 内置 `withLogging()` / `withOAuth(provider, url)`;`withLogging` 默认写 `console`,stdio 进程里需自供 `logger`。
@@ -239,7 +242,7 @@ const res = await client.callTool({ name, arguments }, {
 
 ### 9.1 server 包(`createMcpServer({ name, version, tools })` 形态)
 
-- **入口选择是显式分叉**:HTTP 走 `createMcpHandler`、stdio 走 `serveStdio`;二者都接受「工厂」而非单例 server —— 与 Balsa 的动态工具容器(`DynamicArgument<Record<string, Tool>>`)**天然契合**:每请求/每连接按当次容器注册。若要单实例语义,才用低层 `McpServer` + `connect`。
+- **入口选择是显式分叉**:HTTP 走 `createMcpHandler`、stdio 走 `serveStdio`;二者都接受「工厂」而非单例 server —— 与 Balsa 的动态工具容器(`DynamicArgument<Record<string, Tool>>`)**天然契合**:每请求/每连接按当次容器注册。若要单实例语义,才用 `McpServer` + `connect` 自布线(更底层的 `Server` 已 deprecated)。
 - **ToolContext 合成**(Balsa 六件套 `signal` / `runId` / `toolCallId` / `requestContext` / `traceId` / `spanId`)在 MCP 侧只有部分对应物:`signal` ← `ctx.mcpReq.signal`;**`toolCallId` 的天然候选是 `ctx.mcpReq.id`(JSON-RPC id,SDK 未以其命名)**;`runId` / `traceId` / `spanId` 在 MCP 协议面**无对应物**(需空串/自造),`requestContext` 为空袋。
 - **错误三线映射已精确**:Balsa 的「输入校验 / execute 抛错 / 输出校验」三线在 MCP 侧就是 `isError: true` 结果,SDK 自己完成归一(catch 分支);Balsa 只需保证 `execute` 不吞异常、`outputSchema` 与 `structuredContent` 成对出现。
 - **工具名合法性要自己校验**:SDK 不查字符集/长度,只在 `x-mcp-header` 上警告;重复名由 SDK 抛错。规范 SHOULD 的字符集(含 `.`,1–128)与 Balsa `tools.md` 现写的 `[a-zA-Z0-9_-]{1,64}` **不一致**。
