@@ -13,4 +13,13 @@
 7. [storage.md](storage.md) — 存储适配策略:port 集合 + adapter 家族(非子系统)、additive-only 演化纪律
 8. [harness.md](harness.md) — Harness 语义集:durable 审批闸、signals、schedules(文档分类,非模块)
 
-> **能力包(M5)口径**:目录与构建沿 [ADR-0002](../adr/0002-package-structure.md) 的 M5 修订记(平铺 `packages/<短名>`、清单字段沿核心、对核心走 peer);依赖红线与黄灯数字口径沿 [ADR-0015](../adr/0015-ci-lightweight-redlines.md) 的 M5 修订记。各包的定义表面仍归对应篇章:MCP server/client → tools.md、OTLP exporter → observability.md、SQLite adapter → storage.md、AI SDK 互操作 → model.md、croner 封装 → harness.md、bunfold 桥(已裁,#79) → memory.md。
+> **能力包(M5)口径**:目录与构建沿 [ADR-0002](../adr/0002-package-structure.md) 的 M5 修订记(平铺 `packages/<短名>`、清单字段沿核心、对核心走 peer);依赖红线与黄灯数字口径沿 [ADR-0015](../adr/0015-ci-lightweight-redlines.md) 的 M5 修订记。六包 + bunfold 裁单已设计冻结(地图 [#65](https://github.com/0xnicholas/balsa-framework/issues/65) 收线,实施另立 effort);各包定义表面仍归对应篇章:
+>
+> | 包 | 定义表面(所在节) |
+> | --- | --- |
+> | `@balsa/mcp-server` / `@balsa/mcp-client` | [tools.md](tools.md)「MCP server 能力包」/「MCP client 能力包」 |
+> | `@balsa/otlp` | [observability.md](observability.md)「OTLP 能力包(M5 设计冻结)」 |
+> | `@balsa/sqlite` | [storage.md](storage.md)「SQLite 参考 adapter(M5 设计冻结)」 |
+> | `@balsa/ai-sdk` | [model.md](model.md)「AI SDK 互操作能力包(M5 设计冻结)」 |
+> | `@balsa/croner` | [harness.md](harness.md)「croner 封装能力包」 |
+> | bunfold 桥(**已裁**,不建包;[#79](https://github.com/0xnicholas/balsa-framework/issues/79)) | [memory.md](memory.md)「外部记忆引擎(M5 裁定:不产桥接包)」 |

@@ -11,7 +11,9 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 > yet**: the package version is still `0.0.0` and the registry has nothing under `@balsa`. The
 > planned versions are 0.1.0 = M1+M2, 0.2 = M1–M3, 0.3 = M1–M4 (everything this README
 > describes) and 0.5 = M1–M5, all currently pending a manual owner publish — until then, use
-> Balsa from this repo (see [Development](#development)).
+> Balsa from this repo (see [Development](#development)). Beyond the core, the M5 capability
+> packages are **design-frozen** — specs committed, implementation still to come, nothing
+> installable yet (see [Capability packages](#capability-packages-m5)).
 
 ## Why Balsa
 
@@ -235,9 +237,25 @@ parsing never enters the core. A trigger is either threadless (`agent.generate`)
 | `@balsa/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
 | `@balsa/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
 
-External-dependency capabilities (MCP server/client, OTLP exporter, SQLite storage adapter,
-AI SDK interop) ship as separate `@balsa/<capability>` packages — install only what you use
-(see the [roadmap](docs/ROADMAP.md), M5).
+### Capability packages (M5)
+
+**Design frozen, not yet published.** Capability packages that carry external dependencies ship
+as separate `@balsa/<capability>` packages — install only what you use. All six are specified and
+frozen ([roadmap](docs/ROADMAP.md), M5); implementation is a separate effort, and none of them is
+on npm yet:
+
+| Package | What it will give you | Spec |
+| --- | --- | --- |
+| `@balsa/otlp` | an OTLP exporter: Balsa spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
+| `@balsa/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
+| `@balsa/mcp-client` | another MCP server's tools, as Balsa tools | [tools.md](docs/architecture/tools.md) |
+| `@balsa/sqlite` | a SQLite adapter for all four storage ports | [storage.md](docs/architecture/storage.md) |
+| `@balsa/ai-sdk` | AI SDK UI message stream interop and a `useChat` route | [model.md](docs/architecture/model.md) |
+| `@balsa/croner` | cron expressions as the injected `next` function | [harness.md](docs/architecture/harness.md) |
+
+The bunfold memory bridge was evaluated and ruled out for now; its reopen conditions live in the
+roadmap's deferred list. Packaging and dependency-redline rules are in
+[ADR-0002](docs/adr/0002-package-structure.md) and [ADR-0015](docs/adr/0015-ci-lightweight-redlines.md).
 
 ## Examples
 

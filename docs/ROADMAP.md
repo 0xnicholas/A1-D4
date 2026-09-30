@@ -59,12 +59,26 @@
 
 - **OTLP exporter 包**:GenAI semconv 映射,HTTP only(依赖 M1 观测内核)
 - **MCP server 包 / MCP client 包**:同一份 Tool 双向流通,桥接 schema 直通零适配(依赖 M1 工具)
-- **SQLite 参考 adapter**:实现全部四个存储 port;驱动选型留实现期,默认 `node:sqlite`(Node ≥22 基线,见 [决策:存储适配策略](https://github.com/0xnicholas/balsa-framework/issues/15))(依赖 M2–M4 的 ports)
+- **SQLite 参考 adapter**:实现全部四个存储 port;驱动已冻 = `node:sqlite`(免 flag 基线 ≥22.13,见下「设计冻结」;port 策略见 [决策:存储适配策略](https://github.com/0xnicholas/balsa-framework/issues/15))(依赖 M2–M4 的 ports)
 - **AI SDK 互操作包**:chunk 协议 ↔ AI SDK 流格式等外部格式转换(依赖 M1)
+- **croner 封装包**:cron 表达式 → `next` 注入片段的便利件(表达式仍归宿主侧定义,不入记录;依赖 M4 schedules 的 `NextFn`;M4 地图移交件)
 - **bunfold 桥接包(按需可裁)**:外部记忆系统桥接参考实现,价值在验证 memory seam 设计(依赖 M2)——**M5 裁定:裁**(不产桥接包;重开条件见延后清单「外部记忆引擎桥接」)
 
 **验证**:OTLP → 本地 collector example;MCP server/client 对打 example;SQLite 跨进程挂起恢复 example。
 **依赖**:各包分别挂 M1–M4 对应接缝,包间可并行。
+
+**设计冻结(M5 收尾,2026-09-30)**:[wayfinder 地图:M5 生态能力包](https://github.com/0xnicholas/balsa-framework/issues/65) 收线——七件全部落成决策(六包 + bunfold 裁单),各件定义表面冻结在 `docs/architecture/` 的增补节,实施按 spec 直落、不再需要裁决。**实施(落码 / example / 测试 / 依赖预算基线)另立 effort**,本里程碑只到 spec;发布动作(0.5,owner 手工)口径不变(见下「发布节奏与 v1.0 门槛」与 [#45](https://github.com/0xnicholas/balsa-framework/issues/45))。
+
+| 件 | 冻结规范(节) | 决策 | 事实底座 |
+| --- | --- | --- | --- |
+| OTLP exporter `@balsa/otlp` | `docs/architecture/observability.md`「OTLP 能力包(M5 设计冻结)」 | [#73](https://github.com/0xnicholas/balsa-framework/issues/73) | `docs/research/otlp-js-packages.md` |
+| MCP server `@balsa/mcp-server` | `docs/architecture/tools.md`「MCP server 能力包」 | [#74](https://github.com/0xnicholas/balsa-framework/issues/74) | `docs/research/mcp-v2-sdk-surface.md` |
+| MCP client `@balsa/mcp-client` | `docs/architecture/tools.md`「MCP client 能力包」 | [#75](https://github.com/0xnicholas/balsa-framework/issues/75) | 同上 |
+| SQLite adapter `@balsa/sqlite` | `docs/architecture/storage.md`「SQLite 参考 adapter(M5 设计冻结)」 | [#76](https://github.com/0xnicholas/balsa-framework/issues/76) | `docs/research/sqlite-driver-landscape.md` |
+| AI SDK 互操作 `@balsa/ai-sdk` | `docs/architecture/model.md`「AI SDK 互操作能力包(M5 设计冻结)」 | [#77](https://github.com/0xnicholas/balsa-framework/issues/77) | `docs/research/ai-sdk-ui-stream-protocol.md` |
+| croner 封装 `@balsa/croner` | `docs/architecture/harness.md`「croner 封装能力包」 | [#78](https://github.com/0xnicholas/balsa-framework/issues/78) | `docs/research/croner.md` |
+| bunfold 桥(**已裁**,不建包) | `docs/architecture/memory.md`「外部记忆引擎(M5 裁定:不产桥接包)」 | [#79](https://github.com/0xnicholas/balsa-framework/issues/79) | `docs/research/bunfold.md` |
+| 横切基建政策(目录 / 依赖红线 / 发布口径) | `docs/architecture/README.md` 能力包口径 + ADR-0002 / ADR-0015 的 M5 修订记 | [#72](https://github.com/0xnicholas/balsa-framework/issues/72) | — |
 
 ## 发布节奏与 v1.0 门槛
 

@@ -46,7 +46,7 @@ type ModelInput =
 
 ## AI SDK 互操作能力包(M5 设计冻结)
 
-> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@balsa/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@balsa/core` 走 peer、与核心锁步发布。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
+> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@balsa/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@balsa/core` 走 peer、与核心锁步发布;事实底座 = `docs/research/ai-sdk-ui-stream-protocol.md`(2026-09-30 实测,版本钉 `ai@7.0.123`)。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
 
 ### 包面
 
