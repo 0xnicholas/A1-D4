@@ -33,7 +33,7 @@ from the AI SDK provider ecosystem — no adapters, no registries.
 
 ## Requirements
 
-- Node.js ≥ 22.12
+- Node.js ≥ 22.13
 - An AI SDK provider package for your model (e.g. `@ai-sdk/openai`), plus a schema library such as
   `zod` for tool input/output — the core itself has zero dependencies
 

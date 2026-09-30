@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.33.2",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "build": "pnpm -r build",
@@ -16,6 +16,8 @@
     "check:runtime-deps": "pnpm -r --if-present check:runtime-deps",
     "check:byte-budget": "pnpm -r --if-present check:byte-budget",
     "byte-budget:update": "pnpm -r --if-present byte-budget:update",
+    "check:deps-budget": "pnpm -r --if-present check:deps-budget",
+    "deps-budget:update": "pnpm -r --if-present deps-budget:update",
     "verify": "pnpm typecheck && pnpm build && pnpm test && pnpm check:dist && pnpm check:runtime-deps"
   },
   "devDependencies": {

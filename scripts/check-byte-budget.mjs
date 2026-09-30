@@ -1,11 +1,14 @@
-// 字节预算黄灯(ADR-0001,M1-02 #23):比对 @balsa/core 构建产物的字节数,超预算给出黄灯。
+// 字节预算黄灯(ADR-0001,M1-02 #23):比对构建产物的字节数,超预算给出黄灯。
 // 口径 = esbuild minify 后每个子路径导出入口的 bundle 字节(与构建链解耦,见 ADR-0014/0015);
 // 基线落 byte-budget.json,`--update` 用实测值重写。
+// M5 分形(ADR-0015 修订):测量把非相对导入一律 external——数字只反映第一方代码,
+// 供应商重量由 deps-budget 数字承载(check-deps-budget.mjs);对零依赖的 core 无差异。
+// 落位(ADR-0015 M5 修订):共享实现居根 scripts/,各包以 `node ../../scripts/check-byte-budget.mjs`
+// 薄脚本指回;退出码契约不变。
 // 退出码契约(ADR-0015):0 = 在预算内;1 = 需处理(黄灯,CI 用 `|| test $? -eq 1` 容忍);
 // 2 = 配置/测量硬错误(口径不符、入口无产物、测量失败)——CI 照常变红。
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import * as esbuild from 'esbuild';
 
@@ -31,20 +34,28 @@ function readJson(file) {
 
 const argv = process.argv.slice(2);
 const update = argv.includes('--update');
-const packageDir = resolve(
-  argv.find((arg) => !arg.startsWith('--')) ?? fileURLToPath(new URL('..', import.meta.url)),
-);
+const packageDir = resolve(argv.find((arg) => !arg.startsWith('--')) ?? process.cwd());
 const manifest = readJson(join(packageDir, 'package.json'));
 
 const formatBytes = (bytes) =>
   `${String(bytes).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} B`;
 const formatDelta = (delta) => `${delta > 0 ? '+' : ''}${formatBytes(delta)}`;
 
-/** esbuild minify 单个导出入口(连其相对导入一起 bundle),返回 minified 与 gzip 字节数。 */
+/** 非相对导入一律 external 的 esbuild 插件:`external: ['*']` 会连相对路径一起外化,
+ * 改用解析钩子按形态判定——只有包形态的说明符（含 Node 内置）出包，相对导入照常内联。 */
+const externalPackagesPlugin = {
+  name: 'external-packages',
+  setup(build) {
+    build.onResolve({ filter: /^[^./]/ }, (args) => ({ external: true }));
+  },
+};
+
+/** esbuild minify 单个导出入口，返回 minified 与 gzip 字节数（非相对导入一律 external，见文件头）。 */
 async function measure(file) {
   const { outputFiles } = await esbuild.build({
     entryPoints: [file],
     bundle: true,
+    plugins: [externalPackagesPlugin],
     minify: true,
     format: 'esm',
     platform: 'node',
@@ -177,7 +188,7 @@ function publishToCi() {
   const lines = [
     `## ${manifest.name} 字节预算`,
     '',
-    `口径 \`${METRIC}\`:esbuild minify 后每个子路径导出入口的 bundle 字节。ADR-0001:仅内部回归参考,不卡合并。`,
+    `口径 \`${METRIC}\`(非相对导入 external,仅第一方代码):esbuild minify 后每个子路径导出入口的 bundle 字节。ADR-0001:仅内部回归参考,不卡合并。`,
     '',
     '| entry | budget | current | delta | gzip | status |',
     '| --- | ---: | ---: | ---: | ---: | --- |',

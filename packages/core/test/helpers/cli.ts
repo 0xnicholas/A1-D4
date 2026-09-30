@@ -5,12 +5,18 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * CI 红线脚本(`packages/core/scripts/`)的测试夹层:组装临时包目录,以子进程真实调用 CLI,
- * 断言退出码与输出——脚本的接缝是命令行本身,不伸手进内部函数。
+ * CI 红线脚本的测试夹层:脚本实现居仓库根 scripts/(ADR-0015 M5 修订),
+ * 本夹层组装临时包目录,以子进程真实调用 CLI,断言退出码与输出——
+ * 脚本的接缝是命令行本身,不伸手进内部函数。测试文件落在 core/test 骑根 vitest 收集面,
+ * 测的是共享脚本本身;后续多包重复时再议抽高(见地图雾点)。
  */
-const SCRIPTS_DIR = fileURLToPath(new URL('../../scripts/', import.meta.url));
+const SCRIPTS_DIR = fileURLToPath(new URL('../../../../scripts/', import.meta.url));
 
-export type RedlineScript = 'check-runtime-deps' | 'check-byte-budget';
+export type RedlineScript =
+  | 'check-dist'
+  | 'check-runtime-deps'
+  | 'check-byte-budget'
+  | 'check-deps-budget';
 
 export interface CliResult {
   readonly status: number | null;
