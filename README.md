@@ -9,9 +9,9 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 > **Status:** pre-1.0. Agents, memory, workflows and the harness trio — durable agents, signals,
 > schedules — are implemented and verified ([roadmap](docs/ROADMAP.md)). **No npm release exists
 > yet**: the package version is still `0.0.0` and the registry has nothing under `@balsa`. The
-> planned versions are 0.1.0 = M1+M2, 0.2 = M1–M3 and 0.3 = M1–M4 (everything this README
-> describes), all currently pending a manual owner publish — until then, use Balsa from this repo
-> (see [Development](#development)).
+> planned versions are 0.1.0 = M1+M2, 0.2 = M1–M3, 0.3 = M1–M4 (everything this README
+> describes) and 0.5 = M1–M5, all currently pending a manual owner publish — until then, use
+> Balsa from this repo (see [Development](#development)).
 
 ## Why Balsa
 
