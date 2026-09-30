@@ -19,5 +19,6 @@
 - 测试从工作区根一把跑;单文件与过滤走 vitest CLI 的路径参数,包内不各自配 runner。
 - 发布面为纯 ESM:Node 22.12 以下不可用;0.x 期若出现真实需求再评估双构建。
 - 工具链版本由根 `package.json` + `pnpm-lock.yaml` 锁定(pnpm 由 `packageManager` 字段固定);dev 工具提升到工作区根,包内不重复声明。
+- **修订(M5 SQLite 参考 adapter 设计冻结,2026-09-30)**:engines 基线自 `>=22.12.0` 抬至 **`>=22.13.0`**(root `engines` / core 与能力包清单 / CI `node-version` 同步),依据 [决策:SQLite 参考 adapter](https://github.com/0xnicholas/balsa-framework/issues/76):`node:sqlite` 在 22.12 需 `--experimental-sqlite`、22.13 起免 flag,而 22.13 ≥ 22.12 使 `require(esm)` 下限性质不变;上文标题与正文的「Node ≥22.12 基线」以本修订为准,双构建仍不做。
 
 (来源:M1-01 ticket #22)

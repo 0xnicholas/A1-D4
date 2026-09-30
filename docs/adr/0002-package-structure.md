@@ -19,5 +19,6 @@ pnpm monorepo。**核心单包**以子路径导出各子系统入口(如 `core/a
   - **对核心的依赖声明**:`peerDependencies: { "@balsa/core": "workspace:^" }`(发布物 = `^0.5.0`)+ `devDependencies: { "@balsa/core": "workspace:*" }`(仅工作区本地解析,不发布)。理由:身份语义假定单份 core(span/chunk 对象身份、组合根共享实例如 signals 两侧同一 `Memory`),peer 是唯一挡得住重复实例的声明方式;npm 7+ 自动安装 peer,随装体验与普通 dependencies 几乎无差。**能力包之间默认不建依赖边**,如真实需要按同规则显式声明并单议。
   - **版本与发布**:1.0 前能力包与核心**锁步同一发布列车**——M5 发布时全部 `@balsa/*` 为 `0.5.0`、peer 范围 `^0.5.0`;单 tag `v0.5.0` + 单 GitHub Release(notes 按包分节,沿既有 changelog 约定);发布动作 owner 手工(沿 #45):bump → tag → `pnpm -r publish --access public`(pnpm 拓扑序 core 先发、自动重写 `workspace:^` 为 `^0.5.0`);每包一个最小英文 README(npm 门面,公共面英文沿 ADR-0013)。
   - **测试与 example 落位**:能力包单测进 `pnpm verify`(`packages/*/test/**` 已被根 vitest 收集;无网络/外部服务的硬约束见 ADR-0015 修订);端到端验证落 `examples/<名>`(workspace 成员、不进 verify),每包 ≥1 个 example 归实施。脚本/测试/example 的实现产物不在本决策范围。
+- **修订(M5 SQLite 参考 adapter 冻结,2026-09-30)**:清单字段的 engines 先例自 `>=22.12.0` 抬至 **`>=22.13.0`**(root `engines` 与 CI `node-version` 同步),依据 [决策:SQLite 参考 adapter](https://github.com/0xnicholas/balsa-framework/issues/76)——`node:sqlite` 免 flag 基线;其余清单字段与上条 M5 口径不变。
 
 (来源:wayfinder ticket #8)

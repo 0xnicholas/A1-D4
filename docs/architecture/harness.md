@@ -33,7 +33,7 @@ interface AgentRunSnapshotStore {
 // AgentRunSnapshot = { runId, status: 'suspended', messages, stepCount, suspendPayload, traceId? } JSON-only
 ```
 
-与 `WorkflowSnapshotStore` 同构:基础形状冻结、JSON-only、内存默认实现进核心、统一 adapter 家族。可选扩展按能力标志模式:`deleteSnapshot(runId)`、`listSuspended(q?)`(待审批列表),缺席即无枚举能力。无 CAS——durable 不做多副本恢复,跨进程安全归部署方。
+与 `WorkflowSnapshotStore` 同构:基础形状冻结、JSON-only、内存默认实现进核心、统一 adapter 家族。可选扩展按能力标志模式:`deleteSnapshot(runId)`、`listSuspended(q?)`(待审批列表),缺席即无枚举能力;签名与枚举排序 / 游标口径单点在 `docs/architecture/storage.md`(SQLite 参考 adapter 节)。无 CAS——durable 不做多副本恢复,跨进程安全归部署方。
 
 ## Signals(基础层)
 

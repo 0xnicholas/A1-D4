@@ -169,7 +169,7 @@ interface WorkflowSnapshotStore {
 - **模型层(#9,已定)**:事件流与快照中的流式词汇复用 chunk 协议;step 内用模型走 `ModelInput` 三形状。
 - **Agent(#10,已定)**:不复用 agent loop;agent 由用户一行包装进 step;agent 级审批/挂起归 Harness,本规范的快照机制是其底层机器。
 - **存储(#15,已定)**:本规范钉 `WorkflowSnapshotStore` port(两个方法 + JSON-only);adapter 家族与扩展面见 `docs/architecture/storage.md`。
-- **Harness(#18,已定)**:跨进程恢复与 durable timer 明确裁出;durable 重启 = 应用层用 load→重进原语 + `listSnapshots` 自举;agent 侧审批挂起机器与 schedules 见 `docs/architecture/harness.md`。
+- **Harness(#18,已定)**:跨进程恢复与 durable timer 明确裁出;重启自举 = 应用层用 load→重进原语 + 枚举扩展(workflow 侧 `listSnapshots`、durable 侧 `listSuspended`,排序/游标口径见 `docs/architecture/storage.md`);agent 侧审批挂起机器与 schedules 见 `docs/architecture/harness.md`。
 - **Observability(#14,已定)**:span 挂在 run / step 边界(run span 覆盖 start / resume 到终态,step span 每次执行一个、name = step id),lifecycle 事件流是其事件锚点,traceId 随快照持久化(resume 续同一 trace);见 `docs/architecture/observability.md`。
 - **Memory(#12)**:无直接耦合。
 
