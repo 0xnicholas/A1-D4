@@ -106,19 +106,37 @@ await server.close()                        // 闭合已开入口、中止在途
 
 ## MCP client 能力包
 
-独立 npm 包,依赖 `@modelcontextprotocol/client`(13 包 / 14.1 MiB,#6 实测;大头是 OAuth/SSE/stdio,属功能必需)。**与 server 包分开是按需组合的硬要求**:依赖是包级粒度,合包则 server 用户连坐 client 的 13 包。
+独立 npm 包 `@balsa/mcp-client`(#72 首批六包之一;ADR-0002 M5 修订)。直连依赖仅 `@modelcontextprotocol/client@^2.2.0`(`.` 与 `./stdio` 两个子路径面;13 包 / 14.1 MiB,#6 实测;大头是 OAuth/SSE/stdio,属功能必需),`@balsa/core` 走 peer(清单三件套沿能力包先例)。**与 server 包分开是按需组合的硬要求**:依赖是包级粒度,合包则 server 用户连坐 client 的 13 包。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
 
 ```ts
-const client = await createMcpClient({ transport: … })
-// client.tools: Record<string, Tool> —— execute 代理到远端,直接展开进 agent 容器
+const client = await createMcpClient({
+  transport:
+    | { type: 'stdio', command: string, args?: string[], env?: Record<string, string> }
+    | { type: 'http', url: string | URL, headers?: Record<string, string> },
+  protocol?: 'auto' | 'legacy' | { pin: '2026-07-28' },  // 省略 = 'auto'
+  timeoutMs?: number,                                     // 省略 = SDK 缺省 60s
+})
+
+client.tools            // getter:当前快照 Record<string, Tool> —— execute 代理到远端,直接展开进 agent 容器
+await client.refresh()  // 重新 listTools 并换快照;失败保留旧快照并 reject
+await client.close()    // HTTP 先 terminateSession(失败静默)→ client.close();幂等
 ```
 
 - **接入形态唯一**:外部 MCP 工具转译为本框架 Tool 直接进 agent 容器;不做 mastra 式 MCPConfiguration 平行容器。
-- **连接**:stdio(`command + args + env`,拉起子进程)+ Streamable HTTP(`url + headers`)。
-- **认证**:headers 透传(bearer 等)覆盖多数远程 server;OAuth 授权流助手裁出 v1(后加 minor)。注意裁它不缩小安装树(SDK 整包照装),裁的是产品面。
-- **发现**:connect 时 `listTools` 一次并缓存,`refresh()` 手动刷新;不做 listChanged 变更订阅(长驻监听与无运行时负担有张力)。
-- **名冲突**:纯函数 helper `prefixTools(tools, prefix)`——不冲突零概念,冲突时一行解决;不进 client 配置面。
-- **桥接工具的 schema**:「JSON Schema 直通」的 Standard Schema 包装——`~standard.validate` 直通成功(校验在远端,失败经 execute 错误回喂),`~standard.jsonSchema` 返回远端原文;零依赖零适配层。
+- **传输**:stdio(`command + args + env`,SDK 自拥子进程)+ Streamable HTTP(`url + headers` → transport `requestInit.headers`)。`env` 语义照 SDK:给了就是**整份**环境,不给 = SDK 白名单(不继承整份 `process.env`);`stderr` 缺省 inherit——子进程日志进父 stderr,正是 MCP 要的。旋钮面收口:stdio 的 `stderr` / `cwd` / `maxBufferSize`、HTTP 的 `fetch` / `authProvider` / `sessionId`、`listMaxPages`、响应缓存三件(`responseCacheStore` / `cachePartition` / `defaultCacheTtlMs`)与客户端中间件 v1 一律不暴露;逃逸口是官方 SDK 自布线(与 server 票同一条纪律)。**不接受 SDK transport 实例注入**。
+- **身份**:SDK 的 `Client({ name, version })` 由包内定(`@balsa/mcp-client` + 包版本),v1 不暴露覆写。
+- **era 姿态**:缺省 `'auto'`(先 `server/discover` 探测,定不了就回退 legacy `initialize`);可切 `'legacy'`(零探测,即 SDK 自身缺省)或 `{ pin: '2026-07-28' }`(不回退,失败即抛)——**我们显式把缺省抬到 auto**,SDK 缺省是 legacy。代价是 connect 期成本:stdio 上多一次短命兄弟探测进程;HTTP 探测静默超时按 outage 拒绝、不回落。
+- **超时**:SDK 逐请求缺省 60s(`DEFAULT_REQUEST_TIMEOUT_MSEC`),且**没有 client 级默认值设置**——`timeoutMs` 必须由本包在 connect 与**每次** `callTool` 上透传(长工具调用的唯一入口);不提供 per-call 覆盖。
+- **认证**:headers 透传(bearer 等)覆盖多数远程 server;OAuth 授权流助手裁出 v1(SDK 的 `authProvider` 不接线;裁它不缩小安装树,裁的是产品面)。
+- **发现与快照**:connect 时 `listTools` 一次(no-cursor 自动翻页聚合,SDK 上限 64 页)建快照;`refresh()` 走 `cacheMode: 'refresh'` 强制真取并**换新快照**;`tools` 是 getter,返回当前快照(对象身份稳定到下次 refresh,旧引用不失效)。长驻 agent 用 `tools: () => client.tools`(`DynamicArgument` 每次解析拿最新)。不做 listChanged 订阅(长驻监听与无运行时负担有张力);SDK 响应缓存沿默认(`defaultCacheTtlMs` 0 = 每次真取仍存储)。modern + 非 stdio 的连接上 SDK 会剔除 x-mcp-header 声明非法的工具(规范 MUST,仅 warn)——快照可能少于服务端广告。
+- **连接生命周期**:断线**不自动重连**——在途与后续调用抛 SDK 错误,恢复 = 新建 client;`refresh()` 不兼任重连探测。`close()` 幂等;在途请求以 `CONNECTION_CLOSED` 拒绝;stdio 子进程按 SDK 顺序关停(关 stdin → SIGTERM → SIGKILL)。不做进程退出钩子、不暴露 closed 观测——宿主不 `close()` 就是子进程常驻,这条写文档不兜底。
+- **错误面**:原样抛出,**不加层、不改消息**(与 server 票同调)。连接期 = `SdkError`(`ERA_NEGOTIATION_FAILED` 等)/ `SdkHttpError`(401 / 403)/ 探测超时;运行期 = `REQUEST_TIMEOUT` / `CONNECTION_CLOSED` / 协议错误 / 输出校验 `ProtocolError` / `LIST_PAGINATION_EXCEEDED`。
+- **ToolContext 消费**:`signal` → `callTool({ signal })` 直通(不额外预检);`toolCallId` / `runId` / `traceId` / `spanId` **不出网**(协议无对应位、v1 不注入 tracer),`requestContext` 不透传(远端进程读不到)。与 server 票的对称点写进文档:`toolCallId` 是本地身份,不承诺跨连接稳定;把 toolCallId 经 `_meta` / 自定义头送远端做关联不做(minor 位)。
+- **结果投影**:`structuredContent !== undefined` → **直接返回该值**(`ToolResultChunk.output` 是 `unknown`,任意 JSON 自然流通);否则 text 块按换行拼接;非 text 块(图片 / 音频 / resource link)降级为占位文本——工具结果通道没有多模态 part,是 v1 的诚实边界。`isError: true` → 抛错,由框架转成 `Tool 'x' failed: …` 错误结果回喂(与「三线归一」同一条路)。空结果返回 `''`。
+- **MRTR 姿态**:无 elicitation / sampling / roots handler,`inputRequired.autoFulfill: false` 显式钉死——远端的 `input_required` 变成确定性 `SdkError(UnsupportedResultType)` 回喂,而不是「没有 handler 的自动流程」。
+- **桥接工具的 schema**:「JSON Schema 直通」的 Standard Schema 包装(内部工厂,不公开导出)——工厂返回**显式标注 `StandardSchema<unknown, unknown>`** 的对象(注解不可省:字面量给不出 `~standard.types` 时核心推断落成 `never`);`vendor: 'balsa'`、`version: 1`、运行时 `types: { input: unknown, output: unknown }`;`~standard.validate(value, options?)` 永远**同步**返回 `{ value }`(忽略 options;校验在远端,失败经 execute 错误回喂);`~standard.jsonSchema.input({ target })` 返回远端 `inputSchema` 原文(**忽略 target**、同引用);`~standard.jsonSchema.output` **直接抛**(桥接 Tool 不承载 outputSchema,误触达即炸,不给假值)。wrapper 与 `~standard` 一并冻结。**目标版本边界**:远端 schema 常为 2020-12 而核心发 provider 的是 draft-07 子集——原样直通,框架不改写、不剥元字段;要 draft-07 就在远端侧改写。
+- **不挂 outputSchema**:桥接 Tool 的 `outputSchema` 缺省——远端与 SDK 客户端已按远端 outputSchema 校验 `structuredContent`(非 isError 结果缺它 → 抛 `InvalidRequest`、不合 → 抛 `InvalidParams`),Balsa 侧再挂只会得到「永不失败的 validate」假校验。代价:MCP→MCP 再导出丢 `structuredContent`、只出 text;保真诉求留 minor(显式 opt-in)。
+- **名冲突**:纯函数 helper `prefixTools(tools, prefix, separator = '_')`——返回新冻结 Record,键 = `prefix + separator + name`;execute 闭包内的远端名不变(**前缀不进 wire**),固定前缀是同构映射故不做冲突检测;不进 client 配置面。远端工具名**不在桥接层校验或清洗**(MCP 规范 SHOULD 允许 `.` 等,provider 各自更严——那是用户与 helper 的事)。
 
 ## 与其它子系统的关系
 

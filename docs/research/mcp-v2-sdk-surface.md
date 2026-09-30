@@ -3,6 +3,7 @@
 > Issue: #68 · 日期: 2026-09-30 · 分支: `research/mcp-v2-sdk-surface` · 性质: 事实收集,不做决策。
 > 事实基线:sdk 仓 `modelcontextprotocol/typescript-sdk` main 本地克隆(含 `docs/` 一手文档与 `packages/*/src` 源码)· npm registry 实测 2026-09-30 · MCP 规范 2026-07-28。包数/体积沿 #6 实测(server 2.1.0 / client 2.1.0),本票不重抓,只补版本漂移与 API 面。
 > **勘误(2026-09-30,#74 事实核查,核查 commit `7f4c12a`)**:两处已改入正文——(1) v2 里「低层」类名是 `Server`(deprecated),`McpServer` 是高层注册器,手布线用法两者皆可;(2) `InMemoryTransport` 仅连 2025 代,modern(2026-07-28)的 in-process 入口是 `handler.fetch`。另补 §4.2 转换目标与校验路径的精确事实。
+> **勘误与补遗(2026-09-30,#75 决策期事实核查,同克隆 `7f4c12a`)**:§7.1 括注「默认 … `{ mode:'auto' }` 先 `server/discover` 探测」有误——源码 JSDoc 明示 `versionNegotiation` **缺省是 `'legacy'`**(无探测、握手字节不变),`'auto'` / `{ pin }` 是显式 opt-in。同批补遗(决策已消费,不回改正文):`DEFAULT_REQUEST_TIMEOUT_MSEC = 60_000` 且逐请求生效、client 无默认值设置位;`callTool` 内建输出校验(有 outputSchema 时非 isError 结果缺 `structuredContent` → 抛 `ProtocolError(InvalidRequest)`,不合 schema → 抛 `InvalidParams`);2.2.0 新增响应缓存(SEP-2549,`defaultCacheTtlMs` 缺省 0)与 `cacheMode: 'use' | 'refresh' | 'bypass'`;`inputRequired.autoFulfill` 缺省 true;`StdioServerParameters` 的 `env` 缺省 = SDK 白名单 / `stderr` 缺省 inherit / `maxBufferSize` 10 MB;modern + 非 stdio 连接上 SDK **MUST 剔除** x-mcp-header 声明非法的工具(仅 `console.warn`)。
 
 ## TL;DR
 

@@ -26,5 +26,13 @@ Tool 收敛为四字段普通对象(`description` + 可选 `inputSchema`/`output
   - **ToolContext 合成**:`signal ← ctx.mcpReq.signal`;`toolCallId ← String(ctx.mcpReq.id)`;`runId` / `traceId` / `spanId` 空串(无 run、不注入 tracer);`requestContext` 冻结空袋(仅框架写的 `signal` / `runId: ''`)。
   - **结果与错误投影**:`outputSchema` 存在 → `structuredContent` = output 原文 + text 渲染(`string` 原样 / 其余 `JSON.stringify`);三线错误(输入校验 / execute 抛错 / 输出校验)全交 SDK 归一为 `isError` 结果,未知 / 禁用工具为协议错误(wire 错误还原归 client 包)。
   - **工具名口径改写**:暴露期校验由上文 `[a-zA-Z0-9_-]{1,64}` 改为对齐 MCP 规范 SHOULD 的 `[A-Za-z0-9_.-]{1,128}`(含点、上限 128),在 `createMcpServer()` 构造期逐键校验;上文 Consequences 相应行为本修订取代。
+- **修订(M5 MCP client 设计冻结,2026-09-30)**:`@balsa/mcp-client` 设计冻结(包面 / 传输与 era / 快照与生命周期 / ToolContext 消费 / 结果与错误投影 / 桥接 schema),依据 [决策:MCP client 能力包](https://github.com/0xnicholas/balsa-framework/issues/75) 决议评论与 `docs/architecture/tools.md`「MCP client 能力包」节:
+  - **包面**:`createMcpClient({ transport, protocol?, timeoutMs? })` 返回单对象——`client.tools`(getter,当前快照 `Record<string, Tool>`)、`await client.refresh()`(真取并换快照,失败保留旧快照)、`await client.close()`(HTTP 先 `terminateSession` 再关连接,幂等);身份与旋钮面收口,不接受 SDK transport 实例注入。
+  - **传输与 era**:描述符二选一(stdio `command + args + env` / Streamable HTTP `url + headers`);era **缺省抬到 `'auto'`**(SDK 自身缺省是 legacy),可切 `'legacy'` 或 `{ pin: '2026-07-28' }`;`timeoutMs` 在 connect 与每次 `callTool` 透传(SDK 逐请求缺省 60s 且无 client 级设置位)。
+  - **快照与生命周期**:connect 时 `listTools` 一次建快照,`refresh()` 走 `cacheMode: 'refresh'`;**不自动重连**、不做 listChanged 订阅与进程退出钩子;断线 = 抛错回喂,恢复 = 新建 client;stdio 子进程归 SDK transport,`close()` 按关 stdin → SIGTERM → SIGKILL 拆。
+  - **ToolContext 消费**:`signal` 直通 `callTool`;`toolCallId` / `runId` / `traceId` / `spanId` 不出网、`requestContext` 不透传(协议无对应位);与 server 修订的对称点是 `toolCallId` 只作本地身份。
+  - **结果与错误投影**:`structuredContent` 直返、否则 text 拼接(非 text 块降级占位);`isError` 与所有 SDK throw 一律抛错 → 框架转 `Tool 'x' failed: …` 回喂(不加层、不改消息);`input_required` 由 `inputRequired.autoFulfill: false` 钉成确定性错误。
+  - **桥接 schema 落地**:工厂返回**显式标注类型**的直通 wrapper(`validate` 恒同步成功、`jsonSchema.input` 返回原文且忽略 target、`jsonSchema.output` 抛),不公开导出;上文「桥接工具的 inputSchema 是 JSON Schema 直通包装」的细节由本修订钉定,并**明定桥接 Tool 不挂 `outputSchema`**(远端与 SDK 客户端已做真校验,再挂直通 wrapper 是假校验)。
+  - **依赖与预算**:直连仅 `@modelcontextprotocol/client@^2.2.0`(`./stdio` 子路径),数字口径归 `deps-budget.json`(实施图落基线);`@balsa/core` 走 peer。
 
 (来源:wayfinder ticket #13)
