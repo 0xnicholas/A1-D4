@@ -44,15 +44,81 @@ type ModelInput =
 - 自定义端点(Ollama / LMStudio / OpenAI-compatible 网关):用户自装 `@ai-sdk/openai-compatible` 类现成包,核心无特殊机制。
 - 字符串路由(models.dev 目录 + 解析器)若做,是独立能力包——已登记地图 Not yet specified,路线图阶段再判断。
 
-## AI SDK 互操作能力包
+## AI SDK 互操作能力包(M5 设计冻结)
 
-- 职责:chunk 协议 → AI SDK UI stream 的转换器(`toAISdkStream` 等价物);对接 `useChat()` 的 fetch 风格路由 handler(`chatRoute` 等价物,转发 `AbortSignal`)。
-- 目标 **0 直接依赖**(自实现协议转换;CI 以 devDependency 的 `ai` 包做格式对校),上限 2 个且仅限类型/协议级包。
+> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@balsa/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@balsa/core` 走 peer、与核心锁步发布。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
+
+### 包面
+
+- `toAISdkStream(stream: AsyncIterable<Chunk>, options?: { onError?: (error: unknown) => string }): AsyncIterable<AISdkStreamChunk>` — 转换器(体帧;源流失败时发 `error` 帧收尾)。
+- `createChatRoute({ agent, identity, onError?, keepAliveMs? }): (request: Request) => Promise<Response>` — Web 标准 `useChat()` 路由。
+- `toAISdkMessages(messages: readonly StoredMessage[]): UIMessage[]` — thread 历史回读(同步纯函数)。
+- `AISdkStreamChunk` — 本包封闭帧联合,结构兼容 AI SDK `UIMessageChunk`;发布物不引 `ai` 类型(类型级零依赖)。
+
+### 目标协议与漂移纪律
+
+- 目标 = `ai@7` 代 UI message stream **词汇表** + 线级响应头 `x-vercel-ai-ui-message-stream: v1`(官方要求;客户端不校验,网关可能看)。
+- **单一代、无 `version` 选项、不做多代适配器**(本 ADR「锁定单一 spec 版本」原则推广到 UI stream 协议):AI SDK 词汇表换代 = 本包 breaking,锁步发布下随全 `@balsa/*` major 走,旧代不承诺。
+- 客户端白名单逐帧解析:已发帧子集**可小于**目标词汇,**不得超出**(未知 `type` 整流抛错)。
+- 对校:`ai` 精确钉 `devDependencies`(`7.0.123`),升级为有意 PR;三条对校——帧联合对 `UIMessageChunk` 类型可赋值 / 产物 SSE 字节 → `parseJsonEventStream(uiMessageChunkSchema)` → `readUIMessageStream` 往返断言 / 响应头常量与 `UI_MESSAGE_STREAM_HEADERS` 全等。
+
+### 转换器:`toAISdkStream`
+
+- 输入 `AsyncIterable<Chunk>`(只吃流面——agent / durable / signals 订阅同一入口);输出帧对象流,SSE 编码不在转换器(归 route / 宿主)。
+- **职责切分:转换器只产体帧**;消息级 `start` / `finish` 由调用方写(`finish` 的 reason 与 metadata 需要终值,转换器看不到)。
+- 帧映射(逐行冻结):
+
+| Balsa | 发出 | 规则 |
+| --- | --- | --- |
+| — | `start-step` | 流首帧前一条;`finish-step` 之后的下一条**模型产出**帧前补下一条(`tool-result` 不触发) |
+| `text-delta` | 惰性 `text-start` + `text-delta` | 块 id 合成;连续 delta 一段,遇任何非 text 帧(含 `tool-call` / `finish`)补 `text-end` |
+| `tool-call` | `tool-input-available` | 仅此一帧——无参数增量可发;`providerExecuted: true`(框架端执行,挡客户端 `onToolCall` / 自动续发)、`dynamic: true`(客户端不知道工具 schema);raw-string input 不做启发式判定,校验失败以结果 `isError` 回来 |
+| `tool-result` | `output-available` / `output-error` | `isError` 分流;`errorText` = string 原样,否则 `JSON.stringify`(失败回退 `String()`);`providerExecuted: true` |
+| `finish`(每 step) | `finish-step` | **保持原序**(该 step 的 `tool-result` 排在其后);客户端 reducer 原位更新、容错已实证 |
+| 源流抛出 | `error` | 默认脱敏 `"An error occurred."`,`onError` 可换;随后由调用方收尾 |
+
+- **不发清单**(显式声明):`reasoning-*`、`tool-input-start` / `tool-input-delta` / `tool-input-error`、`tool-approval-*`、`source-*`、`file`、`reasoning-file`、`custom`、`data-*`、`reset-step`、独立 `message-metadata`、`abort`——无法从 chunk 协议重建的帧一律不外发;挂起表达走消息级 metadata(见下)。
+
+### 路由:`createChatRoute`
+
+- `(request: Request) => Promise<Response>`,`POST` only(其余 405 + `Allow: POST`);agent / durable agent 同一入口,Next / Hono / 裸 node 的接线归宿主范式(实施 / 示例)。
+- **run 输入 = memory 权威**:thread = `identity(request)` 返回的 `{ thread?, resource }`(thread 缺省 `body.id`),resource 必填(授权归应用);`messages` 只取**尾部 user 消息**转 `ModelMessage[]`(text / file 起步,其余 part 类型 400);历史一律走 thread recall,不与客户端全量回放双喂;`trigger` 不分支(`regenerate-message` = 重跑尾条,消息不可变表现为追加)。
+- `start` 帧**不带** `messageId`——客户端持有自生成的 assistant 消息 id(`body.messageId` 是尾条消息 id,不作 UI id 用)。
+- **HTTP 机制**:body 白名单 `id` / `messages` / `trigger` / `messageId`(只读前两者;`modelSettings` / `maxSteps` 等永不从 body 读);400(JSON 无效 / 尾条非 user / `id` 缺失)与 405 给具体原因,首帧前失败 500(默认脱敏 + `onError`,真错误进 tracer),错误体统一 `{ error: string }`;首帧后失败 → `error` 帧 + `finish { finishReason: 'error' }` + `[DONE]`(HTTP 200);响应头 = 官方 5 件套;`keepAliveMs` 默认关(被代理缓冲的部署显式打开);同 thread 并发不设锁(thread 导向机制是 signals,本路由是请求-响应适配器)。
+- **取消**:`request.signal` 直传 run 的 `signal`,响应流 `cancel()` 同接 abort;无恢复端点(AI SDK `resume: true` 与 abort 不互容,核心 resumable stream 已裁)。
+- **终帧**:`finish { finishReason, messageMetadata? }`;`finishReason` 映射 `stop→stop` / `length→length` / `tool-calls→tool-calls` / `error→error` / `suspended→other`;`messageMetadata = { usage?, suspended? }`(usage = run 累计)。
+
+### 挂起表达(durable agent)
+
+- 挂起不在 chunk 流里(流以模型自己的 `finish(tool-calls)` 收尾);route 读终值后在终帧表达:`finishReason: 'other'` + `messageMetadata: { suspended: { runId, awaitingApproval } }`。
+- **不合流 `tool-approval-*`**:AI SDK 逐 `approvalId` 的流内审批与 Balsa run 级挂起 / 快照是两套机制,且审批决定是单布尔(N:1),合流会把错位藏进实现。
+- resume 编排归应用(自调 `durable.resume`;实施图给范式);重开条件 = 真实用例要求一键审批 UX。
+
+### 订阅流表达(signals)
+
+- `toAISdkStream` 直接吃 `signals.subscribeToThread(...)`:一个订阅 = **一条持续 UI 消息**(`start` 由调用方写,`finish-step` 按 step 落,消息级 `finish` 在断开 / 收尾时写)。
+- 逐 run 消息切分**不做**:订阅通道只有 chunk、无 run 边界标记,`finish(tool-calls)` 收尾的 run 与 step 续跑不可分辨(step cap 与挂起同形);重开条件 = 真实用例要求逐 run 消息(届时核心 signals 需加 run 边界事件,另票)。
+
+### 历史回读:`toAISdkMessages`
+
+- 输入升序 `StoredMessage[]` → `UIMessage[]`;user 消息一条;user 之后的极大 assistant / tool 序列折叠为**一条** assistant UIMessage:text → text part、tool-call → tool part(`input-available`)、同序列第二条起 assistant 前插 `step-start`、tool-result 按 `toolCallId` 折入对应 part(正常 → `output-available`、`error-*` → `output-error`、`execution-denied` → `output-denied`;assistant 内联的 provider-executed 结果同规则)。
+- 宽容原则:配对不上的结果、未知 part 类型(reasoning / custom / reasoning-file)跳过不抛错;不做 system / 工作记忆。
+- UIMessage id 取折叠序列首条消息 id;与在途流的客户端自生成 id 不一致属已知(跨刷新 id 重生成,文档写明)。
+
+### 裁单与重开条件
+
+| 裁单 | 理由 | 重开条件 |
+| --- | --- | --- |
+| 反向互操作(`withMastra` 类:给纯 AI SDK 用户套 processor / memory) | 方向倒置——核心须接 AI SDK 流 part 词汇作回调输入,把外部流格式塞进自己的 seam(违本 ADR);永久兼容面 | ≥1 真实用例(AI SDK 原生应用在其 `streamText` 循环里用 Balsa memory / processor 且接受外部依赖) |
+| workflow / network 路由(mastra `workflowRoute` / `networkRoute` 类) | 本包只做 agent chunk 面;workflow lifecycle 事件流是另一套词汇 | 真实用例要求 workflow run 直出 UI stream |
+| AI SDK `resume: true` 的 GET 恢复端点 | 官方明言 resume 与 abort 不互容;核心 resumable stream 已裁 | 沿 `docs/ROADMAP.md` 延后清单 |
+| 无状态全量 `UIMessage[] → ModelMessage[]` 转换 | 与 memory 权威双喂冲突;无状态 chat 不是本框架形态 | 真实用例要求无 memory 的纯无状态路由 |
+| typed 工具渲染(`dynamic: false` 直通) | 工具 schema 只在服务端,客户端类型面不可知 | 真实用例要求 typed 工具 part |
 
 ## 依赖预算
 
 - **核心(含模型层)运行时依赖硬线 = 0**。模型层是全框架最不可能裁剪的子系统,正因如此它必须守住零依赖,否则"按需组合"名存实亡。
-- 互操作能力包预算如上。所有数字按 ADR-0001 作内部 CI 回归参考(超预算 PR 亮黄灯),不对外承诺。
+- 互操作能力包运行时依赖硬线 = 0;`ai` 仅 devDependency(对校,见上节),数字口径归 `deps-budget.json`。所有数字按 ADR-0001 作内部 CI 回归参考(超预算 PR 亮黄灯),不对外承诺。
 
 ## 与其它子系统的关系
 
@@ -60,3 +126,4 @@ type ModelInput =
 - **Workflows(#11)**:step 边界 JSON 快照与流式事件复用 chunk 协议词汇。
 - **Observability(#14,已定)**:`agent-step` span 的 model/provider/usage/finishReason 取自模型契约的 finish/usage chunk;见 `docs/architecture/observability.md`。
 - **Memory(#12)**:如需 embedding 模型,复用同一契约模式(接受 AI SDK spec 的 EmbeddingModel 实例、vendor 结构类型),届时确认。
+- **Harness(#18,已定)/Signals**:互操作包的挂起表达与订阅流表达见上节(durable 挂起 → `finishReason: 'other'` + `messageMetadata.suspended`;`subscribeToThread` → 一条持续 UI 消息)。
