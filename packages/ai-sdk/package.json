@@ -1,0 +1,45 @@
+{
+  "name": "@balsa/ai-sdk",
+  "version": "0.0.0",
+  "description": "Balsa AI SDK interop — the agent's chunk stream as an AI SDK UI message stream (useChat-compatible routes), zero runtime dependencies.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:dist": "node ../../scripts/check-dist.mjs",
+    "check:runtime-deps": "node ../../scripts/check-runtime-deps.mjs",
+    "check:byte-budget": "node ../../scripts/check-byte-budget.mjs",
+    "byte-budget:update": "node ../../scripts/check-byte-budget.mjs --update",
+    "check:deps-budget": "node ../../scripts/check-deps-budget.mjs",
+    "deps-budget:update": "node ../../scripts/check-deps-budget.mjs --update"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xnicholas/balsa-framework.git",
+    "directory": "packages/ai-sdk"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@balsa/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@balsa/core": "workspace:*",
+    "ai": "7.0.123"
+  }
+}
