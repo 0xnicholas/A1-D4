@@ -5,10 +5,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { inputRequired, type ServerContext } from '@modelcontextprotocol/server';
+import { inputRequired } from '@modelcontextprotocol/server';
 import { SdkError, SdkErrorCode } from '@modelcontextprotocol/client';
 import { createMcpClient } from '@balsa/mcp-client';
-import { serveSdkServer, sleep, toolContext, toolOf, type Served } from './helpers.js';
+import { neverAnswers, serveSdkServer, sleep, toolContext, toolOf, type Served } from './helpers.js';
 
 /** Captures a rejection (or a resolution's absence) as a value for asserting on. */
 const caught = (call: unknown): Promise<unknown> =>
@@ -98,16 +98,17 @@ describe('createMcpClient over HTTP', () => {
     }
   });
 
-  it('passes timeoutMs to every callTool (REQUEST_TIMEOUT on a slow tool)', async () => {
+  it('passes timeoutMs to every callTool (REQUEST_TIMEOUT when the tool never answers)', async () => {
+    // `timeoutMs` is one budget shared by the connect handshake, listTools and every callTool
+    // (the package's per-request semantics), so it must clear a loopback handshake even when the
+    // suite runs many workers in parallel. The tool below never answers on its own: what the
+    // assertion times is the call's timeout, far above any handshake, not a scheduler race.
     const served = await serveSdkServer((server) => {
-      server.registerTool('slow', { description: 'Sleeps' }, async () => {
-        await sleep(400);
-        return { content: [{ type: 'text' as const, text: 'finally' }] };
-      });
+      server.registerTool('hangs', { description: 'Never answers' }, neverAnswers('finally'));
     });
     try {
-      const client = await createMcpClient(httpConfig(served, 75));
-      const error: unknown = await caught(toolOf(client, 'slow').execute(undefined, toolContext()));
+      const client = await createMcpClient(httpConfig(served, 1_000));
+      const error: unknown = await caught(toolOf(client, 'hangs').execute(undefined, toolContext()));
       expect(SdkError.isInstance(error)).toBe(true);
       expect((error as SdkError).code).toBe(SdkErrorCode.RequestTimeout);
       await client.close();
@@ -118,12 +119,7 @@ describe('createMcpClient over HTTP', () => {
 
   it('propagates the context signal into the remote call', async () => {
     const served = await serveSdkServer((server) => {
-      server.registerTool('hanging', { description: 'Waits for cancellation' }, async (srv: ServerContext) => {
-        await new Promise<void>((resolve) => {
-          srv.mcpReq.signal.addEventListener('abort', () => resolve());
-        });
-        return { content: [{ type: 'text' as const, text: 'never seen' }] };
-      });
+      server.registerTool('hanging', { description: 'Waits for cancellation' }, neverAnswers('never seen'));
     });
     try {
       const client = await createMcpClient(httpConfig(served, 10_000));

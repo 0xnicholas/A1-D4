@@ -9,7 +9,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
-import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
+import { createMcpHandler, McpServer, type ServerContext } from '@modelcontextprotocol/server';
 
 /** A serving counterpart bound to an ephemeral loopback port. */
 export interface Served {
@@ -181,6 +181,21 @@ async function listen(server: Server): Promise<Served> {
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * A tool handler that never answers on its own: it resolves only when the request's signal is
+ * aborted (a client timeout or cancellation), then returns a result nobody is left to read —
+ * `lateText` names that result so the two fixtures can be told apart. Lets a test assert the
+ * client-side budget without racing a loaded scheduler.
+ */
+export function neverAnswers(lateText: string) {
+  return async (srv: ServerContext) => {
+    await new Promise<void>((resolve) => {
+      srv.mcpReq.signal.addEventListener('abort', () => resolve());
+    });
+    return { content: [{ type: 'text' as const, text: lateText }] };
+  };
 }
 
 /** The six-piece context the framework guarantees every `execute`; only `signal` crosses the bridge. */
