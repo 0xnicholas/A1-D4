@@ -6,14 +6,13 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 > subproject. Packages publish under the `@balsa/*` scope (starting with `@balsa/core`), and future
 > subprojects live alongside it.
 
-> **Status:** pre-1.0. Agents, memory, workflows and the harness trio — durable agents, signals,
-> schedules — are implemented and verified ([roadmap](docs/ROADMAP.md)). **No npm release exists
-> yet**: the package version is still `0.0.0` and the registry has nothing under `@balsa`. The
-> planned versions are 0.1.0 = M1+M2, 0.2 = M1–M3, 0.3 = M1–M4 (everything this README
-> describes) and 0.5 = M1–M5, all currently pending a manual owner publish — until then, use
-> Balsa from this repo (see [Development](#development)). Beyond the core, the M5 capability
-> packages are **design-frozen** — specs committed, implementation still to come, nothing
-> installable yet (see [Capability packages](#capability-packages-m5)).
+> **Status:** pre-1.0. Agents, memory, workflows, the harness trio — durable agents, signals,
+> schedules — and the six M5 capability packages are implemented and verified
+> ([roadmap](docs/ROADMAP.md)). **No npm release exists yet**: the package version is still
+> `0.0.0` and the registry has nothing under `@balsa`. The planned versions are 0.1.0 = M1+M2,
+> 0.2 = M1–M3, 0.3 = M1–M4 and 0.5 = M1–M5 (everything this README describes), all pending a
+> manual owner publish — until then, use Balsa from this repo (see [Development](#development))
+> and see [Capability packages](#capability-packages-m5) for the core-external packages.
 
 ## Why Balsa
 
@@ -239,12 +238,15 @@ parsing never enters the core. A trigger is either threadless (`agent.generate`)
 
 ### Capability packages (M5)
 
-**Design frozen, not yet published.** Capability packages that carry external dependencies ship
-as separate `@balsa/<capability>` packages — install only what you use. All six are specified and
-frozen ([roadmap](docs/ROADMAP.md), M5); implementation is a separate effort, and none of them is
-on npm yet:
+Capability packages that carry external dependencies ship as separate `@balsa/<capability>`
+packages — install only what you use. All six are implemented and verified: unit tests in
+`pnpm verify`, five end-to-end examples covering all six (see [Examples](#examples)), and
+minified byte budgets plus dependency-closure baselines where there is a dependency to measure
+([roadmap](docs/ROADMAP.md), M5). They are **not on npm yet** — the
+version is still `0.0.0` and the registry has nothing under `@balsa` (a manual owner publish, see
+[Status](#status)):
 
-| Package | What it will give you | Spec |
+| Package | What it gives you | Spec |
 | --- | --- | --- |
 | `@balsa/otlp` | an OTLP exporter: Balsa spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
 | `@balsa/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
@@ -277,6 +279,11 @@ Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
 | [`workflow-approval`](examples/workflow-approval/) | `foreach` / `parallel` / `branch`, an agent step, suspend → snapshot → resume |
 | [`durable-approval`](examples/durable-approval/) | the approval gate: a tool call held at the step boundary, `finishReason: 'suspended'`, `resume({ approved })` two ways |
 | [`signals-desk`](examples/signals-desk/) | one thread: wake / inject / queue in order, a typed `sendSignal`, `subscribeToThread`, a scheduled `tick` |
+| [`mcp-tools`](examples/mcp-tools/) | one tool container served over MCP and bridged back — HTTP and stdio, one round-trip |
+| [`sqlite-resume`](examples/sqlite-resume/) | a run suspends in one process, its snapshot lands in SQLite, a new process resumes it |
+| [`ai-chat-route`](examples/ai-chat-route/) | a `useChat`-compatible chat route: suspension in the stream, app-side resume |
+| [`otlp-collector`](examples/otlp-collector/) | a traced agent run landing in a local collector as GenAI semconv spans |
+| [`cron-schedule`](examples/cron-schedule/) | a cron expression as the injected `next` fragment: save, occurrences advance, `tick` fires |
 
 ## Documentation
 

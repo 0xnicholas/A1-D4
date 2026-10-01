@@ -67,7 +67,7 @@
 **验证**:OTLP → 本地 collector example;MCP server/client 对打 example;SQLite 跨进程挂起恢复 example。
 **依赖**:各包分别挂 M1–M4 对应接缝,包间可并行。
 
-**设计冻结(M5 收尾,2026-09-30)**:[wayfinder 地图:M5 生态能力包](https://github.com/0xnicholas/balsa-framework/issues/65) 收线——七件全部落成决策(六包 + bunfold 裁单),各件定义表面冻结在 `docs/architecture/` 的增补节,实施按 spec 直落、不再需要裁决。**实施(落码 / example / 测试 / 依赖预算基线)另立 effort**,本里程碑只到 spec;发布动作(0.5,owner 手工)口径不变(见下「发布节奏与 v1.0 门槛」与 [#45](https://github.com/0xnicholas/balsa-framework/issues/45))。
+**设计冻结(M5 收尾,2026-09-30)**:[wayfinder 地图:M5 生态能力包](https://github.com/0xnicholas/balsa-framework/issues/65) 收线——七件全部落成决策(六包 + bunfold 裁单),各件定义表面冻结在 `docs/architecture/` 的增补节,实施按 spec 直落、不再需要裁决。**实施已收口(2026-10-01,见下「实施完成」)**;发布动作(0.5,owner 手工)口径不变(见下「发布节奏与 v1.0 门槛」与 [#45](https://github.com/0xnicholas/balsa-framework/issues/45))。
 
 | 件 | 冻结规范(节) | 决策 | 事实底座 |
 | --- | --- | --- | --- |
@@ -80,6 +80,8 @@
 | bunfold 桥(**已裁**,不建包) | `docs/architecture/memory.md`「外部记忆引擎(M5 裁定:不产桥接包)」 | [#79](https://github.com/0xnicholas/balsa-framework/issues/79) | `docs/research/bunfold.md` |
 | 横切基建政策(目录 / 依赖红线 / 发布口径) | `docs/architecture/README.md` 能力包口径 + ADR-0002 / ADR-0015 的 M5 修订记 | [#72](https://github.com/0xnicholas/balsa-framework/issues/72) | — |
 
+**实施完成(M5 收尾,2026-10-01)**:六包全部落码并核验(实施票 [#87](https://github.com/0xnicholas/balsa-framework/issues/87)–[#92](https://github.com/0xnicholas/balsa-framework/issues/92) 全关,bunfold 沿裁单不产包)——`@balsa/mcp-server` / `@balsa/mcp-client` / `@balsa/sqlite` / `@balsa/ai-sdk` / `@balsa/otlp` / `@balsa/croner`,各含单测 + 双预算基线(ai-sdk 空集基线;sqlite 零运行时依赖,沿脚本语义免 deps 基线,同 core)+ 最小英文 README;五 example 全跑通(`examples/mcp-tools` 双 transport / `sqlite-resume` 跨进程 / `ai-chat-route` / `otlp-collector` / `cron-schedule`,负例 exit 1);导出面核对:core 的 export-map / entry-points 测试在位(按设计只覆盖 core 导出表),产物面由 `check:dist` 逐包验真(七包 **16 子路径**全过);`check:runtime-deps` 白名单闸门全绿;`deps-budget` 六包逐包核对(五份基线 + sqlite 免基线)**全部在数、零黄灯**;字节预算 **16/16 零超支**;`pnpm verify` 全绿(**856 例 67 文件**)。发布交接口径见下「发布节奏与 v1.0 门槛」M5 收尾修订。依据 [实施:M5 收尾——verify 全绿核对 + 导出/预算总表 + ROADMAP/README 修订 + 发布交接口径](https://github.com/0xnicholas/balsa-framework/issues/93) 决议评论。
+
 ## 发布节奏与 v1.0 门槛
 
 - **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsa-framework/issues/20)。
@@ -90,6 +92,7 @@
 - **修订(M3 收线,2026-09-30)**:[#54](https://github.com/0xnicholas/balsa-framework/issues/54)(块内 suspend——迭代现场快照 + 块内 resume)后 M3 全表面终态:`./workflows` 16,817 B(预算 7/7,基线随 #54 更新,+2,859 B)、`pnpm verify` 全绿(579 例 38 文件)、`examples/workflow-approval` 本地 mock 复跑通过(挂起/回放/记录自断言);M3 wayfinder 地图 [#46](https://github.com/0xnicholas/balsa-framework/issues/46) 关账(七张实施票 #47–#54 全关)。发布结论沿上条不变。
 - **修订(M4 收尾,2026-09-30)**:Harness 三件套(durable 审批闸 / signals / schedules)交付并核验——三个新子路径 `./signals` 5,509 B、`./durable-agent` 4,573 B、`./schedules` 3,037 B(字节预算 10/10,全部零超支;组合根 `.` 50,708 B,gzip 15,749 B)、导出三面一致(export-map / entry-points 测试 + `check:dist` 10 子路径)、`pnpm verify` 全绿(**659 例 42 文件**;零运行时依赖 58 模块 0 处外部导入)、两个新 example 以本地 OpenAI-compatible mock 端到端跑通——`examples/durable-approval`(挂起 → 快照 → 批准/拒绝两路 resume,拒绝不终止 run)与 `examples/signals-desk`(空闲唤醒 / 活跃注入 / 排队保序 / 类型化 sendSignal / subscribeToThread / schedules tick),负例均 exit 1。0.3 = M1–M4 全部内容,流程沿 0.1 结论(tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 / 0.2 / 0.3 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含先后)归 owner 手工前置。依据 [实施:examples + M4 收尾——双 example + 字节预算三层 + 导出核对 + verify 全绿 + ROADMAP 修订](https://github.com/0xnicholas/balsa-framework/issues/61) 决议评论。
 - **修订(M5 版本口径,2026-09-30)**:原「**M5 完成 = v1.0**」更正为「**M5 完成 = 0.5**」——生态能力包以 0.5 交付(序列 0.1.0 → 0.2 → 0.3 → 0.5,0.4 跳空);**1.0 不再绑定 M5**,门槛先搁置(不排期);存储 port additive-only 与各公开面 major 约束不变,仍自 **1.0 起生效**(ADR-0009 / ADR-0010)。依据 [决策:M5 版本口径——M5 收尾发 0.5,1.0 不再绑定 M5](https://github.com/0xnicholas/balsa-framework/issues/64)。
+- **修订(M5 收尾,2026-10-01)**:生态能力包六包交付并核验——交付清单、逐包预算数字与负例记录见上「M5 生态能力包」实施完成段(`pnpm verify` 全绿 **856 例 67 文件**;字节预算 16/16 零超支;导出面 `check:dist` 16 子路径全过;`deps-budget` 六包核对零黄灯;五 example 全跑通含负例 exit 1)。**0.5 = M1–M5 全部内容**;发布交接:owner 前置 = 创建 npm org `@balsa` + registry 复核(仍 FREE)→ bump 全 `@balsa/*` = **0.5.0** → 单 tag `v0.5.0` → `pnpm -r publish`(口径沿 [#45](https://github.com/0xnicholas/balsa-framework/issues/45) / ADR-0002 M5;流程沿 0.1 结论:tag + GitHub Release notes、不新增 `CHANGELOG.md`、owner 手动发布);收尾复核:**0.1.0 / 0.2 / 0.3 / 0.5 均未发布**(version 仍 0.0.0、无 tag、registry 404 FREE)——发布动作(含先后)归 owner 手工前置。差距参照 `docs/research/mastra-gap-analysis.md` 的刷新触发「M5 收尾」**已满足**,刷新另立 effort(沿 [#63](https://github.com/0xnicholas/balsa-framework/issues/63) 口径,该文首注已记)。依据 [实施:M5 收尾——verify 全绿核对 + 导出/预算总表 + ROADMAP/README 修订 + 发布交接口径](https://github.com/0xnicholas/balsa-framework/issues/93) 决议评论。
 
 ## 延后清单(post-v1,需求信号触发)
 
