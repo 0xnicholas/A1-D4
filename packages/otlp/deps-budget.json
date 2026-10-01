@@ -1,0 +1,25 @@
+{
+  "metric": "npm-install-closure-packages-and-unpacked-bytes",
+  "dependencies": {
+    "@opentelemetry/api": {
+      "packages": 1,
+      "bytes": 1001329
+    },
+    "@opentelemetry/exporter-trace-otlp-http": {
+      "packages": 11,
+      "bytes": 19254726
+    },
+    "@opentelemetry/exporter-trace-otlp-proto": {
+      "packages": 11,
+      "bytes": 19252639
+    },
+    "@opentelemetry/resources": {
+      "packages": 4,
+      "bytes": 14032665
+    },
+    "@opentelemetry/sdk-trace": {
+      "packages": 5,
+      "bytes": 14830500
+    }
+  }
+}
