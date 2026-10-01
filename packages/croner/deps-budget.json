@@ -1,0 +1,9 @@
+{
+  "metric": "npm-install-closure-packages-and-unpacked-bytes",
+  "dependencies": {
+    "croner": {
+      "packages": 1,
+      "bytes": 154686
+    }
+  }
+}
