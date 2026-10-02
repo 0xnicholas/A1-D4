@@ -36,7 +36,7 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: 硬闸门(typecheck / build / test / check:dist / 仅声明依赖红线)
+      - name: 硬闸门(typecheck / build / test / check:dist / 仅声明依赖红线 / 导出面红线)
         run: pnpm verify
 
       - name: 字节预算黄灯(ADR-0001:超预算不卡合并;口径/测量硬错误照常变红)

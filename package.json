@@ -13,12 +13,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:dist": "pnpm -r --if-present check:dist",
+    "check:export-surface": "pnpm -r --if-present check:export-surface",
     "check:runtime-deps": "pnpm -r --if-present check:runtime-deps",
     "check:byte-budget": "pnpm -r --if-present check:byte-budget",
     "byte-budget:update": "pnpm -r --if-present byte-budget:update",
     "check:deps-budget": "pnpm -r --if-present check:deps-budget",
     "deps-budget:update": "pnpm -r --if-present deps-budget:update",
-    "verify": "pnpm typecheck && pnpm build && pnpm test && pnpm check:dist && pnpm check:runtime-deps"
+    "verify": "pnpm typecheck && pnpm build && pnpm test && pnpm check:dist && pnpm check:runtime-deps && pnpm check:export-surface"
   },
   "devDependencies": {
     "@ai-sdk/provider": "^4.0.18",

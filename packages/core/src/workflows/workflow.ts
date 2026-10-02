@@ -135,22 +135,22 @@ export interface WorkflowBuilder<
 }
 
 /** A phantom schema carrying a keyed/arrayed output type through the chain where no real schema exists. */
-type DataSchema<T> = StandardSchema<T, T>;
+export type DataSchema<T> = StandardSchema<T, T>;
 
 /** The keyed `{ [step.id]: output }` object a `parallel` block produces. */
-type KeyedOutputsOf<TSteps extends Step> = {
+export type KeyedOutputsOf<TSteps extends Step> = {
   [TStep in TSteps as TStep['id']]: StandardSchemaV1.InferOutput<TStep['outputSchema']>;
 };
 
 /** The steps of an authored branch list, as a union. */
-type BranchStepOf<TBranches extends readonly (readonly [BranchCondition, Step])[]> =
+export type BranchStepOf<TBranches extends readonly (readonly [BranchCondition, Step])[]> =
   TBranches[number] extends readonly [unknown, infer TStep extends Step] ? TStep : never;
 
 /**
  * The strict `then` check: the previous output must be accepted by the step's input schema. On a
  * mismatch the extra parameter member is missing, so the error names the rule.
  */
-type ThenInputAccepts<TPrevSchema extends StandardSchema, TStepInputSchema extends StandardSchema> =
+export type ThenInputAccepts<TPrevSchema extends StandardSchema, TStepInputSchema extends StandardSchema> =
   StandardSchemaV1.InferOutput<TPrevSchema> extends StandardSchemaV1.InferInput<TStepInputSchema>
     ? unknown
     : {

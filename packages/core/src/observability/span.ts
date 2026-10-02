@@ -94,7 +94,7 @@ export type SpanError = {
  * OTel-compatible hex, input/output are first-class citizens (a prompt is the main subject of LLM
  * debugging), `attributes` are narrowed by type and `metadata` is the user's open bag.
  */
-interface SpanFields {
+export interface SpanFields {
   /** Span id — 16 hex characters. */
   id: string;
   /** Trace id — 32 hex characters. */

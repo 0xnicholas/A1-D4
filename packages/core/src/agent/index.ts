@@ -9,6 +9,7 @@ export { Agent } from './agent.js';
 export { resolveDynamicArgument } from './dynamic.js';
 export { StructuredOutputError } from './structured-output.js';
 export type {
+  FailureSite,
   ProcessErrorArgs,
   ProcessErrorResult,
   ProcessInputArgs,

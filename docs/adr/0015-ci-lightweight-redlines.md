@@ -33,5 +33,10 @@ CI 单 job,两段:硬闸门 `pnpm verify`(typecheck / build / test / check:dist 
   - **字节预算口径分形**:能力包测量把非相对导入一律 external,数字只反映第一方代码(供应商重量由 deps-budget 数字承载);对零依赖的 core 无差异;gzip 照旧记录、不设闸门。
   - **脚本落位**:共享实现移入根 `scripts/`(check-dist / check-runtime-deps / check-byte-budget / check-deps-budget),各包 `package.json` 留同名薄脚本指回根实现,`pnpm -r --if-present` 编排与 0/1/2 退出码契约不变;core 包内 `scripts/` 副本删除。脚本实现归实施图(本票只冻位置与挂法)。
   - **verify 内测试硬约束**:能力包单测必须无网络/外部服务(传输层 mock/fake;`node:sqlite` 等内置可用临时文件),保 CI 单 job 裸跑;需要真实服务/跨进程的验证落 `examples/`(不进 verify)。
+- **修订(2026-10-02,文档站前置 [balsa-framework#82](https://github.com/0xnicholas/balsa-framework/issues/82))**:verify 增硬闸门 `pnpm check:export-surface`,依据 [balsa-docs api-reference §6/§7](https://github.com/0xnicholas/balsa-docs/blob/main/docs/spec/api-reference.md):
+  - **口径**:「导出面 = 文档面」——被公共签名引用的类型必须能从**某个子路径入口**导出(判定是「有页」,不是「逐个入口自足」);否则参考树里它无页、交叉链接断链。
+  - **判定走产物声明扫描**(`dist/*.d.ts` 的公共声明文本里,类型位置的标识符必须解析到某个入口导出的名字),**不在框架侧跑 TypeDoc**——文档侧零警告红线不充分(api-reference §3:同一入口在不同解析环境下 0 警告 vs 10 警告,警告出现与否依赖解析环境);同一条扫描对能力包同样成立(能力包入口单一,今天零命中)。
+  - **唯一排除通道 = 源码 JSDoc 的 `@internal`**(与生成侧 `excludeInternal` 同源),不另设白名单。
+  - **落位与退出码**:实现 `scripts/check-export-surface.mjs`,七包同名薄脚本指回,挂法沿本 ADR(0 = 干净 / 1 = 有缺口 / 2 = 配置·产物硬错误);与 `check:runtime-deps` 同属**硬闸门**(不是黄灯)。
 
 (来源:M1-02 ticket #23;度量口径由 ADR-0014 留给本票决定)

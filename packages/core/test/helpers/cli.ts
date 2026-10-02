@@ -16,7 +16,8 @@ export type RedlineScript =
   | 'check-dist'
   | 'check-runtime-deps'
   | 'check-byte-budget'
-  | 'check-deps-budget';
+  | 'check-deps-budget'
+  | 'check-export-surface';
 
 export interface CliResult {
   readonly status: number | null;

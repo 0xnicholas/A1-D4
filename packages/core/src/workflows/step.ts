@@ -118,11 +118,11 @@ export interface StepConfig<
 }
 
 /** The `resumeData` type a resume schema implies; `undefined` when the step declares none. */
-type ResumeDataOf<TSchema extends StandardSchema | undefined> =
+export type ResumeDataOf<TSchema extends StandardSchema | undefined> =
   TSchema extends StandardSchema ? StandardSchemaV1.InferOutput<TSchema> : undefined;
 
 /** The `suspend(payload)` payload type a suspend schema implies; `unknown` when the step declares none. */
-type SuspendPayloadOf<TSchema extends StandardSchema | undefined> =
+export type SuspendPayloadOf<TSchema extends StandardSchema | undefined> =
   TSchema extends StandardSchema ? StandardSchemaV1.InferOutput<TSchema> : unknown;
 
 /**

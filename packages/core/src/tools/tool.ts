@@ -79,12 +79,12 @@ export interface ToolConfig<
 }
 
 /** The `execute` input type a schema implies; `undefined` when the tool declares no schema. */
-type SchemaInput<TSchema> = TSchema extends StandardSchema
+export type SchemaInput<TSchema> = TSchema extends StandardSchema
   ? StandardSchemaV1.InferInput<TSchema>
   : undefined;
 
 /** The `execute` output type a schema implies; `unknown` when the tool declares no schema. */
-type SchemaOutput<TSchema> = TSchema extends StandardSchema
+export type SchemaOutput<TSchema> = TSchema extends StandardSchema
   ? StandardSchemaV1.InferOutput<TSchema>
   : unknown;
 

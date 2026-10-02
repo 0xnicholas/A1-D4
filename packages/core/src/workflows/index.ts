@@ -40,9 +40,17 @@
  * created. Spec: `docs/architecture/workflows.md`.
  */
 export { createStep } from './step.js';
-export type { Step, StepConfig, StepContext } from './step.js';
+export type { ResumeDataOf, Step, StepConfig, StepContext, SuspendPayloadOf } from './step.js';
 export { createWorkflow } from './workflow.js';
-export type { Workflow, WorkflowBuilder, WorkflowConfig } from './workflow.js';
+export type {
+  BranchStepOf,
+  DataSchema,
+  KeyedOutputsOf,
+  ThenInputAccepts,
+  Workflow,
+  WorkflowBuilder,
+  WorkflowConfig,
+} from './workflow.js';
 export { createWorkflowRun } from './run.js';
 export type {
   WorkflowCreateRunOptions,
@@ -54,6 +62,7 @@ export type {
   WorkflowRunSuspendedOutcome,
   WorkflowStartOptions,
 } from './run.js';
+export type { WorkflowDefinition } from './walker.js';
 export { WorkflowValidationError } from './validate.js';
 export { createInMemorySnapshotStore } from './in-memory-snapshot-store.js';
 export type {

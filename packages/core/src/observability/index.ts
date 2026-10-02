@@ -36,6 +36,7 @@ export type {
   Span,
   SpanAttributes,
   SpanError,
+  SpanFields,
   SpanType,
   SpanUpdate,
   ToolCallAttributes,

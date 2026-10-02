@@ -11,7 +11,7 @@
  * Spec: `docs/architecture/tools.md`.
  */
 export { createTool } from './tool.js';
-export type { Tool, ToolConfig, ToolContext } from './tool.js';
+export type { SchemaInput, SchemaOutput, Tool, ToolConfig, ToolContext } from './tool.js';
 export type {
   StandardJSONSchemaV1,
   StandardSchema,
