@@ -82,6 +82,55 @@
 
 **实施完成(M5 收尾,2026-10-01)**:六包全部落码并核验(实施票 [#87](https://github.com/0xnicholas/balsats-framework/issues/87)–[#92](https://github.com/0xnicholas/balsats-framework/issues/92) 全关,bunfold 沿裁单不产包)——`@balsats/mcp-server` / `@balsats/mcp-client` / `@balsats/sqlite` / `@balsats/ai-sdk` / `@balsats/otlp` / `@balsats/croner`,各含单测 + 双预算基线(ai-sdk 空集基线;sqlite 零运行时依赖,沿脚本语义免 deps 基线,同 core)+ 最小英文 README;五 example 全跑通(`examples/mcp-tools` 双 transport / `sqlite-resume` 跨进程 / `ai-chat-route` / `otlp-collector` / `cron-schedule`,负例 exit 1);导出面核对:core 的 export-map / entry-points 测试在位(按设计只覆盖 core 导出表),产物面由 `check:dist` 逐包验真(七包 **16 子路径**全过);`check:runtime-deps` 白名单闸门全绿;`deps-budget` 六包逐包核对(五份基线 + sqlite 免基线)**全部在数、零黄灯**;字节预算 **16/16 零超支**;`pnpm verify` 全绿(**856 例 67 文件**)。发布交接口径见下「发布节奏与 v1.0 门槛」M5 收尾修订。依据 [实施:M5 收尾——verify 全绿核对 + 导出/预算总表 + ROADMAP/README 修订 + 发布交接口径](https://github.com/0xnicholas/balsats-framework/issues/93) 决议评论。
 
+## 下一阶段(完善)
+
+**目标形态 = 子系统完整判据**(不绑版本号):把八个子系统(模型 / Agent / 工具 / 工作流 / 记忆 / 观测 / 存储 / Harness)各自的「什么算完整」定死——规范承诺兑现 + 已记录砍单项清账 + 有意分叉写明 + 质量面达标——再以它为准判掉三份盘点:**有意分叉**写明理由并落各篇规范的「砍单与承载缝」表,**欠账**提升为下「必须项」表(自定触发 = 完整判据本身,验证面 = 兑现的第二半)。判定口径:二元结论(有意分叉 / 欠账)+ 两道门(写不出分叉理由的按欠账;写不出验证面的欠账不得提升)+ 禁跟单(mastra 有 / 以后有用 / 不贵)。术语见 `CONTEXT.md`(完整判据 / 自定触发 / 有意分叉·欠账 / 形状内语义差异 / 验证面)。
+
+**依据与产出**:本段由规划型地图 [Wayfinder 地图:完善现有功能](https://github.com/0xnicholas/balsats-framework/issues/102) 产出——判据票 [#104](https://github.com/0xnicholas/balsats-framework/issues/104)(八份完整判据 + 二元判定口径)、[决策:§3 形状内语义差异逐条判定](https://github.com/0xnicholas/balsats-framework/issues/105)、[决策:砍单表逐条判定](https://github.com/0xnicholas/balsats-framework/issues/106)、[决策:质量与债务处置](https://github.com/0xnicholas/balsats-framework/issues/107);事实底座 = `docs/research/completeness-audit.md`(审计报告:八篇规范 456 条承诺三方对账 + 60 行砍单复核 + §3 语义 33 条 + 质量/债务盘点)与 `docs/research/mastra-gap-analysis.md`(对比总账)。**实施另起 wayfinder 地图**——本节只出必须项、顺序与验证面;每项的票据级大纲见 [任务:计划成文](https://github.com/0xnicholas/balsats-framework/issues/108) 决议评论。
+
+### 必须项(11 行)
+
+`判据要求` 列即**自定触发**:为什么按完整判据就必须做;`验证面` 列 = 具体承担机制(测试 / example / 闸门 / 类型系统 / 缺席证明 / 编译期约束)。两项缺一不得提升。
+
+| 提升项 | 判据要求(自定触发) | 验证面 | 落点 |
+| --- | --- | --- | --- |
+| **M-1** 并发与取消语义断言 | Agent · 面4(质量达标)——真并发与取消是唯一「生产必踩而框架未声明语义」的执行边界;不可断言 = 不可守卫 | 4 条用例:模型流中 abort · 同一 agent 并发 run · 同 thread 并发写(core + sqlite)· signals 并发投递 | `packages/core/test/`(agent-stream / agent-loop / memory / signals)· `packages/sqlite/test/memory.test.ts` |
+| **M-2** 行为性未验断言补齐 | 模型 `M-52` / Agent `AG-40` / 工作流 `P-11` · 面1(承诺兑现)——已实装但缺验证面,按判据不构成兑现 | 五条用例:`finishReason` 逐值映射 · 钩子抛错即 run 失败 · `store.save` 抛错两路(随 run 失败 / failed 终态 best-effort)· route 取消直通(`M-51`)· 臂不一致被下游校验拦截(`DOC-4`) | `packages/core/test/*` · `packages/ai-sdk/test/*` |
+| **M-3** MCP 两包断言补齐 | 工具 · 面1——两包冻结面承诺**无断言**(已是发布出的公开面) | `MS-3` authInfo 透传 · `MS-4` SDK 默认值承接 · `MS-5` · `MS-11` 构造时快照语义 · `MS-12` object 根 + draft-2020-12 目标 · `MC-4` · `MC-9` 多页翻页聚合 · `MC-10/11` `CONNECTION_CLOSED` · `MC-15` 运行时 `vendor`/`version`/`types` | `packages/mcp-server/test/*` · `packages/mcp-client/test/*` |
+| **M-4** 组合根 logger 槽 | 观测 · 面1——`docs/architecture/observability.md` 承诺「组合根已有的 logger 通道」,`CONTEXT.md` 组合根词条已含 logger,实装缺席 | `AppConfig` 落 logger 槽 + 传给子系统(一条 app 测试断言行)+ 规范对齐 | `packages/core/src/app.ts` + core 根导出 |
+| **M-5** 离线 example 冒烟闸门 | 工程质量 · 面4——examples 是多数提升项的验证面;不在闸门内 = 验证面不可执行 | CI 一步跑离线例:`cron-schedule` · `otlp-collector` · `mcp-tools`(HTTP + stdio);带 mock 的三个**后置**(mock 脚本先入仓) | `.github/workflows/ci.yml` · `examples/` |
+| **M-6** `check-dist` 单测 | 工程质量 · 面4——五个 check 脚本中唯一无单测者(闸门自身可信度) | `check-dist` 单测(与 `check-byte-budget.test.ts` 同形) | `scripts/` |
+| **M-7** 发布路径加固 | 工程质量 · 面4——`REL-2`(发布无任何自动前置,0.5.0 已实证抓到过时元数据)+ `REL-1`(线上元数据不可原地改) | 七包 `prepublishOnly`(跑 verify)+ 发布后核对单(`description` / `repository.url` / dist-tags / exports) | 七包 `package.json` · 本节发布交接口径 |
+| **M-8** 文档真相源对齐 | 跨篇 · 面4——文档与实装**相反**是最贵的一类错(读者照做即错) | 五处修订:`DOC-1` · `DOC-2` · `DOC-6`(码名 → `InvalidResult`)· `DOC-10` · `DOC-11` + 修订核对表 | `packages/core/src/workflows/{events,step}.ts` · `docs/architecture/tools.md` · `README.md` |
+| **M-9** 规范措辞校准与已知代价明写 | 跨篇 · 面4——规范说反 / 说满会持续误导(措辞级,不涉实装) | 六处:`AG-15`·`H-11` 限定「不传 seam 时」· `ST-63`「组合根**不**代管」· `M-52` 恒写 `{usage}` · `DOC-3` JSON-only 归 port 契约 · `DOC-4` 调用方保证 + 下游校验拦截 · agent / workflows **无界缓冲 · 无背压**各一句(消费者侧责任) | `docs/architecture/{agent,harness,storage,model,workflows}.md` |
+| **M-10** 超规范项补规范 | 跨篇 · 面1——实装已超规范且更优,规范落后即真相源分裂 | 五处:`DOC-5` 桥接运行时 `types` 字面 · `DOC-7` `storage.init()` 同步形态 · `DOC-8` Signals 签名(`tracer?`)+ `stream`/`generate` · `DOC-9` `schedules.save` 的 Invalid Date 校验 · `DOC-12` 两行中文源码注释英文化 | `docs/architecture/{tools,storage,harness}.md` · `packages/core/src/memory/in-memory-store.ts` |
+| **P-1** §3 语义钉子:三条行为断言 | Agent · 面1 + 工作流 · 面1 + Harness · 面1——SEM-A2 非并发 / SEM-B16 条件内 `suspend()` 报错 / SEM-D7 `tick` 无 span 三条语义已实装但无验证面,按判据不构成兑现 | 三条断言:第二个工具在第一个 settle 前不启动 · 条件内 `suspend()` 抛 `suspendOutsideStep` · `tick` 不创建 span | `packages/core/test/agent-loop.test.ts` / `workflows-suspend-resume.test.ts` / `schedules.test.ts` |
+
+### 顺序与依赖
+
+四项批次,批间无硬依赖(可并行开工);批序表达的是「谁的验证面先可信」:
+
+- **批 1 · 闸门先行**:M-5(离线 example 冒烟)· M-6(`check-dist` 单测)· M-7(发布路径加固)——闸门自身先自证,后续各票的验证面才可执行;M-7 另收口「发布前必做」清单。
+- **批 2 · 断言补齐(可并行)**:M-1 · M-2 · M-3 · P-1——纯测试增量、互不依赖;同文件面(M-2 与 P-1 都落 `packages/core/test/`)串行同一写者,免写冲突。
+- **批 3 · 唯一公开面增量**:M-4(组合根 logger 槽)——additive 配置字段,与批 2 可并行;落地时同步观测篇措辞。
+- **批 4 · 文档真相源(发布前收口)**:M-8 · M-9 · M-10——不阻塞批 1–3,但**任何发布动作前必须收口**(M-8 的 `DOC-1`/`DOC-2` 是代码注释,走 patch;其余为文档)。
+
+### 有意分叉的落点
+
+- **八篇规范的「砍单与承载缝」表已归一**为目标表形 `项 | 承载缝 | 判定 | 理由·ADR 指针`(model 篇另留「重开条件」列),共 95 行;判定侧落定:§3 形状内语义差异 33 条 + 审计 §2 砍单行集 60 行 + 延后清单能力项 20 行——**有意分叉 110 行 / 已兑现(非差异)3 段 / 净提升 0 行**。
+- **单一真相源**:分叉理由与承载缝只在规范表(本节不复制理由);「重开条件」只在延后清单(规范表只写承接指针)。
+- **提升项与分叉的边界**:唯一从 §3 走出的提升是 `P-1`(三条已实装但无验证面的语义,按判据不构成兑现);§2 与延后清单**零提升**。
+
+### 与延后清单的关系
+
+延后清单 20 个能力项(延后档 13 + 出域档 7)逐条判定为**有意分叉**:全部**原地留**,重开条件一律不变——「重开条件」的单一真相源仍是延后清单(新增「承接」列只为指到规范表行,判定与理由见各篇规范表)。因此本阶段**不从延后清单移出任何行**;必须项表 11 行全部来自承诺面(§1)、语义面(§3)与质量面(§4)。
+
+### 版本口径
+
+- **标注 0.6**(序列 0.5.0 → 0.6,0.4 已跳空):提升项内容量 = 断言补齐 + 两个闸门 + 一个 additive 配置槽 + 文档对齐——**无破型、无新子系统**。
+- **与 1.0 门槛的关系**:倾向「与 1.0 门槛合并评估」——**本阶段不定义 1.0**(1.0 门槛自 M5 口径修订起搁置,见下「发布节奏与 v1.0 门槛」);若 0.6 收线后提升项自然构成门槛,另起 effort 正式定义。
+- **随 0.6 记账的既有破型**:品牌改名把 OTel 属性族 `balsa.*` → `balsats.*`、`service.name` 默认 `balsats`,对 0.5.0 消费者是观测 wire 面破型(pre-1.0 窗口内落,ADR-0009 已注记)——与本节提升项无关,但同一发布承载。
+
 ## 发布节奏与 v1.0 门槛
 
 - **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsats-framework/issues/20)。
@@ -97,6 +146,7 @@
 - **修订(改名清扫,2026-10-02)**:全树**活面** `@balsa/*` → `@balsats/*` 落地——七包 name 与相互依赖(peer `/` dev)、十 example(名 / 依赖 / 脚本与命令)、源码与测试 import、包内 tsconfig `paths` 与 vitest 别名、脚本常量(`lib.mjs` / `check-runtime-deps` / `check-deps-budget`)、活文档(README / `CONTEXT.md` / `AGENTS.md` / `docs/architecture/**` / 本文件当前状态表述)、`pnpm-lock.yaml` 重生成;**历史记录面按 dated records 保留**(ADR 正文与既有修订记、本文件既有修订行、`docs/research/` 快照),`git grep '@balsa/'` 只剩保留面。核验:`pnpm verify` 全绿(**856 例 67 文件**,与清扫前基线同数)、`check:dist` 16 子路径全过、`check:runtime-deps` 七包全绿、`deps-budget` 零黄灯;字节预算 **16/16 零超支**——**基线随清扫更新**(core `.` / `./model` / `./agent` 各 +8 B、otlp +8 B、sqlite +6 B、mcp-client +2 B:错误消息与导出注释内 scope 串变长的机械增量,非代码增量);example 以终态包名复跑:`cron-schedule` / `otlp-collector` / `mcp-tools`(HTTP + stdio)exit 0。依据 [实施:改名清扫——@balsa/* → @balsats/*(包名 / 引用面 / 示例 / 文档 / 脚本)+ verify 全绿](https://github.com/0xnicholas/balsats-framework/issues/96)。
 - **修订(品牌改名,2026-10-02)**:对外品牌名 `Balsa` → **`Balsats`**、仓库/项目名 `balsa-framework` → **`balsats-framework`**(GitHub 原地改名,旧地址 / git 协议经 301;本地目录同名)——**ADR-0013 同日修订记「品牌名 balsa 不变」「仓库名 `balsa-framework` 不变」两条作废**,标识根与品牌名自此同一。活面:根 `package.json` name、七包 description / `repository.url`、`README` / `CONTEXT.md` / `AGENTS.md`、`docs/architecture/**`、十 example(脚本 / README / env / 临时目录)与包 README prose;**文字面之外的 wire 面一并换名**:OTel 属性族 `balsa.*` → `balsats.*`(`span.type` / `run_id` / `thread_id` / `resource_id` / `request.*` / `input` / `output` / `metadata` / `error.details`)、`service.name` 默认 `balsats`、mcp-client 桥接 `~standard.vendor` → `balsats`、console exporter 前缀 `[balsats]`、示例 env `BALSA_*` → `BALSATS_*` 与探针 / 临时目录名。**代价记账**:(1) **0.5.0 已上线**——线上 tarball 内 README 与 `repository.url` **不可回改**,旧链接 / 旧仓库地址经 GitHub 301 仍有效;(2) `balsats.*` 属性键与 `service.name` 默认值是**对 0.5.0 消费者的 wire 面破型**(pre-1.0 窗口内落,随下一版记账;ADR-0009 已注记);(3) **GitHub org 归属与侧翼仓名不在本次改动面内**——org `balsats` 迁移沿 ADR-0013「迁移后置」口径不变,`balsa-docs` / `balsa-website` 改名归各自仓库动线;(4) **GitHub 仓库改名与本地目录改名由 owner 在侧翼动线收口后执行**——本行先落文档与代码面(改名前置条件,不是遗留项)。**保留面**:ADR 正文与既有修订记、本文件既有修订行、`docs/research/` 快照 prose;活面文档内链接已统一改写为新仓库名(dated records 内链接按 ADR 惯例保留旧地址)。核验:`pnpm verify` 全绿(**865 例 68 文件**,与清扫前基线同数)、`check:dist` 16 子路径全过、`check:runtime-deps` 七包全绿、`deps-budget` 零黄灯;字节预算 **16/16 零超支**——**基线随改名更新**(core `./observability` +2 B、mcp-client `.` +2 B、otlp `.` +26 B:品牌串变长的机械增量;mcp-server `.` **−70 B 为 #83 遗留的既有漂移**,本次一并吸收,非改名所致);example 以终态品牌复跑:`otlp-collector`(断言 `balsats.*` 属性族)与 `mcp-tools`(HTTP + stdio)exit 0。依据:本次 session 裁决(**未立票**)。
 - **修订(发布 0.5.0,2026-10-02)**:七包 **0.5.0 已在 npm 上线**——未认证七端点全 200(= 真 public,`publishConfig.access` 覆盖 scope 默认 `private`);`latest=0.5.0`、`engines >=22.13.0`、peer 已改写 `^0.5.0`;线上 tarball 与本地 pack 逐包同文件集(`dist/` + README + LICENSE 齐,非空包);单 tag `v0.5.0` → `f86984d` + [GitHub Release](https://github.com/0xnicholas/balsats-framework/releases/tag/v0.5.0)(notes 覆盖七包 + M1–M5);通路 = `pnpm -r publish --no-git-checks`(owner 手工,账号 2FA;pnpm 10 `--publish-branch` 默认 `master` 而仓库在 `main`;重跑安全)。**发布后验证([#97](https://github.com/0xnicholas/balsats-framework/issues/97))**:干净目录安装冒烟(七包 + core 根 + 9 子路径 **10/10** import + 运行时冒烟)与六能力包实装冒烟全绿;此前各条收尾复核的「0.1.0 / 0.2 / 0.3 / 0.5 均未发布」由本行结案。**口径收口([#99](https://github.com/0xnicholas/balsats-framework/issues/99))**:本文件「现实差距」的「发布 0.5.0」「公开上手面」两行结案、README Status / Install / 能力包段翻转为已发布、Release notes 品牌与链接随改名修正(**发布事实不动**);**已发布 tarball 的 `repository.url` / description 元数据(七包仍指旧名、写 "Balsa …")不可原地修改**,只能随下次发布修正(不属本图收口活面)。**归属收口**:GitHub 仓库改名与本地目录改名已执行(仓库现为 `0xnicholas/balsats-framework`,见上「品牌改名」行),侧翼两仓亦已改名(`balsats-docs` / `balsats-website`,归各自动线);**org `balsats` 迁移仍后置**(发布后另起 effort,沿身份裁决行)。依据 [实施:发布 0.5.0](https://github.com/0xnicholas/balsats-framework/issues/45) / [发布后验证](https://github.com/0xnicholas/balsats-framework/issues/97) / [收尾](https://github.com/0xnicholas/balsats-framework/issues/99)。
+- **修订(下一阶段成文,2026-10-02)**:新增上「下一阶段(完善)」段(规划型地图 [#102](https://github.com/0xnicholas/balsats-framework/issues/102) 产出)——八份子系统完整判据定死「什么算完整」,以它为准判掉三份盘点(§3 语义 33 条 + §2 砍单 60 行 + §1/§4 131 行):**必须项 11 行**(M-1…M-10 + P-1,逐项带自定触发与验证面)、**有意分叉 110 行**落八篇规范的「砍单与承载缝」表、延后清单 20 能力项全部原地留(重开条件不变)。**版本口径标注 0.6**(倾向:与 1.0 门槛合并评估;1.0 门槛仍未定义)。依据 [任务:计划成文——ROADMAP 增补段「下一阶段(完善)」+ 实施票大纲](https://github.com/0xnicholas/balsats-framework/issues/108)。
 
 ## 延后清单(post-v1,需求信号触发)
 
@@ -104,35 +154,37 @@
 
 > 修订(2026-09-30,对比 ticket [#63](https://github.com/0xnicholas/balsats-framework/issues/63)):清单升级为四列表,重开条件统一为可观察、可累计的判定信号。
 
+> 修订(2026-10-02,判定票 [#106](https://github.com/0xnicholas/balsats-framework/issues/106)):能力项 20 行(延后档 13 + 出域档 7)逐条判定为**有意分叉**——全部**原地留**、重开条件不变;新增「承接」列指到规范表行(判定与理由的单一真相源在 `docs/architecture/*.md` 的「砍单与承载缝」表,本清单不复制理由)。
+
 ### 延后档(触发式)
 
-| 缺口 | 重开条件(可观察) | 承载缝 |
-| --- | --- | --- |
-| Supervisor 能力包(createSupervisor 类) | as-tool 组合的真实重复痛点 ≥3 次复述,或 ≥1 个真实项目因包装样板 / 传播遗漏 / 嵌套审批受阻 | 能力包优先;核心字段须重开 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsats-framework/issues/19) 的演化门 |
-| RAG / 语义召回 | ≥1 个真实用例要求跨会话语义检索(外部用户或自身产品场景) | memory 落库 hook + 能力包(复用模型契约的 embedding 模式) |
-| 外部记忆引擎桥接(bunfold 类) | ≥1 个真实用例要求框架侧提供桥接包(而非宿主侧自组装),且接受外部常驻服务依赖(独立服务 + 其 LLM 抽取管线 + 数据落盘);或此类引擎出现可嵌入(库)形态(无需常驻服务) | 能力包;缝 = memory 落库 hook / recall 增强(实施期裁决) |
-| Evals / scorers | ≥1 个用例要求在 CI 或线上做断言式评估 | Processor,或独立包消费 run 结果 |
-| 字符串路由(models.dev 类) | ≥1 个真实用例要求按名切模型 / provider 目录(而非照搬 mastra 形态) | 能力包(不引入 core magic string) |
-| OTel bridge 能力包 | ≥1 个用户已有 OTel 采集管线、要求原生接入(与 M5 的 OTLP 导出分属两件事) | 能力包 |
-| Background tasks | 「工具 ack + sendSignal 唤醒」文档范式的失效报告 ≥1:`untilIdle` 式自动续跑 / 并发限额 / 结果自动回灌任一成为硬需求 | 文档范式先行,能力包其次 |
-| Goals / State signals | WM + Processor 组合被证明不够:≥1 个用例需要 judge 判定 + 预算语义 | 能力包;前置 = thread 状态域 |
-| 跨实例 signals | ≥1 个部署要求 >1 进程共享同一 thread | 能力包(共享 PubSub + 租约) |
-| resumable stream | ≥1 个断连重连 / 迟到订阅的真实诉求(用户报告,非推测) | 能力包(事件缓存) |
-| 外部 runner 适配 | ≥1 个用户在 Inngest / Temporal 类平台上要求跑 workflow | 能力包(引擎接缝已留) |
-| 每步检查点 + 崩溃重放 | ≥1 个用户明确接受重发 LLM 与幂等成本、并要求自动恢复 | 能力包 / 部署方(ADR-0011 已裁) |
-| time-travel / restart | ≥1 个调试或审计场景要求从任意步重跑 | load→重进原语上的薄变种,无 port 变更 |
+| 缺口 | 重开条件(可观察) | 承载缝 | 承接(规范表行) |
+| --- | --- | --- | --- |
+| Supervisor 能力包(createSupervisor 类) | as-tool 组合的真实重复痛点 ≥3 次复述,或 ≥1 个真实项目因包装样板 / 传播遗漏 / 嵌套审批受阻 | 能力包优先;核心字段须重开 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsats-framework/issues/19) 的演化门 | `agent.md`「多 agent 组合」演化门(ADR-0012) |
+| RAG / 语义召回 | ≥1 个真实用例要求跨会话语义检索(外部用户或自身产品场景) | memory 落库 hook + 能力包(复用模型契约的 embedding 模式) | `memory.md`(CUT-MEM1) |
+| 外部记忆引擎桥接(bunfold 类) | ≥1 个真实用例要求框架侧提供桥接包(而非宿主侧自组装),且接受外部常驻服务依赖(独立服务 + 其 LLM 抽取管线 + 数据落盘);或此类引擎出现可嵌入(库)形态(无需常驻服务) | 能力包;缝 = memory 落库 hook / recall 增强(实施期裁决) | `memory.md`(CUT-MEM2) |
+| Evals / scorers | ≥1 个用例要求在 CI 或线上做断言式评估 | Processor,或独立包消费 run 结果 | `agent.md`(CUT-AG1) |
+| 字符串路由(models.dev 类) | ≥1 个真实用例要求按名切模型 / provider 目录(而非照搬 mastra 形态) | 能力包(不引入 core magic string) | `model.md` 砍单与承载缝(篇级) |
+| OTel bridge 能力包 | ≥1 个用户已有 OTel 采集管线、要求原生接入(与 M5 的 OTLP 导出分属两件事) | 能力包 | `observability.md`(CUT-OBS2) |
+| Background tasks | 「工具 ack + sendSignal 唤醒」文档范式的失效报告 ≥1:`untilIdle` 式自动续跑 / 并发限额 / 结果自动回灌任一成为硬需求 | 文档范式先行,能力包其次 | `harness.md`(CUT-H5) |
+| Goals / State signals | WM + Processor 组合被证明不够:≥1 个用例需要 judge 判定 + 预算语义 | 能力包;前置 = thread 状态域 | `harness.md`(CUT-H2 / H6) |
+| 跨实例 signals | ≥1 个部署要求 >1 进程共享同一 thread | 能力包(共享 PubSub + 租约) | `harness.md`「Signals(基础层)」运行时段 |
+| resumable stream | ≥1 个断连重连 / 迟到订阅的真实诉求(用户报告,非推测) | 能力包(事件缓存) | `harness.md`(CUT-H1)· `model.md`(CUT-M3) |
+| 外部 runner 适配 | ≥1 个用户在 Inngest / Temporal 类平台上要求跑 workflow | 能力包(引擎接缝已留) | `workflows.md`(CUT-W9) |
+| 每步检查点 + 崩溃重放 | ≥1 个用户明确接受重发 LLM 与幂等成本、并要求自动恢复 | 能力包 / 部署方(ADR-0011 已裁) | `harness.md`(CUT-H1) |
+| time-travel / restart | ≥1 个调试或审计场景要求从任意步重跑 | load→重进原语上的薄变种,无 port 变更 | `workflows.md`(CUT-W7) |
 
 ### 出域档(定位改变才重开)
 
-| 缺口 | 重开条件(可观察) | 承载缝 |
-| --- | --- | --- |
-| Studio / editor / stored agents | 定位裁决改变 = 做托管产品或协作面(ADR 级) | — |
-| channels / voice / workspaces & sandboxes | 同上,或社区出现可用实现 | 生态 |
-| 托管平台 | 商业决策(非技术触发) | — |
-| OM 类后台压缩 | ≥1 个用例要求跨会话长期记忆、且接受后台 LLM 成本 | bunfold 类外部记忆桥 |
-| notification inbox | ≥1 个用例要求持久化收件箱 / 优先级投递 | 应用层或能力包 |
-| signal providers(webhook / poll 入口) | ≥1 个用例要求 webhook 接入且示例模式不可复用 | 示例模式 |
-| AgentController / session | ≥1 个用例要做交互式编码 agent 产品 | 应用层自组装 |
+| 缺口 | 重开条件(可观察) | 承载缝 | 承接(规范表行) |
+| --- | --- | --- | --- |
+| Studio / editor / stored agents | 定位裁决改变 = 做托管产品或协作面(ADR 级) | — | `agent.md` 裁单表(CUT-AG3) |
+| channels / voice / workspaces & sandboxes / browser | 同上,或社区出现可用实现 | 生态 | `agent.md`(CUT-AG2) |
+| 托管平台 | 商业决策(非技术触发) | — | —(商业决策,无技术承载缝可落) |
+| OM 类后台压缩 | ≥1 个用例要求跨会话长期记忆、且接受后台 LLM 成本 | bunfold 类外部记忆桥 | `memory.md`(CUT-MEM2) |
+| notification inbox | ≥1 个用例要求持久化收件箱 / 优先级投递 | 应用层或能力包 | `harness.md`(CUT-H3)· `storage.md`(CUT-ST3) |
+| signal providers(webhook / poll 入口) | ≥1 个用例要求 webhook 接入且示例模式不可复用 | 示例模式 | `harness.md`(CUT-H4) |
+| AgentController / session | ≥1 个用例要做交互式编码 agent 产品 | 应用层自组装 | `harness.md`(CUT-H7) |
 
 ### 现实差距(非功能)
 

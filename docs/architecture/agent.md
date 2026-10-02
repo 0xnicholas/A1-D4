@@ -27,18 +27,6 @@ interface AgentConfig {
 - **memory**:一等可选字段。本规范只钉三件事:字段存在、可选、读写时机固定(模型调用前 recall、每个 step 后 save);接口方法与 thread/resource 语义归「决策:Memory 语义」。
 - **组合根关系**:独立 `new Agent(...)` 是一等用法,不强制注入;横切依赖(tracer 等)经组合根分发时 Agent 被动接受,不感知其存在——组合根 `createApp({ tracer })` 的 `app.agent(config)` 建出的 Agent 即已接受分发,配置自带 tracer 时显式优先。**tracer 注入缝**:`AgentConfig.tracer` 接受观测子系统实例(组合根分发或独立 new 显式传入),不属定义表面——不是可被 Processor/能力包承载的能力,而是子系统装配位;缺席时 run 不创建任何 span 对象(零开销),三边界埋点与 trace 续接见 `docs/architecture/observability.md`。
 
-砍单与承载缝(砍的是字段位置,不是能力):
-
-| 砍单项 | 承载缝 |
-| --- | --- |
-| scorers / evals | Processor 或独立 scorer 消费 run 结果;Evals 体系在雾中 |
-| voice / browser / channels / workspace / skills | 能力包;Voice/Channels/Workspaces 已在地图 Out of scope |
-| editor / rawConfig | Studio 出域 |
-| durable / pubsub / backgroundTasks / signals / goal / notifications | 「决策:Harness 语义集」——Harness 持有 agent,不是 agent 持有 Harness |
-| defaultOptions / metadata | 用户一行包装 |
-| hooks / transform / maxRetries | Processor + 模型 fallback 链 |
-| 标题生成 | 应用层职责 |
-
 ## 执行语义
 
 - **输入**:`string | Message[]`,Message **直通模型契约的 vendor prompt 类型**——不发明自有消息格式,内部流转与 Memory 存储同一格式;spec 升级时格式跟随,由模型层的 major 跟随策略兜底。
@@ -88,6 +76,24 @@ const researcherAsTool = async (ctx: RequestContext) =>
 - **memory**:默认无状态(包装器不传 memory);带记忆委派 = 显式传 `memory: { thread, resource }`,thread 策略(每次委派新 thread / 固定 thread)归应用。
 - **嵌套审批不支持**:审批闸只挂最外层入口 agent(`createDurableAgent`,见 `docs/architecture/harness.md`);内层 sub-agent 不做 durable 包装,其工具直接执行——要闸内层危险工具就上提到父级闸。sub run 以 `suspended` 收尾时,包装器按普通文本结果回喂父模型;恢复 = 应用层 resume sub + signal 唤醒父(Harness 原语组合,无新机制)。
 - **演化门**:真实需求信号(as-tool 模式的重复痛点——包装样板、传播遗漏、嵌套审批诉求)触发重开内建问题;落点 = `createSupervisor` 类能力包优先,仅当其证明需要核心新缝时才以 minor 字段进核心(ADR-0012)。
+
+## 砍单与承载缝
+
+判定口径见 `docs/ROADMAP.md`「下一阶段(完善)」;`A*` 行 = 对比总账 §3「形状内语义差异」(`docs/research/mastra-gap-analysis.md`),`CUT-AG*` 行 = 审计 §2 砍单行集(`docs/research/completeness-audit.md`)。判定三值:有意分叉 / 已兑现(非差异) / 提升(→ 必须项表 ID)。
+
+| 项 | 承载缝 | 判定 | 理由·ADR 指针 |
+| --- | --- | --- | --- |
+| **A1** `instructions` 仅 string | `processInput` 可改写系统消息;动态 `instructions` 函数可拼装多段 | 有意分叉 | 可逆性不对称——后加可选字段是 minor、删字段是 major;provider 级能力(缓存控制等)证明需要后再加(ADR-0005) |
+| **A3** `structuredOutput` 只 strict | `processError` / `processOutputStep` 承载重试与修补 | 有意分叉 | 失败即报错、不静默降级、不做修复轮;与工具校验「失败即报错」同调(ADR-0005;`docs/architecture/tools.md` 校验语义) |
+| **A6** `maxSteps` 耗尽 → `finishReason: 'tool-calls'` | `steps[]` + `usage` 可判「第 N 步仍在要求工具」 | 有意分叉 | 截断信号归框架、不 relay provider 原始 reason,`finishReason` 五值冻结(ADR-0005 / 0004) |
+| **A2** 同一步多工具**串行** | 工具自身可内部并发;需求信号到 → 按 run 开关 | 有意分叉 + 验证面欠账 → **P-1** | 并发策略 v1 不做、留待需求信号——顺序确定、失败路径单一、abort 语义简单(ADR-0005) |
+| **CUT-AG1** scorers / evals | Processor 或独立 scorer 消费 run 结果(`steps` / `text` / `usage` 均公开面) | 有意分叉 | evals 是 CI / 线上的断言体系,超出 agent 定义表面;Processor 三钩是唯一横切点(ADR-0005);延后清单「Evals / scorers」 |
+| **CUT-AG2** voice / browser / channels / workspace / skills | 能力包 / 应用层;`browser` 具名入延后清单出域档行,`skills` → [#84](https://github.com/0xnicholas/balsats-framework/issues/84) | 有意分叉 | 六项皆平台 / 应用层能力面,与「定义表面最小 + 零权限模型」立场一致(ADR-0005) |
+| **CUT-AG3** editor / rawConfig | 应用层 / 宿主工具链 | 有意分叉 | Studio / editor 出域——定位裁决改变才重开(ADR-0005);延后清单「Studio / editor / stored agents」 |
+| **CUT-AG4** durable / pubsub / backgroundTasks / signals / goal / notifications | **已兑现段**:durable / signals(含进程内 pubsub)已成独立子系统并冻结(`docs/architecture/harness.md`,ADR-0011)。**剩余三件指针**:backgroundTasks → 延后清单「Background tasks」;goals → 延后清单「Goals / State signals」;notifications → `sendSignal({ type: 'notification' })` 即时注入 | 已兑现 + 有意分叉 | 本行「砍的是字段位置」的原表述随 durable / signals 出账失效;剩余三件是能力形缺口,不是字段位置(ADR-0005 / 0011) |
+| **CUT-AG5** defaultOptions / metadata | 用户一行包装 + 组合根 `createApp` 分发;metadata 走观测的开放袋 → `balsats.metadata` | 有意分叉 | 全局默认归组合根 / 宿主职责;run 级开放袋归观测(ADR-0002 / 0009) |
+| **CUT-AG6** hooks / transform / maxRetries | `processInput` / `processOutputStep` / `processError` + 模型 fallback 链 | 有意分叉 | Processor 三钩是唯一横切点,不引入第二套钩子矩阵;重试归 fallback 链(仅未产出 chunk 时切换)(ADR-0005 / 0004) |
+| **CUT-AG7** 标题生成 | 应用层;要走模型 → Processor + metadata | 有意分叉 | 标题是产品态不是 agent 语义;`title` 是调用方字段(ADR-0005 / 0007) |
 
 ## 与其它子系统的关系
 

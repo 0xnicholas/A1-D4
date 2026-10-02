@@ -108,20 +108,26 @@ schedules.save({
 - **signals**:注入 = 当前 `agent-run` span 上的 `isEvent` 事件;唤醒/调度触发的新 run 自身一个 `agent-run` span。不新增 span 类型常量。
 - **tick 本身无 span**(进程内原语,非自动埋点边界之一)。
 
-## 裁单与承载缝
+## 砍单与承载缝
 
-| 裁单项 | 承载缝 |
-| --- | --- |
-| 崩溃自动恢复 / resumable stream / 多副本恢复 | `resume` 原语 + `listSuspended` 可选扩展归应用;外部 runner(Inngest 类)能力包方向 |
-| state signals | working memory + Processor 组合;入雾 |
-| notification inbox | `sendSignal({ type: 'notification' })` 即时注入 |
-| signal providers | 示例模式(薄基类 + 订阅登记簿 DIY) |
-| background tasks(deferred / untilIdle) | 「工具 ack + 完成后 sendSignal 唤醒」组合,文档范式;入雾 |
-| goals(standing objective + judge) | Processor + working memory 原型化;入雾 |
-| AgentController / session 语义 | Agent 类自行组装;「thread 持久 / live 状态内存」分层已隐含于 memory/agent 规范 |
-| durable sleep / 长延时等待 | schedules + suspend 组合 |
-| `ifActive`/`ifIdle` 分支行为矩阵 | 固定三句语义 |
-| 触发记录(trigger history) | observability span |
+判定口径见 `docs/ROADMAP.md`「下一阶段(完善)」;`CUT-H*` 行 = 审计 §2 砍单行集(`docs/research/completeness-audit.md`),`D*` 行 = 对比总账 §3「形状内语义差异」(`docs/research/mastra-gap-analysis.md`)。判定三值:有意分叉 / 已兑现(非差异) / 提升(→ 必须项表 ID)。
+
+| 项 | 承载缝 | 判定 | 理由·ADR 指针 |
+| --- | --- | --- | --- |
+| **D1** 审批声明在 durable 包装层 | 需要审批 → `createDurableAgent` 包装;裸 agent 不变(Tool 四字段不动) | 有意分叉 | 核心零权限模型;审批闸是包装层能力(ADR-0005 / 0011;`tools.md` D2 行互引) |
+| **D3** `approved: false` = 「用户拒绝」回喂、run 继续 | 需要硬停 → `processError` / 工具自带终止语义 | 有意分叉 | 拒绝是信息不是错误——以 `isError` 工具结果回喂、模型可改方案(ADR-0011 / 0005) |
+| **CUT-H1** 崩溃自动恢复 / resumable stream / 多副本恢复 | `resume` + `listSuspended` 可选扩展归应用;原语均已落 | 有意分叉 | 自动恢复是外部 runner 能力包方向(ADR-0011);延后清单「resumable stream」「每步检查点 + 崩溃重放」「外部 runner 适配」 |
+| **CUT-H2** state signals | working memory + Processor 组合 | 有意分叉 | 命名状态车道 + diff/merge 是新概念面;前置 = thread 状态域(ADR-0007 / 0011);延后清单「Goals / State signals」 |
+| **CUT-H3** notification inbox | `sendSignal({ type: 'notification' })` 即时注入 | 有意分叉 | 持久化收件箱 + 投递策略是应用 / 能力包面;即时注入覆盖主场景(ADR-0011);`storage.md` CUT-ST3 行互引 |
+| **CUT-H4** signal providers(webhook / poll 入口) | 示例模式(薄基类 + 订阅登记簿 DIY) | 有意分叉 | 入口形态是部署面,不进规范(ADR-0011);延后清单「signal providers」 |
+| **CUT-H5** background tasks(deferred / untilIdle) | 「工具 ack + 完成后 `sendSignal` 唤醒」组合 | 有意分叉 | `untilIdle` 续轮会改动 agent 流的完成语义;原语组合已等效(ADR-0011);延后清单「Background tasks」 |
+| **CUT-H6** goals(standing objective + judge) | Processor + working memory 原型化 | 有意分叉 | judge + 预算语义是新概念面;前置 = thread 状态域(ADR-0011 / 0007);延后清单「Goals / State signals」 |
+| **CUT-H7** AgentController / session 语义 | Agent 类自行组装(「thread 持久 / live 状态内存」分层已隐含) | 有意分叉 | 交互式编码 agent 产品面出域(ADR-0011);延后清单「AgentController / session」 |
+| **CUT-H8** durable sleep / 长延时等待 | schedules + suspend 组合(原语已落) | 有意分叉 | 核心不要长驻进程;无 sleep 原语(ADR-0011);与 `workflows.md` CUT-W11 行互引 |
+| **D4** / **CUT-H9** `ifActive` / `ifIdle` 分支行为矩阵 | 固定三句语义(活跃注入 / 空闲唤醒 / 排队保序)已落 | 有意分叉 | 固定三句即标准面——行为矩阵会把最小语义扩成开关森林(ADR-0011) |
+| **D6** / **CUT-H10** 触发记录(trigger history) | observability span;`tick` 无 span 由 **P-1** 断言固定 | 有意分叉 | 不建 fire log:追责靠 run 自己的 trace(ADR-0011 / 0009) |
+| **D5** 排队队列进程内 | 既有:延后清单「跨实例 signals」行 | 有意分叉 | 单进程语义显式、进程死即丢,文档化(ADR-0011) |
+| **D7** `tick` 本身无 span | 需要 tick 级可观测 → 用户自定义 span | 有意分叉 + 缺席断言 → **P-1** | `tick` 是进程内原语、非七边界埋点之一;追责靠被触发 run 的 trace(ADR-0011 / 0009) |
 
 ## 与其它子系统的关系
 

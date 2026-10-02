@@ -149,20 +149,31 @@ interface WorkflowSnapshotStore {
 
 ## 砍单与承载缝
 
-| 砍单项 | 承载缝 |
-| --- | --- |
-| map / sleepUntil | 内联 step / 一行算术 |
-| createStep(agent\|tool) 特化重载 | 一行手写包装(文档范式) |
-| 嵌套 workflow as step | 后加 minor |
-| state / setState 黑板 | getStepResult + 显式管道;后加 minor |
-| bail | branch 建模;后加 minor |
-| validateInputs 开关 | 永远校验 |
-| time-travel / restart / restartAll | 引擎 load→重进原语;durable 归 Harness(#18) |
-| shouldPersistSnapshot / prune 钩子 | 固定 step 边界写 |
-| resume CAS / serializedStepGraph / 多引擎适配 | adapter 可选扩展(`docs/architecture/storage.md`)/ 外部 runner 能力包方向 |
-| chunk 级流式透传 | step 内自行消费;后加 minor |
-| durable sleep / 长延时等待 | schedules + suspend 组合(`docs/architecture/harness.md`);调度触发归平台 cron / tick 原语 |
-| tripwire / canceled 状态 | AbortSignal → failed |
+判定口径见 `docs/ROADMAP.md`「下一阶段(完善)」;`B*` 行 = 对比总账 §3「形状内语义差异」(`docs/research/mastra-gap-analysis.md`),`CUT-W*` 行 = 审计 §2 砍单行集(`docs/research/completeness-audit.md`)。判定三值:有意分叉 / 已兑现(非差异) / 提升(→ 必须项表 ID)。
+
+| 项 | 承载缝 | 判定 | 理由·ADR 指针 |
+| --- | --- | --- | --- |
+| **B1** `dowhile` 迭代**前**求值、可 0 次 | `.dountil`(后测,至少一次) | 有意分叉 | 前测与 `while` 直觉一致、条件只读、可 0 次;后测语义由 `.dountil` 给(ADR-0006) |
+| **CUT-W1** map / sleepUntil | 内联 step + 一行算术(`foreach` / `sleep(ms\|fn)`) | 有意分叉 | 两者覆盖主流;后加 minor(ADR-0006) |
+| **CUT-W2** `createStep(agent\|tool)` 特化重载 | 一行手写包装——范式有树内证据(`examples/workflow-approval`) | 有意分叉 | 定义表面不收简写重载;后加 minor(ADR-0006) |
+| **CUT-W3** 嵌套 workflow as step | step `execute` 内手接子 run(父 run 只记 step 边界,子 run 自拥快照) | 有意分叉 | 子图字段面留判断位;后加 minor——跨图一体化恢复才有缺口(ADR-0006) |
+| **CUT-W4** state / setState 黑板 | `getStepResult` + 显式管道 | 有意分叉 | 显式管道替代黑板;后加 minor(ADR-0006) |
+| **CUT-W5** bail | `branch` 建模 | 有意分叉 | `branch` 已足;后加 minor(ADR-0006) |
+| **CUT-W6** validateInputs 开关 | 需要绕过校验 → 放宽 schema 本身 | 有意分叉 | 校验永远开 = 标准字面「三处固定校验」,没有可关的理由(ADR-0003 / 0006) |
+| **B5** resume 按记录回放重建 tip | 记录回放(records-first)即机制本体 | 有意分叉 | 前序 step 不重执行、条件不重估——副作用不重复(ADR-0006) |
+| **B6** `resumeData` 只给被点名的那一次执行 | 需要广播 → 显式走 `getStepResult` / 参数管道 | 有意分叉 | 记录回放模型下数据归属明确;无「广播给兄弟臂 / 后续迭代」语义(ADR-0006) |
+| **B7** 快照 = 固定五字段 + 可选 `traceId` / `iterationSite` | `iterationSite` 承载块内现场(`CONTEXT.md` 迭代现场) | 有意分叉 | 最小可判 JSON 快照;快照是库语义不是历史(只留最新一份)(ADR-0006 / 0010) |
+| **B8** 无 `suspendedPaths` / `serializedStepGraph` 路径模型 | 位置 = 扁平 `position` + `iterationSite`(下「CUT-W9」行互引) | 有意分叉 | 不建路径模型——`suspendedPaths` 式多路径挂起模型在 `CONTEXT.md` 记 _Avoid_(ADR-0006) |
+| **CUT-W9** resume CAS / serializedStepGraph / 多引擎适配 | **已兑现段**:CAS 已落为 adapter 可选扩展(`compareAndSave`,`@balsats/sqlite` 已实现);**两件指针**:`serializedStepGraph` 随「B8 不建路径模型」,多引擎 → 外部 runner 能力包 | 已兑现 + 有意分叉 | 三件已分流:一件已兑现(ADR-0010)、一件随 B8 分叉、一件是能力包方向(ADR-0006) |
+| **CUT-W7** time-travel / restart / restartAll | `load` → 重进原语,**需先截断该位之后的记录**;durable 侧重启归 Harness | 有意分叉 | 调试 / 审计场景非 v1 判据;records-first 回放决定它不是「薄变种」(ADR-0006 / 0011);延后清单「time-travel / restart」 |
+| **CUT-W8** shouldPersistSnapshot / prune 钩子 | 固定 step 边界写;保留期清理 = adapter 扩展(`deleteSnapshot` / `listSnapshots`,`@balsats/sqlite` 已落) | 有意分叉 | 固定边界写是良定义策略;保留期策略归 adapter(ADR-0006 / 0010) |
+| **B2** `retries` = 额外尝试数 + 固定 1000ms + 可打断 | backoff 策略对象已留扩展位;重试只包 `execute` | 有意分叉 | 最多 `retries + 1` 次最直观;固定间隔 = 最小配置、无退避矩阵;等待可打断 = abort 一致语义(ADR-0006) |
+| **B3** `sleep` 动态时长收 `RequestContext` | 需要上一步输出算时长 → 显式传参 / 内联 step 计算 | 有意分叉 | 全字段统一动态参数口径(`T \| ((ctx) => T)`);`RequestContext` 是唯一解析上下文(ADR-0006 / 0005) |
+| **CUT-W11** durable sleep / 长延时等待 | **宿主平台 cron / `tick` → 应用 `listSnapshots` + `resume`**(`ScheduleTarget` 只收 agent / signal,workflows 无调度目标) | 有意分叉 | 核心 `.sleep` = `setTimeout`,非 durable;与 `harness.md`「CUT-H8 durable sleep」行互引(ADR-0006 / 0011) |
+| **B4** 无 `waiting` 状态、abort 即 failed | 既有「CUT-W12 tripwire / canceled」行(互引) | 有意分叉 | run 状态机三态最小(`success \| failed \| suspended`);sleep 期间保持 running;取消落 failed 不单设 canceled(ADR-0006) |
+| **CUT-W12** tripwire / canceled 状态 | AbortSignal → failed | 有意分叉 | run 状态机三态最小;取消落 `failed`(AbortError),不单设 canceled;与 B4 互引(ADR-0006) |
+| **CUT-W10** chunk 级流式透传 | step 内自行消费 chunk 流 | 有意分叉 | 事件面固定四类,不设 chunk 通道(与 agent 篇「chunk 级 processor 裁出 v1」同调)(ADR-0006 / 0005) |
+| **B16** 条件里调用 `suspend()` 报错 | 需要条件内挂起 → 显式 step 内 `if` + `suspend()` | 有意分叉 + 验证面欠账 → **P-1** | 条件是只读的——无副作用、挂起点须可定位重进(ADR-0006) |
 
 ## 与其它子系统的关系
 

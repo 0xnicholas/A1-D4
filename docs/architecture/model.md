@@ -105,20 +105,29 @@ type ModelInput =
 - 宽容原则:配对不上的结果、未知 part 类型(reasoning / custom / reasoning-file)跳过不抛错;不做 system / 工作记忆。
 - UIMessage id 取折叠序列首条消息 id;与在途流的客户端自生成 id 不一致属已知(跨刷新 id 重生成,文档写明)。
 
-### 裁单与重开条件
+### 裁单
 
-| 裁单 | 理由 | 重开条件 |
-| --- | --- | --- |
-| 反向互操作(`withMastra` 类:给纯 AI SDK 用户套 processor / memory) | 方向倒置——核心须接 AI SDK 流 part 词汇作回调输入,把外部流格式塞进自己的 seam(违本 ADR);永久兼容面 | ≥1 真实用例(AI SDK 原生应用在其 `streamText` 循环里用 Balsats memory / processor 且接受外部依赖) |
-| workflow / network 路由(mastra `workflowRoute` / `networkRoute` 类) | 本包只做 agent chunk 面;workflow lifecycle 事件流是另一套词汇 | 真实用例要求 workflow run 直出 UI stream |
-| AI SDK `resume: true` 的 GET 恢复端点 | 官方明言 resume 与 abort 不互容;核心 resumable stream 已裁 | 沿 `docs/ROADMAP.md` 延后清单 |
-| 无状态全量 `UIMessage[] → ModelMessage[]` 转换 | 与 memory 权威双喂冲突;无状态 chat 不是本框架形态 | 真实用例要求无 memory 的纯无状态路由 |
-| typed 工具渲染(`dynamic: false` 直通) | 工具 schema 只在服务端,客户端类型面不可知 | 真实用例要求 typed 工具 part |
+本包的裁单与重开条件归口于篇章级「砍单与承载缝」表(CUT-M1–M5 行),此处不再重列——单一真相源。
+
 
 ## 依赖预算
 
 - **核心(含模型层)运行时依赖硬线 = 0**。模型层是全框架最不可能裁剪的子系统,正因如此它必须守住零依赖,否则"按需组合"名存实亡。
 - 互操作能力包运行时依赖硬线 = 0;`ai` 仅 devDependency(对校,见上节),数字口径归 `deps-budget.json`。所有数字按 ADR-0001 作内部 CI 回归参考(超预算 PR 亮黄灯),不对外承诺。
+
+## 砍单与承载缝
+
+判定口径见 `docs/ROADMAP.md`「下一阶段(完善)」;`A*` 行 = 对比总账 §3「形状内语义差异」(`docs/research/mastra-gap-analysis.md`),`CUT-M*` 行 = 审计 §2 砍单行集(`docs/research/completeness-audit.md`)。判定三值:有意分叉 / 已兑现(非差异) / 提升(→ 必须项表 ID)。本表是**篇章级单表**:AI SDK 互操作能力包的裁单行也在此(保留「重开条件」列)。
+
+| 项 | 承载缝 | 判定 | 理由·ADR 指针 | 重开条件 |
+| --- | --- | --- | --- | --- |
+| **CUT-M1** 反向互操作(`withMastra` 类:给纯 AI SDK 用户套 processor / memory) | `Memory` 类可独立 `new`(port 直用);processor / 挂起点属自有 loop——纯 AI SDK 侧只能手写等价钩子 | 有意分叉 | 方向倒置:核心须接受 AI SDK 流 part 词汇作回调输入,把外部流格式塞进自有 seam;永久兼容面(ADR-0004) | ≥1 真实用例(AI SDK 原生应用在其 `streamText` 循环里用 memory / processor 且接受外部依赖) |
+| **CUT-M2** workflow / network 路由(mastra `workflowRoute` / `networkRoute` 类) | 应用端点自行把 workflow 事件流 / run 记录映射为 UI 流(事件面公开) | 有意分叉 | 本包只做 agent chunk 面;workflow lifecycle 事件流是另一套词汇(ADR-0004 / 0006) | 真实用例要求 workflow run 直出 UI stream |
+| **CUT-M3** AI SDK `resume: true` 的 GET 恢复端点 | 应用自建 GET 端点;事件缓存归应用 | 有意分叉 | 官方明言 resume 与 abort 不互容;核心 resumable stream 已裁(ADR-0004) | 沿 `docs/ROADMAP.md` 延后清单「resumable stream」 |
+| **CUT-M4** 无状态全量 `UIMessage[] → ModelMessage[]` 转换 | `ModelInput` 三形状直通(`Message[]` 直传);缺的只是 UI part → `ModelMessage` 转换件,由用户侧承担 | 有意分叉 | 与 memory 权威双喂冲突;无状态 chat 不是本框架形态(ADR-0004 / 0007) | 真实用例要求无 memory 的纯无状态路由 |
+| **CUT-M5** typed 工具渲染(`dynamic: false` 直通) | `dynamic: true` 兜底(tool part 带 input 已可渲染);typed 诉求由客户端按 `toolName` 自查 | 有意分叉 | 工具 schema 只在服务端,客户端类型面不可知(ADR-0004) | 真实用例要求 typed 工具 part(opt-in minor) |
+| **A4** chunk 协议仅四帧(无推理增量 / 参数增量) | **无**——数据不可恢复:互操作包同样跳过(`reasoning-*` / `tool-input-*` 在归一层静默丢弃,`usage` 仍计 reasoning tokens) | 有意分叉 | 词汇最小 + 单一 spec 版本 + 外部格式转换归互操作包(ADR-0004) | 真实用例要求思考流 / 工具参数流式 → 加帧(additive minor) |
+| **A5** fallback 仅在该次尝试**未产出任何 chunk** 时切换 | 外层重试(调用方或 `processError`) | 有意分叉 | 流中途失败不切换候选——不重复输出、不产生半截文本歧义(ADR-0004;对比总账 §1「本框架更保守」) | —(未立;需真实用例) |
 
 ## 与其它子系统的关系
 

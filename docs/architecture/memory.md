@@ -24,6 +24,7 @@ thread 不存在时自动创建(可带 `title` / `metadata`)。
 
 - **窗口**:`lastMessages` 默认 10,只按条数截断,不做 token 窗口。
 - **消息格式**:即模型契约的 vendor prompt 类型 + 存储信封 `{ id, threadId, resourceId, createdAt }`;内部流转与存储同一格式(「决策:Agent 核心抽象」已钉)。无 mastra 的 `signal` role。消息不可变。
+- **信封与写入幂等**(超规范项,补进规范):`save` 的输入可带显式 `id` / `createdAt`——缺省部分由 Memory 补(`id` 用 `crypto.randomUUID()`、`createdAt` 用实例序列戳),信封的 `threadId` / `resourceId` 由本次调用盖章;带显式 `id` 即**幂等 upsert**(同 id 重写覆盖,port 两侧同语义)。`id` 同时是游标:`before` 取某 id 即只取比它更早的条目。
 - **单一查询入口**:`memory.recall({ threadId, limit?, before?, order? })`,返回可直接喂模型的消息;Memory 实例方法全公开(chat UI 可直接调用)。
 - **时机**(细化「决策:Agent 核心抽象」的钉法):recall 每 run 一次——run 开始、`processInput` 之前;agent loop 内消息列表在内存累积;save 每个 step 后增量落库(首轮含用户输入消息)。
 - **顺序语义**:`processOutputStep` 先于 save——processor 的脱敏/过滤在落库前生效。
@@ -33,6 +34,7 @@ thread 不存在时自动创建(可带 `title` / `metadata`)。
 - 一块跨会话的小块结构化数据(用户画像/偏好/当前目标),归属 resource——**单 scope,不做 thread/resource 开关**(调研原话:两个都做是双倍语义表面;thread 级暂存有消息历史兜底)。
 - **schema-only**:schema 走 Standard Schema 契约(ADR-0003);merge 语义——深合并、`null` 删字段、数组整换。mastra 的 markdown template 形态砍掉(全量替换 = 每次全量 token、易写坏)。
 - **更新只走 tool-call**:启用 WM 时框架自动给 agent 挂 `updateWorkingMemory` 工具;校验失败按既有「工具错误回喂」语义返回模型。
+- **编程写入口**(超规范项,补进规范):`Memory.updateWorkingMemory({ resource, patch })` 是上述工具背后的**同一条语义路径**(merge → 校验,不合 schema 即抛且不写),宿主可直接调用;对应读入口 = `Memory.getWorkingMemory(resource)`。resource 记录是 upsert(`metadata` / `createdAt` 保持);读-改-写非原子,同 resource 并发更新 last-write-wins。
 - **注入**:独立 system message,追加在 instructions 之后,不改写 instructions 本体。
 - read-only 模式裁出 v1(后加 minor)。
 
@@ -58,6 +60,7 @@ interface MemoryStore {
 ```
 
 - 裁单(对照 mastra 10 必备 + 3 可选):`updateMessages`(消息不可变)、`listMessagesById`(语义召回延后连带裁)、`updateThread`(并入 upsert)、`cloneThread` / `copyThread`(延后)、`listMessagesByResourceId`(OM 遗物)。
+- `deleteThread` **只在 port 层**(级联删消息、不动 resource 级数据);`Memory` 实例表面不暴露删除入口——需要清 thread 的宿主直用 port(见本文件「砍单与承载缝」C2 行)。
 - 核心自带内存 Map 默认实现——不接 storage 即纯内存,无运行时负担。adapter 家族见 `docs/architecture/storage.md`(#15 已定),本清单是其输入。
 
 ### 外部记忆引擎(M5 裁定:不产桥接包)
@@ -79,18 +82,20 @@ new Memory({
 
 ## 砍单与承载缝
 
-| 砍单项 | 承载缝 |
-| --- | --- |
-| semantic recall(向量 RAG) | seam:消息落库 hook + embedder 走模型契约模式;能力包方向入雾,归路线图 |
-| OM 类后台压缩管线 | 出本地图范围;bunfold 桥接(已裁,#79;重开条件见 ROADMAP 延后清单);summarize-and-truncate = Processor 模式(文档范式) |
-| thread cloning | 后加 minor |
-| 单条消息 update/delete | `deleteThread` 级联兜底 |
-| thread title 生成 | 应用层职责;title 只是 metadata 字段 |
-| markdown template WM | schema-only(merge) |
-| read-only WM | 后加 minor |
-| token 窗口 | `lastMessages` 条数截断 |
-| 访问控制 | 应用层 |
-| 所有权迁移 | 删旧建新 |
+判定口径见 `docs/ROADMAP.md`「下一阶段(完善)」;`C*` 行 = 对比总账 §3「形状内语义差异」(`docs/research/mastra-gap-analysis.md`),`CUT-MEM*` 行 = 审计 §2 砍单行集(`docs/research/completeness-audit.md`)。判定三值:有意分叉 / 已兑现(非差异) / 提升(→ 必须项表 ID)。
+
+| 项 | 承载缝 | 判定 | 理由·ADR 指针 |
+| --- | --- | --- | --- |
+| **C1** / **CUT-MEM6** markdown template WM | 结构由 Standard Schema 表达(schema-only + merge) | 有意分叉 | 全量替换 = 每次全量 token、易写坏;schema-only + merge 是工作记忆钉子(`CONTEXT.md` 工作记忆)(ADR-0007 / 0003) |
+| **C2** / **CUT-MEM4** 无单条消息 update / delete | **store 层** `deleteThread` 级联为兜底;`Memory` 表面不暴露(port 必备方法之一) | 有意分叉 | 消息不可变 + 可回读是钉子;`Memory` 表面只留 recall / save 入口(ADR-0007) |
+| **C3** / **CUT-MEM3** 无 thread cloning | 用户态读 A 写 B 重组(port 6 必备够用);后加 minor 留扩展 | 有意分叉 | `cloneThread` / `copyThread` 裁单;审计判无等价物,故承载缝写为「用户态重组」而非「后加 minor」一项(ADR-0007) |
+| **C4** / **CUT-MEM9** 不做访问控制 | 应用层端点鉴权 / 中间件 | 有意分叉 | 授权归应用层——resource 是稳定标识不是授权主体(ADR-0007) |
+| **CUT-MEM1** semantic recall(向量 RAG) | 落库 hook = `Memory.save → MemoryStore.saveMessages`;embedder 复用模型契约模式 | 有意分叉 | 语义检索是能力包级缺口;消息不可变 + 单入口 recall 是 v1 钉子(ADR-0007);延后清单「RAG / 语义召回」 |
+| **CUT-MEM2** OM 类后台压缩管线 | bunfold 类外部桥(#79 已裁);summarize-and-truncate = Processor 范式 | 有意分叉 | 出域档(定位改变才重开);token 计数 / summary 消息类型是新概念面(ADR-0007);延后清单「OM 类后台压缩」 |
+| **CUT-MEM5** thread title 生成 | 调用方写 `title` | 有意分叉 | 应用层职责;`title` 只是 metadata 字段(ADR-0007) |
+| **CUT-MEM7** read-only WM | 不挂 WM 更新工具(读仍经 recall) | 有意分叉 | 后加 minor(ADR-0007) |
+| **CUT-MEM8** token 窗口 | `lastMessages` 条数截断 | 有意分叉 | 条数截断是 v1 选择(`memory.ts` 明写 history is truncated by count only);**重开条件 = 真实用例要求按 token 预算裁剪历史**(ADR-0007) |
+| **CUT-MEM10** 所有权迁移 | 删旧建新;错配由一致性检查显式拒绝 | 有意分叉 | 迁移是产品语义,不是存储原语(ADR-0007) |
 
 ## 与其它子系统的关系
 

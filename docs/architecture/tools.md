@@ -138,6 +138,30 @@ await client.close()    // HTTP 先 terminateSession(失败静默)→ client.clo
 - **不挂 outputSchema**:桥接 Tool 的 `outputSchema` 缺省——远端与 SDK 客户端已按远端 outputSchema 校验 `structuredContent`(非 isError 结果缺它 → 抛 `InvalidRequest`、不合 → 抛 `InvalidParams`),Balsats 侧再挂只会得到「永不失败的 validate」假校验。代价:MCP→MCP 再导出丢 `structuredContent`、只出 text;保真诉求留 minor(显式 opt-in)。
 - **名冲突**:纯函数 helper `prefixTools(tools, prefix, separator = '_')`——返回新冻结 Record,键 = `prefix + separator + name`;execute 闭包内的远端名不变(**前缀不进 wire**),固定前缀是同构映射故不做冲突检测;不进 client 配置面。远端工具名**不在桥接层校验或清洗**(MCP 规范 SHOULD 允许 `.` 等,provider 各自更严——那是用户与 helper 的事)。
 
+## 砍单与承载缝
+
+判定口径见 `docs/ROADMAP.md`「下一阶段(完善)」——核心 Tool 面与 MCP 两包冻结面的裁项散点在此收编为单表;`D*` 行 = 对比总账 §3,`CUT-T*` 行 = 审计 §2 砍单行集(其中 `CUT-T3` 为内联裁项群,逐项展开)。所有行的逃逸口同一条纪律:**官方 SDK 自布线**(用户直依 `@modelcontextprotocol/*`)。
+
+| 项 | 承载缝 | 判定 | 理由·ADR 指针 |
+| --- | --- | --- | --- |
+| **D2** 工具保持四字段 | 审批 / 权限一律在包装层(`createDurableAgent`)与调用方;框架不往 Tool 加字段 | 有意分叉 | 四字段 + Record 键唯一真相源;核心零权限模型(ADR-0008 / 0005;`docs/architecture/harness.md` 审批闸) |
+| **CUT-T1** MCP v1 单包(`@modelcontextprotocol/sdk`)路径 | 官方 SDK 自布线 | 有意分叉 | v2 直连两路径是已冻面;v1 单包 92 安装包、硬拉 express+hono(ADR-0008 / 0002) |
+| **CUT-T2** OAuth 授权流助手 | `headers` 透传(bearer)+ 官方 SDK 自布线 | 有意分叉 | 授权是宿主 / 部署面(凭证、回调、浏览器);裁它不缩小安装树,裁的是产品面(ADR-0008) |
+| **CUT-T3·server** legacy sessionful(2025 代有状态连接) | 官方 SDK 自布线(`McpServer.connect(transport)`) | 有意分叉 | 最小表面:HTTP `fetch` + stdio 双入口已覆盖;默认双代全服务已给兼容面(ADR-0008) |
+| **CUT-T3·server** prompts / resources 原语 | 后加 minor | 有意分叉 | v1 仅 tools(ADR-0008) |
+| **CUT-T3·server** `notify` / `bus` 接口 | 跨节点分发 v1 不做 | 有意分叉 | 静态工具无 listChanged;每请求实例模型下无长驻订阅对象(ADR-0008) |
+| **CUT-T3·server** Node `node:http` 绑定 | 宿主自装官方 `@modelcontextprotocol/node`(`toNodeHandler` + host / origin 校验,文档给片段) | 有意分叉 | 不绑 web 框架、不自实现传输;Node 绑定不替宿主选(ADR-0008) |
+| **CUT-T3·server** 创建 / 运行旋钮(`legacy` / `transport` 之外) | 沿 SDK 默认;要别的 → 官方 SDK 自布线 | 有意分叉 | 旋钮一律不暴露,只留显式接缝(ADR-0008) |
+| **CUT-T3·client** 配置旋钮面(stdio 的 `stderr` / `cwd` / `maxBufferSize`、HTTP 的 `fetch` / `authProvider` / `sessionId`、`listMaxPages`、响应缓存三件、客户端中间件) | 官方 SDK 自布线 | 有意分叉 | 最小配置面 + 不提供产品级开关(ADR-0008) |
+| **CUT-T3·client** transport 实例注入 + 身份覆写 | 官方 SDK 自布线 | 有意分叉 | 接入形态唯一(transport 三形态 + 包内定 `Client({ name, version })`);实例注入会把包面契约让给宿主的 transport 版本(ADR-0008) |
+| **CUT-T3·client** per-call `timeoutMs` 覆盖 | `timeoutMs` 由包在 connect 与**每次** `callTool` 透传 | 有意分叉 | 单入口超时;per-call 覆盖与「不做 per-call 旋钮」纪律冲突,长工具调用 = 调 `timeoutMs`(ADR-0008) |
+| **CUT-T3·client** `listChanged` 订阅 | `refresh()` 显式换快照;长驻用 `tools: () => client.tools` | 有意分叉 | 长驻监听与无运行时负担有张力(ADR-0008) |
+| **CUT-T3·client** 断线自动重连 | 恢复 = 新建 client;`refresh()` 不兼任重连探测 | 有意分叉 | 重连策略(退避 / 会话恢复 / 幂等)是部署面,不是包面(ADR-0008) |
+| **CUT-T3·client** elicitation / sampling / roots handler(MRTR) | `inputRequired.autoFulfill: false` 显式钉死——远端 `input_required` 变确定性 `SdkError(UnsupportedResultType)` 回喂 | 有意分叉 | 不做「没有 handler 的自动流程」;本地人机交互原语归 Harness(ADR-0008 / 0011) |
+| **CUT-T3·client** 结果保真(多模态 part + `outputSchema`) | 非 text 块降级占位文本、不挂 `outputSchema`;保真留 minor(显式 opt-in) | 有意分叉 | 工具结果通道没有多模态 part;再挂 `outputSchema` 只会得到「永不失败的 validate」假校验(ADR-0008) |
+| **CUT-T3·client** `toolCallId` 经 `_meta` / 自定义头送远端 | 不做(minor 位) | 有意分叉 | 协议无对应位;本地身份不承诺跨连接稳定(ADR-0008) |
+| **CUT-T3·client** 进程退出钩子 / closed 观测 | 宿主显式 `close()`;这条写文档不兜底 | 有意分叉 | 不接管宿主生命周期(ADR-0002 / 0010) |
+
 ## 与其它子系统的关系
 
 - **模型层(#9,已定)**:chunk 协议承载 tool-call / tool-result 事件;工具 schema 经双接口出 JSON Schema 发给 provider。
