@@ -72,11 +72,11 @@ const formatBytes = (bytes) =>
  * 返回 { packages, bytes };npm 失败即硬错误(退出码 2)。
  */
 async function measureClosure(name, range) {
-  const probeDir = mkdtempSync(join(tmpdir(), 'balsa-deps-budget-'));
+  const probeDir = mkdtempSync(join(tmpdir(), 'balsats-deps-budget-'));
   try {
     writeFileSync(
       join(probeDir, 'package.json'),
-      `${JSON.stringify({ name: 'balsa-deps-budget-probe', private: true, dependencies: { [name]: range } }, null, 2)}\n`,
+      `${JSON.stringify({ name: 'balsats-deps-budget-probe', private: true, dependencies: { [name]: range } }, null, 2)}\n`,
     );
     const npm = spawnSync(
       'npm',

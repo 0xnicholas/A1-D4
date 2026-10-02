@@ -63,7 +63,7 @@ export function withEnvelope(params: Record<string, unknown>): Record<string, un
     ...params,
     _meta: {
       'io.modelcontextprotocol/protocolVersion': '2026-07-28',
-      'io.modelcontextprotocol/clientInfo': { name: 'balsa-test', version: '0.0.0' },
+      'io.modelcontextprotocol/clientInfo': { name: 'balsats-test', version: '0.0.0' },
       'io.modelcontextprotocol/clientCapabilities': {},
     },
   };
@@ -81,7 +81,7 @@ export function sendWire(transport: Transport, request: JsonRpcRequest): Promise
 export function initializeRequest(id = 1): JsonRpcRequest {
   return rpc(
     'initialize',
-    { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'balsa-test', version: '0.0.0' } },
+    { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'balsats-test', version: '0.0.0' } },
     id,
   );
 }

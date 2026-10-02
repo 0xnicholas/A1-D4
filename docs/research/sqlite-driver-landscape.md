@@ -1,6 +1,6 @@
 # 调研:SQLite 驱动现状——node:sqlite vs libsql（四 port 需求对账）
 
-> Issue: [#66](https://github.com/0xnicholas/balsa-framework/issues/66) · 日期:2026-09-30 · 分支:`research/sqlite-driver-landscape` · 性质:事实收集,**不做决策**（供主票「决策:SQLite 参考 adapter」冻结驱动选型）。
+> Issue: [#66](https://github.com/0xnicholas/balsats-framework/issues/66) · 日期:2026-09-30 · 分支:`research/sqlite-driver-landscape` · 性质:事实收集,**不做决策**（供主票「决策:SQLite 参考 adapter」冻结驱动选型）。
 
 ## TL;DR
 

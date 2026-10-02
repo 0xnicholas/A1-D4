@@ -2,7 +2,7 @@
 
 A durable run that outlives the process that made it: the refund desk suspends in a worker process, its
 loop snapshot lands in SQLite through [`@balsats/sqlite`](../../packages/sqlite/), the worker exits — and a
-brand-new process opens its own connection to the same file and resumes the run. Balsa is an ultralight
+brand-new process opens its own connection to the same file and resumes the run. Balsats is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
 One script, two processes (`src/index.ts` re-execs itself as the worker), four acts:
@@ -37,7 +37,7 @@ OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. The SQLite file defaults to a fresh
-temp directory; set `BALSA_SQLITE_EXAMPLE_DB` to keep it. The script self-asserts
+temp directory; set `BALSATS_SQLITE_EXAMPLE_DB` to keep it. The script self-asserts
 (`node:assert/strict`): a worker that fails to suspend, a snapshot that is not in the file, a resume that
 does not execute the held call — each exits non-zero instead of printing a happy face.
 

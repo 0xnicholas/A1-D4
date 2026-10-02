@@ -66,7 +66,7 @@ function resolveProtocol(explicit: OtlpExporterOptions['protocol']): 'protobuf' 
 }
 
 /**
- * The span resource every synthesized span carries: `service.name` defaults to `balsa`, env
+ * The span resource every synthesized span carries: `service.name` defaults to `balsats`, env
  * (`OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES`) overrides the default, explicit options
  * override env — `resourceAttributes` wholly over `serviceName`. No `telemetry.sdk.*`: this
  * package does not run the OTel SDK and does not claim it.
@@ -78,7 +78,7 @@ function buildResource(options: OtlpExporterOptions): Resource {
   if (options.resourceAttributes !== undefined) {
     Object.assign(explicit, options.resourceAttributes);
   }
-  return resourceFromAttributes({ 'service.name': 'balsa' })
+  return resourceFromAttributes({ 'service.name': 'balsats' })
     .merge(envResource)
     .merge(resourceFromAttributes(explicit));
 }

@@ -1,5 +1,5 @@
 /**
- * Balsa ai-chat-route example — one `useChat()`-compatible HTTP route, one durable run, one
+ * Balsats ai-chat-route example — one `useChat()`-compatible HTTP route, one durable run, one
  * app-side resume.
  *
  * The script hosts `createChatRoute` on plain `node:http` (any web-standard host works the same

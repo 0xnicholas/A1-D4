@@ -23,4 +23,6 @@
 
 - **修订(M5 #73)**: OTLP 能力包设计冻结(`@balsa/otlp`)——依赖路线 = 官方 exporter 双协议包(HTTP/protobuf + HTTP/JSON,精确钉)+ `sdk-trace` 的 `BatchSpanProcessor`,不自研序列化 / 传输 / 批处理;桥法 = 只取 `span_ended` 重建结构满足 `ReadableSpan` 的普通对象(`span_started` / `span_updated` 不进 OTLP),`isEvent` → 零时长 span;七类 span 的 semconv 映射表、`balsa.*` 键表、值域兜底与不截断口径见 `docs/architecture/observability.md`「OTLP 能力包(M5 设计冻结)」。`gen_ai.*` 键名字符串直写、不 import `semantic-conventions`(传递树里存在非本包引入);安装树 12 包 / ≈18.42 MiB 是 opt-in 能力包的已知代价(不装不付)。
 
+- **修订(品牌改名,2026-10-02)**:span 属性命名空间 `balsa.*` → **`balsats.*`**(`span.type` / `run_id` / `thread_id` / `resource_id` / `request.*` / `input` / `output` / `metadata` / `error.details`),resource 默认 `service.name` `balsa` → `balsats`;映射契约其余条款(七类映射、值域兜底、载荷拆法)不变,活面定义见 `docs/architecture/observability.md`「OTLP 能力包(M5 设计冻结)」节与 `packages/otlp/README.md`。**记账**:0.5.0 已上线,该换名是对 0.5.0 消费者的 wire 面破型(pre-1.0 窗口内落)。依据 ADR-0013「品牌名与仓库名 balsats」修订块(未立票)。
+
 (来源:wayfinder ticket #14)

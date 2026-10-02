@@ -1,13 +1,13 @@
-# Balsa
+# Balsats
 
-This repository is **balsa-framework**, the framework subproject of the Balsa umbrella (packages
-publish under the `@balsats/*` scope). Other Balsa subprojects live alongside it.
+This repository is **balsats-framework**, the framework subproject of the Balsats umbrella (packages
+publish under the `@balsats/*` scope). Other Balsats subprojects live alongside it.
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues are tracked as GitHub issues on this repo (`0xnicholas/balsa-framework`), managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues are tracked as GitHub issues on this repo (`0xnicholas/balsats-framework`), managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

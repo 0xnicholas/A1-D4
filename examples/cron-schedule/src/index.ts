@@ -1,5 +1,5 @@
 /**
- * Balsa cron-schedule example — a cron expression becomes the `next` fragment `schedules.save()`
+ * Balsats cron-schedule example — a cron expression becomes the `next` fragment `schedules.save()`
  * takes, and the schedule's whole life is walked one act at a time.
  *
  * One script, no external services: a **scripted model** (defined in this file — no API key, no

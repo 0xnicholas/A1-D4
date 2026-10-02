@@ -29,7 +29,7 @@ type ModelInput =
 - **fallback 语义(初版保守)**:每次模型调用按数组顺序逐项尝试;仅在"该次尝试尚未产出任何 chunk"的失败时切换下一项;流中途失败不切换、直接报错(部分输出已发给调用方,切换会产生拼接幻觉)。错误上下文沿链保留(链上全部失败时,错误含每个候选与各自错误;单候选链的失败原样浮出)。
 - **动态函数**:每次执行按请求上下文解析,一个 union 类型换来多租户、按 tier 选模型等表达力。
 
-此形状由 [决策:Agent 核心抽象](https://github.com/0xnicholas/balsa-framework/issues/10) 继承。
+此形状由 [决策:Agent 核心抽象](https://github.com/0xnicholas/balsats-framework/issues/10) 继承。
 
 ## Chunk 协议
 
@@ -68,7 +68,7 @@ type ModelInput =
 - **职责切分:转换器只产体帧**;消息级 `start` / `finish` 由调用方写(`finish` 的 reason 与 metadata 需要终值,转换器看不到)。
 - 帧映射(逐行冻结):
 
-| Balsa | 发出 | 规则 |
+| Balsats | 发出 | 规则 |
 | --- | --- | --- |
 | — | `start-step` | 流首帧前一条;`finish-step` 之后的下一条**模型产出**帧前补下一条(`tool-result` 不触发) |
 | `text-delta` | 惰性 `text-start` + `text-delta` | 块 id 合成;连续 delta 一段,遇任何非 text 帧(含 `tool-call` / `finish`)补 `text-end` |
@@ -91,7 +91,7 @@ type ModelInput =
 ### 挂起表达(durable agent)
 
 - 挂起不在 chunk 流里(流以模型自己的 `finish(tool-calls)` 收尾);route 读终值后在终帧表达:`finishReason: 'other'` + `messageMetadata: { suspended: { runId, awaitingApproval } }`。
-- **不合流 `tool-approval-*`**:AI SDK 逐 `approvalId` 的流内审批与 Balsa run 级挂起 / 快照是两套机制,且审批决定是单布尔(N:1),合流会把错位藏进实现。
+- **不合流 `tool-approval-*`**:AI SDK 逐 `approvalId` 的流内审批与 Balsats run 级挂起 / 快照是两套机制,且审批决定是单布尔(N:1),合流会把错位藏进实现。
 - resume 编排归应用(自调 `durable.resume`;实施图给范式);重开条件 = 真实用例要求一键审批 UX。
 
 ### 订阅流表达(signals)
@@ -109,7 +109,7 @@ type ModelInput =
 
 | 裁单 | 理由 | 重开条件 |
 | --- | --- | --- |
-| 反向互操作(`withMastra` 类:给纯 AI SDK 用户套 processor / memory) | 方向倒置——核心须接 AI SDK 流 part 词汇作回调输入,把外部流格式塞进自己的 seam(违本 ADR);永久兼容面 | ≥1 真实用例(AI SDK 原生应用在其 `streamText` 循环里用 Balsa memory / processor 且接受外部依赖) |
+| 反向互操作(`withMastra` 类:给纯 AI SDK 用户套 processor / memory) | 方向倒置——核心须接 AI SDK 流 part 词汇作回调输入,把外部流格式塞进自己的 seam(违本 ADR);永久兼容面 | ≥1 真实用例(AI SDK 原生应用在其 `streamText` 循环里用 Balsats memory / processor 且接受外部依赖) |
 | workflow / network 路由(mastra `workflowRoute` / `networkRoute` 类) | 本包只做 agent chunk 面;workflow lifecycle 事件流是另一套词汇 | 真实用例要求 workflow run 直出 UI stream |
 | AI SDK `resume: true` 的 GET 恢复端点 | 官方明言 resume 与 abort 不互容;核心 resumable stream 已裁 | 沿 `docs/ROADMAP.md` 延后清单 |
 | 无状态全量 `UIMessage[] → ModelMessage[]` 转换 | 与 memory 权威双喂冲突;无状态 chat 不是本框架形态 | 真实用例要求无 memory 的纯无状态路由 |

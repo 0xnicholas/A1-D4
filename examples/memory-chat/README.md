@@ -1,8 +1,8 @@
 # memory-chat
 
-Balsa's memory subsystem in one scripted session: **message history** across two threads of one
+Balsats's memory subsystem in one scripted session: **message history** across two threads of one
 resource, the `recall()` query, and **working memory** maintained by the model through a tool call.
-Balsa is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no
+Balsats is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no
 runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It runs a
@@ -59,7 +59,7 @@ OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one.
 
-Expected output: the console exporter's `[balsa] span_started / …` lines, the act banners with each
+Expected output: the console exporter's `[balsats] span_started / …` lines, the act banners with each
 `[user → thread]` / `[assistant]` turn, the recalled history, and finally the working-memory record:
 
 ```json

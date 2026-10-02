@@ -1,6 +1,6 @@
 # `@balsats/croner`
 
-Cron expressions for [Balsa](https://github.com/0xnicholas/balsa-framework) schedules: one `cron()`
+Cron expressions for [Balsats](https://github.com/0xnicholas/balsats-framework) schedules: one `cron()`
 call returns exactly the `next` + `timezone` fragment `schedules.save()` takes, so a schedule is
 registered by spreading it in — and the expression never enters the record.
 
@@ -19,10 +19,10 @@ await schedules.save({
 await schedules.tick(); // the platform cron's endpoint calls this
 ```
 
-- Spec: [`docs/architecture/harness.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/harness.md)
-- Facts this package builds on: [`docs/research/croner.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/croner.md)
-- Decisions: [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging); harness spec ([ADR-0011](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0011-harness-semantics.md))
-- Example: [`examples/cron-schedule`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/cron-schedule) — save → occurrences advance → `tick` fires
+- Spec: [`docs/architecture/harness.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/harness.md)
+- Facts this package builds on: [`docs/research/croner.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/croner.md)
+- Decisions: [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging); harness spec ([ADR-0011](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0011-harness-semantics.md))
+- Example: [`examples/cron-schedule`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/cron-schedule) — save → occurrences advance → `tick` fires
 
 ## Install
 

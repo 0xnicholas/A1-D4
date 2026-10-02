@@ -239,7 +239,7 @@ function jsonSchemaPassthrough(remote: Record<string, unknown>): StandardSchema<
   const wrapper: StandardSchema<unknown, unknown> = {
     '~standard': Object.freeze({
       version: 1,
-      vendor: 'balsa',
+      vendor: 'balsats',
       types: Object.freeze({ input: undefined, output: undefined }),
       validate: Object.freeze((value: unknown) => ({ value })),
       jsonSchema: Object.freeze({

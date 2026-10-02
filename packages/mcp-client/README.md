@@ -1,7 +1,7 @@
 # `@balsats/mcp-client`
 
 Bridge a remote [MCP](https://modelcontextprotocol.io) server's tools into a
-[Balsa](https://github.com/0xnicholas/balsa-framework) tool container: one `createMcpClient()`
+[Balsats](https://github.com/0xnicholas/balsats-framework) tool container: one `createMcpClient()`
 object with a `tools` snapshot you spread straight into an agent, a `refresh()`, and a `close()`.
 
 ```ts
@@ -24,10 +24,10 @@ await client.refresh();                      // re-list remotely, swap the snaps
 await client.close();                        // tear down (idempotent)
 ```
 
-- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/tools.md)
-- SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
-- Decisions: [ADR-0008](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
-- Paired example (server + client in one script): [`examples/mcp-tools`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/mcp-tools)
+- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/tools.md)
+- SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
+- Decisions: [ADR-0008](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
+- Paired example (server + client in one script): [`examples/mcp-tools`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/mcp-tools)
 
 ## Install
 
@@ -114,7 +114,7 @@ On modern HTTP connections the SDK must drop tools whose `x-mcp-header` declarat
 
 ## Lightweight
 
-Same axis as the rest of Balsa — install only what you use:
+Same axis as the rest of Balsats — install only what you use:
 
 - dependency closure: everything `@modelcontextprotocol/client` pulls in — its OAuth / SSE / stdio
   closure — recorded in `deps-budget.json`, where count and unpacked size are watched in CI
@@ -124,4 +124,4 @@ Same axis as the rest of Balsa — install only what you use:
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsa-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)

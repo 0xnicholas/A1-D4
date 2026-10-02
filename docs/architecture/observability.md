@@ -130,7 +130,7 @@ createOtlpExporter(options?: {
 
 - **配置优先级 = 显式选项 > env > 官方默认**。未给的项由官方 exporter 基座解析 env:`OTEL_EXPORTER_OTLP_{ENDPOINT,HEADERS,TIMEOUT,COMPRESSION,CERTIFICATE,CLIENT_CERTIFICATE,CLIENT_KEY}` + `..._TRACES_*` 特化(headers 合并、特化优先;通用 endpoint 自动拼 `v1/traces`);url 缺省 `http://localhost:4318/v1/traces`。
 - **`protocol` 是本包自己的 env 面**:官方两个 exporter 包都不读 `OTEL_EXPORTER_OTLP_PROTOCOL`(协议 = 选包),本包读它做选包,显式选项优先。
-- **resource(必填,官方 transformer 缺它直接抛)**:`service.name` 合并序 `'balsa'` < `OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES` < `serviceName` 选项 < `resourceAttributes` 选项(后者整体覆盖);**不发 `telemetry.sdk.*`**——本包没走 OTel SDK,不冒领。
+- **resource(必填,官方 transformer 缺它直接抛)**:`service.name` 合并序 `'balsats'` < `OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES` < `serviceName` 选项 < `resourceAttributes` 选项(后者整体覆盖);**不发 `telemetry.sdk.*`**——本包没走 OTel SDK,不冒领。
 - `instrumentationScope = { name: '@balsats/otlp' }`(不带 version,免锁步版本漂移)。
 - **`flush()` → 批处理器 `forceFlush()`;`shutdown()` → `shutdown()`**,原样透传(框架 tracer 的同名方法转发到这里)。
 - **失败面**:`export()` 只入队、永不抛;队列满静默丢、导出失败静默(官方批处理器语义),诊断走 OTel diag(`diag.setLogger`)。不自研重试 / 日志 / `onError` 回调——可重试状态(429/502/503/504 + `Retry-After`)、超时、并发是官方 exporter 基座职责。
@@ -153,38 +153,38 @@ createOtlpExporter(options?: {
 
 ### 映射契约(七类 + 兜底)
 
-七类 span 的 `name` 一律按模板重建(不用框架原 name);开放 type 原样。每张映射 span 都带 `balsa.span.type`(框架 type 原样),`balsa.*` 键的框架多词字段转 snake_case。
+七类 span 的 `name` 一律按模板重建(不用框架原 name);开放 type 原样。每张映射 span 都带 `balsats.span.type`(框架 type 原样),`balsats.*` 键的框架多词字段转 snake_case。
 
 | type | span name | `gen_ai.operation.name` | kind | 专属属性 |
 | --- | --- | --- | --- | --- |
-| `agent-run` | `invoke_agent {agentName}` | `invoke_agent` | INTERNAL | `gen_ai.agent.name`、`balsa.run_id` |
+| `agent-run` | `invoke_agent {agentName}` | `invoke_agent` | INTERNAL | `gen_ai.agent.name`、`balsats.run_id` |
 | `agent-step` | `chat {model}` | `chat` | CLIENT | `gen_ai.provider.name`、`gen_ai.request.model`、`gen_ai.request.stream: true`、参数白名单、`gen_ai.usage.{input_tokens,output_tokens}`、`gen_ai.response.finish_reasons`、`gen_ai.response.time_to_first_chunk` |
 | `tool-call` | `execute_tool {toolName}` | `execute_tool` | INTERNAL | `gen_ai.tool.name`、`gen_ai.tool.call.id` |
-| `workflow-run` | `invoke_workflow {workflowId}` | `invoke_workflow` | INTERNAL | `gen_ai.workflow.name`、`balsa.run_id` |
+| `workflow-run` | `invoke_workflow {workflowId}` | `invoke_workflow` | INTERNAL | `gen_ai.workflow.name`、`balsats.run_id` |
 | `workflow-step` | `workflow-step {stepId}` | — | INTERNAL | — |
-| `memory-recall` | `memory-recall {threadId}` | — | INTERNAL | `balsa.thread_id` |
-| `memory-save` | `memory-save {threadId}` | — | INTERNAL | `balsa.thread_id`、`balsa.resource_id` |
+| `memory-recall` | `memory-recall {threadId}` | — | INTERNAL | `balsats.thread_id` |
+| `memory-save` | `memory-save {threadId}` | — | INTERNAL | `balsats.thread_id`、`balsats.resource_id` |
 | 开放 type | `span.name` 原样 | — | INTERNAL | — |
 
-- 无 semconv operation 的类(workflow-step / memory / 用户 span)**不硬蹭**:稳定 kebab 名 + `balsa.*` 语境,后端可按 `balsa.span.type` 过滤。
-- `agent-step` 参数白名单(`parameters` = 用户 `modelSettings` 原文):`temperature`→`gen_ai.request.temperature`、`topP`→`top_p`、`topK`→`top_k`、`maxOutputTokens`→`max_tokens`、`stopSequences`→`stop_sequences`、`presencePenalty`→`presence_penalty`、`frequencyPenalty`→`frequency_penalty`、`seed`→`seed`;其余键 → `balsa.request.<key>`(通用值域规则)。
+- 无 semconv operation 的类(workflow-step / memory / 用户 span)**不硬蹭**:稳定 kebab 名 + `balsats.*` 语境,后端可按 `balsats.span.type` 过滤。
+- `agent-step` 参数白名单(`parameters` = 用户 `modelSettings` 原文):`temperature`→`gen_ai.request.temperature`、`topP`→`top_p`、`topK`→`top_k`、`maxOutputTokens`→`max_tokens`、`stopSequences`→`stop_sequences`、`presencePenalty`→`presence_penalty`、`frequencyPenalty`→`frequency_penalty`、`seed`→`seed`;其余键 → `balsats.request.<key>`(通用值域规则)。
 - `gen_ai.request.stream: true` **恒发**:agent loop 对每次模型尝试(含 fallback 链)都走 `doStream`,框架无非流式模型调用路径;semconv 语义是「unset 假定非流式」,不发即失真。
 - `timeToFirstChunk`(毫秒)→ `gen_ai.response.time_to_first_chunk`(秒,number;框架测点 = step 起点到首 chunk,≈请求发出,偏差记此);`finishReason` 原样单元素数组落 `gen_ai.response.finish_reasons`(不发明翻译层,`suspended` 等框架词汇直传);`usage` 只发输入 / 输出两项(semconv 无 total 键,防后端重复计数)。
-- `status`:成功 `UNSET`(OTel 不默认 OK);`error` 时 `{ code: ERROR, message }` + `error.type`(取 `details.name` 字符串,否则 `_OTHER`)+ `balsa.error.details` best-effort JSON(不可序列化则省略——Error 自有属性不可枚举,发 `{}` 不如不发)。
+- `status`:成功 `UNSET`(OTel 不默认 OK);`error` 时 `{ code: ERROR, message }` + `error.type`(取 `details.name` 字符串,否则 `_OTHER`)+ `balsats.error.details` best-effort JSON(不可序列化则省略——Error 自有属性不可枚举,发 `{}` 不如不发)。
 
 ### 载荷映射(input / output)
 
 - **消息语义(agent-run / agent-step)**:`ModelMessage[]` 拆分——`role: 'system'` → `gen_ai.system_instructions`,`user` / `assistant` / `tool` → `gen_ai.input.messages`;span 属性上按规范允许的 JSON 字符串形态落值(数组本体)。`agent-step` 的 input 是该次模型调用的完整 prompt(含历史),不裁剪。
 - parts 转换:`text`→`text`、reasoning→`reasoning`、`tool-call`→`tool_call`(id / name / arguments)、`tool-result`(含 assistant 内联结果)→`tool_call_response`;file / custom / approval 等未识别 part → 单个 `text` part 的 JSON 文本兜底;`ModelToolResultOutput` 的联合(text / json / error-* / execution-denied / content)按同规则降为文本或 JSON 文本。
 - `agent-step` output = 模型文本 → `gen_ai.output.messages = [{ role: 'assistant', parts: [{ type: 'text', content }] }]`(空字符串不发);工具调用不在 step output 里,以 tool-call span 呈现(文档写明)。`agent-run` output = 终值文本;`structuredOutput` 的对象 → 单个 `text` part 的 JSON 文本。
-- `tool-call`:`input` → `gen_ai.tool.call.arguments`、`output` → `gen_ai.tool.call.result`(均 JSON 字符串;result **仅成功时**发,失败信息由 `error.type` / `status.message` / `balsa.error.details` 承载)。
-- **非消息语义兜底(workflow-run / workflow-step / memory-* / 开放 type)**:`input` → `balsa.input`、`output` → `balsa.output`,best-effort JSON 字符串,失败省略。
+- `tool-call`:`input` → `gen_ai.tool.call.arguments`、`output` → `gen_ai.tool.call.result`(均 JSON 字符串;result **仅成功时**发,失败信息由 `error.type` / `status.message` / `balsats.error.details` 承载)。
+- **非消息语义兜底(workflow-run / workflow-step / memory-* / 开放 type)**:`input` → `balsats.input`、`output` → `balsats.output`,best-effort JSON 字符串,失败省略。
 - **不截断**:v1 不做内建截断 / 大小上限——整形缝已在上游(`spanProcessors` 同步改写 + `hideInput` / `hideOutput` trace 级擦除),本包不重复开关;超大 prompt 原样上线是已知代价,宿主用处理器裁剪。
 
 ### 值域与兜底规则
 
 - OTel 属性只收原语:原语 / 原语数组直通(数组中的 null / undefined 剔除,剔空即丢);对象及其他值 `JSON.stringify` 成字符串落同名键;序列化失败丢弃并计 `droppedAttributesCount`。
-- `attributes` 袋走通用规则(白名单已映射的键不重复);`metadata` 开放袋 → 单属性 `balsa.metadata` JSON 字符串(空 / 失败省略;不摊平——避免污染命名空间与撞 semconv 键)。
+- `attributes` 袋走通用规则(白名单已映射的键不重复);`metadata` 开放袋 → 单属性 `balsats.metadata` JSON 字符串(空 / 失败省略;不摊平——避免污染命名空间与撞 semconv 键)。
 - 框架侧 `undefined` 一律省略属性,不发空串哨兵。
 
 ### 裁单
@@ -195,7 +195,7 @@ createOtlpExporter(options?: {
 | OTel bridge / metrics / logs | 沿 ADR-0009(桥延后归路线图雾区;v1 只 tracing) |
 | 自研批处理 / 重试 / 日志 / 错误回调 | 官方基座已在树内且更完整;诊断走 diag |
 | 内建截断 / 敏感数据规则库 | 上游处理器 + hide 开关是唯一整形缝 |
-| `gen_ai.conversation.id` 补全 | agent-step 属性面没有 threadId;不做跨 span 推断(memory span 保留 `balsa.thread_id`) |
+| `gen_ai.conversation.id` 补全 | agent-step 属性面没有 threadId;不做跨 span 推断(memory span 保留 `balsats.thread_id`) |
 
 ## 与其它子系统的关系
 

@@ -45,7 +45,7 @@ describe('工具容器与发给模型的工具列表', () => {
       },
     });
 
-    await agent.generate('Search for balsa.');
+    await agent.generate('Search for balsats.');
 
     expect(model.streamCalls[0]?.tools).toEqual([
       {

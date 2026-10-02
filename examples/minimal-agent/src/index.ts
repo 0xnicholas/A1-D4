@@ -1,5 +1,5 @@
 /**
- * Balsa minimal example — a five-field agent with one tool, streamed to the terminal.
+ * Balsats minimal example — a five-field agent with one tool, streamed to the terminal.
  *
  * The model instance comes straight from an AI SDK provider package; it satisfies the core's
  * model contract structurally, no adapter or registration (ADR-0004). The agent hangs on the

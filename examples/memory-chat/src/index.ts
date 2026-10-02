@@ -1,5 +1,5 @@
 /**
- * Balsa memory-chat example — two threads, one resource, and working memory.
+ * Balsats memory-chat example — two threads, one resource, and working memory.
  *
  * A scripted, non-interactive run drives one agent over one `Memory` instance and shows the two
  * memory mechanisms of the framework working together:

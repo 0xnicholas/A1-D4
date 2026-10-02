@@ -13,7 +13,7 @@
 7. [storage.md](storage.md) — 存储适配策略:port 集合 + adapter 家族(非子系统)、additive-only 演化纪律
 8. [harness.md](harness.md) — Harness 语义集:durable 审批闸、signals、schedules(文档分类,非模块)
 
-> **能力包(M5)口径**:目录与构建沿 [ADR-0002](../adr/0002-package-structure.md) 的 M5 修订记(平铺 `packages/<短名>`、清单字段沿核心、对核心走 peer);依赖红线与黄灯数字口径沿 [ADR-0015](../adr/0015-ci-lightweight-redlines.md) 的 M5 修订记。六包已设计冻结并**实施完成**(地图 [#65](https://github.com/0xnicholas/balsa-framework/issues/65) 收线,实施票 [#87](https://github.com/0xnicholas/balsa-framework/issues/87)–[#92](https://github.com/0xnicholas/balsa-framework/issues/92),bunfold 沿裁单不产包;核对见 `docs/ROADMAP.md` M5「实施完成」段);各包定义表面仍归对应篇章:
+> **能力包(M5)口径**:目录与构建沿 [ADR-0002](../adr/0002-package-structure.md) 的 M5 修订记(平铺 `packages/<短名>`、清单字段沿核心、对核心走 peer);依赖红线与黄灯数字口径沿 [ADR-0015](../adr/0015-ci-lightweight-redlines.md) 的 M5 修订记。六包已设计冻结并**实施完成**(地图 [#65](https://github.com/0xnicholas/balsats-framework/issues/65) 收线,实施票 [#87](https://github.com/0xnicholas/balsats-framework/issues/87)–[#92](https://github.com/0xnicholas/balsats-framework/issues/92),bunfold 沿裁单不产包;核对见 `docs/ROADMAP.md` M5「实施完成」段);各包定义表面仍归对应篇章:
 >
 > | 包 | 定义表面(所在节) |
 > | --- | --- |
@@ -22,4 +22,4 @@
 > | `@balsats/sqlite` | [storage.md](storage.md)「SQLite 参考 adapter(M5 设计冻结)」 |
 > | `@balsats/ai-sdk` | [model.md](model.md)「AI SDK 互操作能力包(M5 设计冻结)」 |
 > | `@balsats/croner` | [harness.md](harness.md)「croner 封装能力包」 |
-> | bunfold 桥(**已裁**,不建包;[#79](https://github.com/0xnicholas/balsa-framework/issues/79)) | [memory.md](memory.md)「外部记忆引擎(M5 裁定:不产桥接包)」 |
+> | bunfold 桥(**已裁**,不建包;[#79](https://github.com/0xnicholas/balsats-framework/issues/79)) | [memory.md](memory.md)「外部记忆引擎(M5 裁定:不产桥接包)」 |

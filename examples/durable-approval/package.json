@@ -2,7 +2,7 @@
   "name": "@balsats/example-durable-approval",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsa durable example: a refund desk where a gated tool call suspends the run until a human approves or rejects it.",
+  "description": "Balsats durable example: a refund desk where a gated tool call suspends the run until a human approves or rejects it.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

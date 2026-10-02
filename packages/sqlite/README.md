@@ -1,6 +1,6 @@
 # `@balsats/sqlite`
 
-The first-party SQLite storage adapter for [Balsa](https://github.com/0xnicholas/balsa-framework):
+The first-party SQLite storage adapter for [Balsats](https://github.com/0xnicholas/balsats-framework):
 one factory over one embedded file, implementing all four storage ports — memory history, workflow
 snapshots, durable-run snapshots and schedules — plus every declared port extension. Zero
 dependencies: the driver is Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html),
@@ -9,7 +9,7 @@ so it installs nothing and runs no service.
 ```ts
 import { createSqliteStorage } from '@balsats/sqlite';
 
-const storage = createSqliteStorage({ path: 'balsa.db', busyTimeoutMs: 5_000 });
+const storage = createSqliteStorage({ path: 'balsats.db', busyTimeoutMs: 5_000 });
 
 storage.memory              // MemoryStore (with getResource / saveResource -> working memory)
 storage.workflowSnapshots   // WorkflowSnapshotStore + compareAndSave / deleteSnapshot / listSnapshots
@@ -21,10 +21,10 @@ storage.init();             // idempotent: open + pragmas (WAL / synchronous NOR
 await storage.close();      // idempotent; after it every port method throws
 ```
 
-- Spec: [`docs/architecture/storage.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/storage.md)
-- Driver facts this package builds on: [`docs/research/sqlite-driver-landscape.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/sqlite-driver-landscape.md)
-- Decisions: [ADR-0010](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0010-storage-port-strategy.md) (storage ports), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
-- Example: [`examples/sqlite-resume`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/sqlite-resume) — a durable run suspends in one process and a new process resumes it from the file
+- Spec: [`docs/architecture/storage.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/storage.md)
+- Driver facts this package builds on: [`docs/research/sqlite-driver-landscape.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/sqlite-driver-landscape.md)
+- Decisions: [ADR-0010](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0010-storage-port-strategy.md) (storage ports), [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
+- Example: [`examples/sqlite-resume`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/sqlite-resume) — a durable run suspends in one process and a new process resumes it from the file
 
 ## Install
 
@@ -110,4 +110,4 @@ is only correct when the caller uses `compareAndSave`; `':memory:'` databases ar
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsa-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)

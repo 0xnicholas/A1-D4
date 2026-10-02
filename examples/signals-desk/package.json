@@ -2,7 +2,7 @@
   "name": "@balsats/example-signals-desk",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsa signals example: one support thread that messages, typed signals and a scheduled trigger all land in.",
+  "description": "Balsats signals example: one support thread that messages, typed signals and a scheduled trigger all land in.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

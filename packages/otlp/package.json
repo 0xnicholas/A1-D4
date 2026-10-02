@@ -1,7 +1,7 @@
 {
   "name": "@balsats/otlp",
   "version": "0.5.0",
-  "description": "Balsa OTLP exporter — spans to GenAI semconv shape over OTLP/HTTP (protobuf or JSON), official OpenTelemetry exporter stack underneath.",
+  "description": "Balsats OTLP exporter — spans to GenAI semconv shape over OTLP/HTTP (protobuf or JSON), official OpenTelemetry exporter stack underneath.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -30,7 +30,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xnicholas/balsa-framework.git",
+    "url": "git+https://github.com/0xnicholas/balsats-framework.git",
     "directory": "packages/otlp"
   },
   "publishConfig": {

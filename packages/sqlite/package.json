@@ -1,7 +1,7 @@
 {
   "name": "@balsats/sqlite",
   "version": "0.5.0",
-  "description": "Balsa SQLite storage adapter — the four storage ports over one embedded file (node:sqlite, zero dependencies).",
+  "description": "Balsats SQLite storage adapter — the four storage ports over one embedded file (node:sqlite, zero dependencies).",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -30,7 +30,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xnicholas/balsa-framework.git",
+    "url": "git+https://github.com/0xnicholas/balsats-framework.git",
     "directory": "packages/sqlite"
   },
   "publishConfig": {

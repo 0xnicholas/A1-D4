@@ -48,9 +48,9 @@ export interface FileStorage {
 
 /** An initialized file-backed storage in a fresh temp directory, removed after the test. */
 export function fileStorage(options: { name?: string; busyTimeoutMs?: number } = {}): FileStorage {
-  const dir = mkdtempSync(join(tmpdir(), 'balsa-sqlite-'));
+  const dir = mkdtempSync(join(tmpdir(), 'balsats-sqlite-'));
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-  const path = join(dir, options.name ?? 'balsa.db');
+  const path = join(dir, options.name ?? 'balsats.db');
   const storage = openStorage(
     options.busyTimeoutMs === undefined ? { path } : { path, busyTimeoutMs: options.busyTimeoutMs },
   );

@@ -1,6 +1,6 @@
 # minimal-agent
 
-The smallest runnable Balsa example. Balsa is an ultralight TypeScript agent framework — compose
+The smallest runnable Balsats example. Balsats is an ultralight TypeScript agent framework — compose
 only what you use, run anywhere, no runtime baggage.
 
 This example defines a five-field agent (`name` / `instructions` / `model` / `tools`) with one
@@ -29,7 +29,7 @@ step requests no tool call or `maxSteps` (default 5) is reached. Failures never 
 invalid input, an `execute` throw and invalid output all come back to the model as an `isError`
 tool result, so it can recover or give up on its own.
 
-Expected output: the console exporter's `[balsa] span_started / …` lines for the agent run, each
+Expected output: the console exporter's `[balsats] span_started / …` lines for the agent run, each
 step and the tool call; a `[tool-call] …` line, the tool's result, then the model's text streamed
 as it arrives, followed by a `steps` / `finishReason` / `usage` summary.
 

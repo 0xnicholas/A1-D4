@@ -5,7 +5,7 @@
  * observe the SDK's shutdown order (stdin close → SIGTERM → SIGKILL) after `client.close()`.
  *
  * Registers two tools: `echo` (a text result round-trip) and `marker` (reports the
- * BALSA_STDIO_MARKER env value — proof that a passed `env` is the child's whole environment).
+ * BALSATS_STDIO_MARKER env value — proof that a passed `env` is the child's whole environment).
  */
 import { writeFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/server';
@@ -23,7 +23,7 @@ serveStdio(() => {
     async ({ value }: { value: string }) => ({ content: [{ type: 'text' as const, text: value }] }),
   );
   server.registerTool('marker', { description: 'Reports the marker env var' }, async () => ({
-    content: [{ type: 'text' as const, text: process.env.BALSA_STDIO_MARKER ?? '<unset>' }],
+    content: [{ type: 'text' as const, text: process.env.BALSATS_STDIO_MARKER ?? '<unset>' }],
   }));
   return server;
 });

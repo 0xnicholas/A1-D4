@@ -77,7 +77,7 @@ export function jsonTextOrUndefined(value: unknown): string | undefined {
 }
 
 /**
- * Best-effort JSON text for `balsa.error.details`: `{}` is worse than nothing (an Error's own
+ * Best-effort JSON text for `balsats.error.details`: `{}` is worse than nothing (an Error's own
  * properties are not enumerable), so an empty object also returns `undefined`.
  */
 export function errorDetailsJson(details: unknown): string | undefined {

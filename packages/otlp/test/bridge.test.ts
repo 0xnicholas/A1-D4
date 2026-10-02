@@ -84,14 +84,14 @@ describe('createOtlpExporter: span_ended bridge', () => {
     }
   });
 
-  it('synthesizes the resource (service.name balsa, no telemetry.sdk.*) and the scope', async () => {
+  it('synthesizes the resource (service.name balsats, no telemetry.sdk.*) and the scope', async () => {
     const capture = await startCapture();
     try {
       const exporter = createOtlpExporter({ protocol: 'json', url: capture.url });
       await exportAndFlush(exporter, { kind: 'span_ended', span: testSpan() });
 
       const span = decodeSpans((await capture.waitForRequests(1))[0]!.body)[0]!;
-      expect(span.resource['service.name']).toBe('balsa');
+      expect(span.resource['service.name']).toBe('balsats');
       expect(Object.keys(span.resource).some((key) => key.startsWith('telemetry.sdk.'))).toBe(false);
       expect(span.scope.name).toBe('@balsats/otlp');
       expect(span.scope.version).toBeUndefined();
@@ -149,7 +149,7 @@ describe('createOtlpExporter: span_ended bridge', () => {
       await exportAndFlush(exporter, { kind: 'span_ended', span: testSpan() });
 
       const span = decodeSpans((await capture.waitForRequests(1))[0]!.body)[0]!;
-      expect(span.resource['service.name']).toBe('balsa');
+      expect(span.resource['service.name']).toBe('balsats');
       expect(span.resource['deployment.environment']).toBe('prod');
       expect(span.resource.region).toBe('eu-west');
     } finally {

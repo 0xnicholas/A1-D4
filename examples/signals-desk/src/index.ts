@@ -1,5 +1,5 @@
 /**
- * Balsa signals-desk example — one support thread that messages and signals both land in.
+ * Balsats signals-desk example — one support thread that messages and signals both land in.
  *
  * A scripted, non-interactive run drives one shop's support desk over a real OpenAI model and
  * shows the M4 signals subsystem end to end, with the schedules primitive wired into the same

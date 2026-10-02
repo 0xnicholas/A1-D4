@@ -1,7 +1,7 @@
 /**
  * The seven-type mapping contract (`docs/architecture/observability.md`「映射契约(七类 + 兜底)」):
  * name templates, `gen_ai.operation.name` / kind per type, the agent-step attribute table, the
- * `balsa.*` vocabulary, error mapping, metadata, and the value-domain rules.
+ * `balsats.*` vocabulary, error mapping, metadata, and the value-domain rules.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ExportedSpan } from '@balsats/core/observability';
@@ -29,8 +29,8 @@ describe('seven-type mapping: names, operations, kinds', () => {
     expect(mapped.attributes).toMatchObject({
       'gen_ai.operation.name': 'invoke_agent',
       'gen_ai.agent.name': 'desk',
-      'balsa.run_id': 'run-1',
-      'balsa.span.type': 'agent-run',
+      'balsats.run_id': 'run-1',
+      'balsats.span.type': 'agent-run',
     });
   });
 
@@ -60,13 +60,13 @@ describe('seven-type mapping: names, operations, kinds', () => {
       'gen_ai.usage.output_tokens': 7,
       'gen_ai.response.finish_reasons': ['stop'],
       'gen_ai.response.time_to_first_chunk': 0.25,
-      'balsa.span.type': 'agent-step',
+      'balsats.span.type': 'agent-step',
     });
     // `total` has no semconv key — no repeated counting across backends.
     expect(Object.keys(mapped.attributes)).not.toContain('gen_ai.usage.total_tokens');
   });
 
-  it('passes agent-step parameters through the whitelist and the rest under balsa.request.*', async () => {
+  it('passes agent-step parameters through the whitelist and the rest under balsats.request.*', async () => {
     const span = testSpan({
       type: 'agent-step',
       name: 'gpt-5',
@@ -89,7 +89,7 @@ describe('seven-type mapping: names, operations, kinds', () => {
       'gen_ai.request.top_p': 0.9,
       'gen_ai.request.max_tokens': 1024,
       'gen_ai.request.stop_sequences': ['END'],
-      'balsa.request.customKnob': 'x',
+      'balsats.request.customKnob': 'x',
     });
   });
 
@@ -110,7 +110,7 @@ describe('seven-type mapping: names, operations, kinds', () => {
       'gen_ai.tool.call.id': 'call-1',
       'gen_ai.tool.call.arguments': '{"orderId":"o-1"}',
       'gen_ai.tool.call.result': '{"refunded":true}',
-      'balsa.span.type': 'tool-call',
+      'balsats.span.type': 'tool-call',
     });
 
     const failed = testSpan({
@@ -153,17 +153,17 @@ describe('seven-type mapping: names, operations, kinds', () => {
     expect(mappedRun.attributes).toMatchObject({
       'gen_ai.operation.name': 'invoke_workflow',
       'gen_ai.workflow.name': 'refund-flow',
-      'balsa.run_id': 'run-9',
-      'balsa.input': '{"orderId":"o-1"}',
-      'balsa.output': '"refunded"',
-      'balsa.span.type': 'workflow-run',
+      'balsats.run_id': 'run-9',
+      'balsats.input': '{"orderId":"o-1"}',
+      'balsats.output': '"refunded"',
+      'balsats.span.type': 'workflow-run',
     });
 
     expect(mappedStep.name).toBe('workflow-step validate');
     expect(mappedStep.attributes).toMatchObject({
-      'balsa.input': '{"orderId":"o-1"}',
-      'balsa.output': 'true',
-      'balsa.span.type': 'workflow-step',
+      'balsats.input': '{"orderId":"o-1"}',
+      'balsats.output': 'true',
+      'balsats.span.type': 'workflow-step',
     });
     expect(mappedStep.attributes).not.toHaveProperty('gen_ai.operation.name');
   });
@@ -189,20 +189,20 @@ describe('seven-type mapping: names, operations, kinds', () => {
 
     expect(mappedRecall.name).toBe('memory-recall thread-1');
     expect(mappedRecall.attributes).toMatchObject({
-      'balsa.thread_id': 'thread-1',
-      'balsa.input': '{"query":"last messages"}',
-      'balsa.output': '[]',
+      'balsats.thread_id': 'thread-1',
+      'balsats.input': '{"query":"last messages"}',
+      'balsats.output': '[]',
     });
     expect(mappedRecall.attributes).not.toHaveProperty('gen_ai.operation.name');
 
     expect(mappedSave.name).toBe('memory-save thread-1');
     expect(mappedSave.attributes).toMatchObject({
-      'balsa.thread_id': 'thread-1',
-      'balsa.resource_id': 'user-7',
+      'balsats.thread_id': 'thread-1',
+      'balsats.resource_id': 'user-7',
     });
   });
 
-  it('passes open types through untouched, marked only by balsa.span.type', async () => {
+  it('passes open types through untouched, marked only by balsats.span.type', async () => {
     const span = testSpan({
       type: 'signal',
       name: 'approval-signal',
@@ -215,8 +215,8 @@ describe('seven-type mapping: names, operations, kinds', () => {
     expect(mapped.kind).toBe(1);
     expect(mapped.attributes).toMatchObject({
       kind: 'approval',
-      'balsa.input': '{"verdict":"approved"}',
-      'balsa.span.type': 'signal',
+      'balsats.input': '{"verdict":"approved"}',
+      'balsats.span.type': 'signal',
     });
     expect(mapped.attributes).not.toHaveProperty('gen_ai.operation.name');
   });
@@ -256,26 +256,26 @@ describe('error, metadata, and the value domain', () => {
 
     expect(mappedNamed.status).toMatchObject({ code: 2, message: 'boom' });
     expect(mappedNamed.attributes['error.type']).toBe('RateLimitError');
-    expect(mappedNamed.attributes['balsa.error.details']).toBe('{"name":"RateLimitError","retryAfter":3}');
+    expect(mappedNamed.attributes['balsats.error.details']).toBe('{"name":"RateLimitError","retryAfter":3}');
 
     // A plain Error's name is the string 'Error' — taken as-is; only a missing name falls back.
     expect(mappedPlain.attributes['error.type']).toBe('Error');
     // An Error's own properties do not enumerate — `{}` would be worse than nothing.
-    expect(mappedPlain.attributes).not.toHaveProperty('balsa.error.details');
+    expect(mappedPlain.attributes).not.toHaveProperty('balsats.error.details');
 
     expect(mappedNameless.attributes['error.type']).toBe('_OTHER');
     expect(mappedBare.attributes['error.type']).toBe('_OTHER');
   });
 
-  it('ships the metadata bag as one balsa.metadata JSON attribute (empty omitted)', async () => {
+  it('ships the metadata bag as one balsats.metadata JSON attribute (empty omitted)', async () => {
     const withMetadata = testSpan({ metadata: { tenant: 'acme', attempt: 2 } });
     const withEmpty = testSpan({ metadata: {} });
     const spans = await shipSpans(withMetadata, withEmpty);
     const mapped = spans[0]!;
     const mappedEmpty = spans[1]!;
 
-    expect(mapped.attributes['balsa.metadata']).toBe('{"tenant":"acme","attempt":2}');
-    expect(mappedEmpty.attributes).not.toHaveProperty('balsa.metadata');
+    expect(mapped.attributes['balsats.metadata']).toBe('{"tenant":"acme","attempt":2}');
+    expect(mappedEmpty.attributes).not.toHaveProperty('balsats.metadata');
   });
 
   it('applies the value-domain rules to unmapped attribute keys', async () => {
@@ -425,7 +425,7 @@ describe('message semantics (agent-run / agent-step payloads)', () => {
     ]);
   });
 
-  it('falls back to balsa.input when the recorded input is not a message array', async () => {
+  it('falls back to balsats.input when the recorded input is not a message array', async () => {
     const span = testSpan({
       type: 'agent-run',
       name: 'desk',
@@ -434,7 +434,7 @@ describe('message semantics (agent-run / agent-step payloads)', () => {
     });
     const [mapped] = await shipSpans(span);
 
-    expect(mapped.attributes['balsa.input']).toBe('{"note":"not a ModelMessage[]"}');
+    expect(mapped.attributes['balsats.input']).toBe('{"note":"not a ModelMessage[]"}');
     expect(mapped.attributes).not.toHaveProperty('gen_ai.input.messages');
   });
 });

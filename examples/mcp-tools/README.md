@@ -3,7 +3,7 @@
 One tool container, served over MCP and bridged back: [`@balsats/mcp-server`](../../packages/mcp-server/)
 serves three tools over the protocol, [`@balsats/mcp-client`](../../packages/mcp-client/) connects and turns
 the remote list back into the framework's `Record<string, Tool>` — the same shape an agent's `tools:`
-takes. Balsa is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no
+takes. Balsats is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no
 runtime baggage.
 
 The example is a single file (`src/index.ts`) that plays both roles in one script, over both transports:

@@ -2,7 +2,7 @@
 
 One cron expression, from the host's definition to a fired run: `@balsats/croner`'s `cron()` returns
 exactly the `next` + `timezone` fragment `schedules.save()` takes, the occurrence function walks the
-schedule as pure computation, and `tick` fires what is due and advances the record. Balsa is an
+schedule as pure computation, and `tick` fires what is due and advances the record. Balsats is an
 ultralight TypeScript agent framework — compose only what you use, run anywhere, no runtime
 baggage.
 

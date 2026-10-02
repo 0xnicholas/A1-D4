@@ -2,7 +2,7 @@
   "name": "@balsats/example-memory-chat",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsa memory example: two threads across one resource, recall, and working memory.",
+  "description": "Balsats memory example: two threads across one resource, recall, and working memory.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

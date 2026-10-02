@@ -59,7 +59,7 @@ export interface SqliteStorage {
  * Creates one storage instance over `path`. Nothing touches the file until `init()`.
  *
  * ```ts
- * const storage = createSqliteStorage({ path: 'balsa.db', busyTimeoutMs: 5_000 })
+ * const storage = createSqliteStorage({ path: 'balsats.db', busyTimeoutMs: 5_000 })
  * storage.memory              // WorkingMemoryStore
  * storage.workflowSnapshots   // WorkflowSnapshotStore + compareAndSave / deleteSnapshot / listSnapshots
  * storage.agentRunSnapshots   // AgentRunSnapshotStore + deleteSnapshot / listSuspended

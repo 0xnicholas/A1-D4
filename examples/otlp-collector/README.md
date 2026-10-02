@@ -3,7 +3,7 @@
 A traced agent run lands in a local OTLP collector as GenAI semantic-convention spans: a `node:http`
 collector plays the backend (Langfuse, LangSmith and any OTel collector speak the same wire), a scripted
 model drives a real agent run, and [`@balsats/otlp`](../../packages/otlp/) ships the run's spans over OTLP.
-Balsa is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no runtime
+Balsats is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no runtime
 baggage.
 
 One script (`src/index.ts`), no API key and no network beyond loopback. Two acts:
@@ -11,8 +11,8 @@ One script (`src/index.ts`), no API key and no network beyond loopback. Two acts
 1. **The run is traced and shipped** — `createApp({ tracer })` distributes the tracer; the framework's own
    span model never leaves the process. The collector receives `invoke_agent refund-desk` →
    `chat scripted-mini` (CLIENT kind, `gen_ai.*` request / usage / response attributes, messages as parts)
-   → `execute_tool checkOrder` (arguments / result), plus `balsa.span.type` and `balsa.run_id` for
-   Balsa-side correlation. The tree keeps trace context: run → step → tool, one trace id.
+   → `execute_tool checkOrder` (arguments / result), plus `balsats.span.type` and `balsats.run_id` for
+   Balsats-side correlation. The tree keeps trace context: run → step → tool, one trace id.
 2. **The failure face** — with the collector unreachable the run still completes: `export()` never throws.
    Only an explicit `flush()` surfaces the transport failure, straight from the official exporter stack.
 

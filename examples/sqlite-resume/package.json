@@ -2,7 +2,7 @@
   "name": "@balsats/example-sqlite-resume",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsa SQLite example: a durable refund desk suspends in one process, its snapshot lands in @balsats/sqlite, and a new process resumes the run.",
+  "description": "Balsats SQLite example: a durable refund desk suspends in one process, its snapshot lands in @balsats/sqlite, and a new process resumes the run.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

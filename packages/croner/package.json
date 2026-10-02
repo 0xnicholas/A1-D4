@@ -1,7 +1,7 @@
 {
   "name": "@balsats/croner",
   "version": "0.5.0",
-  "description": "Balsa croner wrapper — cron expressions as a schedules.save() fragment (next + timezone), no dependencies beyond an exact-pinned croner, no core peer.",
+  "description": "Balsats croner wrapper — cron expressions as a schedules.save() fragment (next + timezone), no dependencies beyond an exact-pinned croner, no core peer.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -30,7 +30,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xnicholas/balsa-framework.git",
+    "url": "git+https://github.com/0xnicholas/balsats-framework.git",
     "directory": "packages/croner"
   },
   "publishConfig": {

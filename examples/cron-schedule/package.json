@@ -2,7 +2,7 @@
   "name": "@balsats/example-cron-schedule",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsa croner example: a cron expression as the schedules.save() fragment — save, occurrences advance, tick fires.",
+  "description": "Balsats croner example: a cron expression as the schedules.save() fragment — save, occurrences advance, tick fires.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

@@ -1,6 +1,6 @@
 # `@balsats/mcp-server`
 
-Serve a [Balsa](https://github.com/0xnicholas/balsa-framework) tool container over MCP: one
+Serve a [Balsats](https://github.com/0xnicholas/balsats-framework) tool container over MCP: one
 `createMcpServer()` object with a web-standard HTTP `fetch` handler and a stdio entry, both fed
 by the same tools.
 
@@ -30,9 +30,9 @@ Servers speak both protocol generations by default: the 2026-07-28 per-request m
 for stdio) to serve modern only. Legacy **sessionful** serving is out of scope — wire it yourself
 with the official `McpServer.connect(transport)` when you need it.
 
-- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/tools.md)
-- SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
-- Decisions: [ADR-0008](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
+- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/tools.md)
+- SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
+- Decisions: [ADR-0008](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 
 ## Install
 
@@ -155,7 +155,7 @@ rewrites no message. An unknown tool is a protocol error instead, as MCP require
 
 ## Lightweight
 
-Same axis as the rest of Balsa — install only what you use:
+Same axis as the rest of Balsats — install only what you use:
 
 - dependency closure: `@modelcontextprotocol/server` plus its core / zod closure, recorded in
   `deps-budget.json`, where count and unpacked size are watched in CI
@@ -165,4 +165,4 @@ Same axis as the rest of Balsa — install only what you use:
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsa-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)

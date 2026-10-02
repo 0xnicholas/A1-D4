@@ -2,7 +2,7 @@
   "name": "@balsats/example-minimal-agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Minimal Balsa example: a five-field agent streams one tool-calling generation.",
+  "description": "Minimal Balsats example: a five-field agent streams one tool-calling generation.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

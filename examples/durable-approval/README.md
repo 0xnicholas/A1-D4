@@ -1,9 +1,9 @@
 # durable-approval
 
-Balsa's durable agent in one scripted session: a **tool call that needs a human** is held at the
+Balsats's durable agent in one scripted session: a **tool call that needs a human** is held at the
 loop's step boundary, the run's **loop snapshot** goes to an `AgentRunSnapshotStore`, the run lands
 `finishReason: 'suspended'`, and `resume(runId, { approved })` continues it — executing the held
-call, or answering it with a rejection result the model replans from. Balsa is an ultralight
+call, or answering it with a rejection result the model replans from. Balsats is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It drives

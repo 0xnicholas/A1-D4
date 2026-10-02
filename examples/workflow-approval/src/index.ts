@@ -1,5 +1,5 @@
 /**
- * Balsa workflow-approval example — one expense report, one approval gate.
+ * Balsats workflow-approval example — one expense report, one approval gate.
  *
  * A scripted, non-interactive run drives one workflow over a real OpenAI model and shows the M3
  * orchestration surface end to end: the operator builder freezing into a flat entry list, the

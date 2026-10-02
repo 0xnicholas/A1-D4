@@ -1,6 +1,6 @@
 # `@balsats/ai-sdk`
 
-Serve a [Balsa](https://github.com/0xnicholas/balsa-framework) agent to AI SDK clients: one
+Serve a [Balsats](https://github.com/0xnicholas/balsats-framework) agent to AI SDK clients: one
 `createChatRoute()` handler that speaks the UI message stream `useChat()` consumes, plus the
 stream converter and history read-back behind it. Zero runtime dependencies; `@balsats/core` is a
 peer.
@@ -17,9 +17,9 @@ export default {
 };
 ```
 
-- Spec: [`docs/architecture/model.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/model.md)
-- Protocol facts this package builds on: [`docs/research/ai-sdk-ui-stream-protocol.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/ai-sdk-ui-stream-protocol.md)
-- Decisions: [ADR-0004](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0004-model-layer-dual-track.md) (model layer), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
+- Spec: [`docs/architecture/model.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/model.md)
+- Protocol facts this package builds on: [`docs/research/ai-sdk-ui-stream-protocol.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/ai-sdk-ui-stream-protocol.md)
+- Decisions: [ADR-0004](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0004-model-layer-dual-track.md) (model layer), [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 
 ## Install
 
@@ -32,7 +32,7 @@ npm install @balsats/ai-sdk @balsats/core
 `createChatRoute({ agent, identity, onError?, keepAliveMs? })` returns
 `(request: Request) => Promise<Response>` — POST only, on any web-standard host (Workers, Deno,
 Bun, Next.js route handlers, Hono, plain `node:http` behind a thin adapter — see
-[`examples/ai-chat-route`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/ai-chat-route)).
+[`examples/ai-chat-route`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/ai-chat-route)).
 
 Runs are **memory-authoritative**: `identity(request)` maps the raw request to
 `{ thread?, resource }` (the thread defaults to the body's `id`; the resource is required and its
@@ -77,7 +77,7 @@ data parts…) is simply not emitted.
 
 ## Lightweight
 
-Same axis as the rest of Balsa — install only what you use:
+Same axis as the rest of Balsats — install only what you use:
 
 - runtime dependencies: none beyond the `@balsats/core` peer (the declared-dependency gate is
   enforced in CI)
@@ -87,4 +87,4 @@ Same axis as the rest of Balsa — install only what you use:
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsa-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)

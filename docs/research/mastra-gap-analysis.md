@@ -5,7 +5,7 @@
 > 事实基线:mastra 侧钉在 2026-09-27～28 快照(`@mastra/core@1.72.0-alpha.4`,main `cceb9ab`;`@mastra/memory@1.32.1`);本框架侧钉在 `docs/ROADMAP.md` M4 收尾行(2026-09-30:`pnpm verify` 全绿 659 例 42 文件、10 个子路径导出、零运行时依赖)。
 > **「重开条件」的单一真相源 = `docs/ROADMAP.md`「延后清单」**;本文只给分档与对比视图,不复制条件。刷新触发(先到者):M5 收尾 / mastra 下一个 major / 公开 1.0 前。
 >
-> **刷新触发已满足(2026-10-01)**:**「M5 收尾」条件已到**——M5 六包已实施完成并核验(见 `docs/ROADMAP.md` M5「实施完成」段);本文事实基线仍钉在本表 2026-09-30 的 Balsa 快照(如「M5 能力包未交付」一栏即该快照事实,已被 M5 实施越过)。刷新(重抓 mastra 上游 + 以六包落地后的缺口表重对账)另立 effort,沿 [#63](https://github.com/0xnicholas/balsa-framework/issues/63) 口径。
+> **刷新触发已满足(2026-10-01)**:**「M5 收尾」条件已到**——M5 六包已实施完成并核验(见 `docs/ROADMAP.md` M5「实施完成」段);本文事实基线仍钉在本表 2026-09-30 的 Balsa 快照(如「M5 能力包未交付」一栏即该快照事实,已被 M5 实施越过)。刷新(重抓 mastra 上游 + 以六包落地后的缺口表重对账)另立 effort,沿 [#63](https://github.com/0xnicholas/balsats-framework/issues/63) 口径。
 
 ## TL;DR
 
@@ -144,4 +144,4 @@
 - 架构规范:`docs/architecture/`(model / agent / tools / workflows / memory / observability / storage / harness 八篇)
 - 决策:`docs/adr/`(0001–0015)
 - 路线图与状态:`docs/ROADMAP.md`、`CONTEXT.md`、根 `README.md`
-- 发布票:[#45](https://github.com/0xnicholas/balsa-framework/issues/45)(发布 0.1.0,owner 手工)
+- 发布票:[#45](https://github.com/0xnicholas/balsats-framework/issues/45)(发布 0.1.0,owner 手工)

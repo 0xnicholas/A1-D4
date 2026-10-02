@@ -1,6 +1,6 @@
 # 调研:bunfold 现状与桥接点(issue #69)
 
-> 主票:[决策:bunfold 桥 go/no-go——桥接形态或重开条件](https://github.com/0xnicholas/balsa-framework/issues/79)(地图 [M5 生态能力包](https://github.com/0xnicholas/balsa-framework/issues/65))。调研日期:2026-09-30。分支:`research/bunfold`。
+> 主票:[决策:bunfold 桥 go/no-go——桥接形态或重开条件](https://github.com/0xnicholas/balsats-framework/issues/79)(地图 [M5 生态能力包](https://github.com/0xnicholas/balsats-framework/issues/65))。调研日期:2026-09-30。分支:`research/bunfold`。
 > 目的:为 bunfold 桥的 **go/no-go** 与桥接形态提供一手事实。**本文只呈现事实,不做决策**;§8 的对账只做事实映射与缺口登记。
 > 钉点:上游仓库与 fork 快照 2026-09-30;fork `0xnicholas/bunfold` 默认线 `feat/server_team`(最新 commit 2026-09-11)+ `vendor` 分支(最新 commit 2026-09-21);npm registry 为 2026-09-30 实时查询。
 
@@ -19,7 +19,7 @@
 
 - 上游仓库:[TencentCloud/TencentDB-Agent-Memory](https://github.com/TencentCloud/TencentDB-Agent-Memory)(创建 2026-04-07,默认线 `feat/server_team`)。
 - fork:[0xnicholas/bunfold](https://github.com/0xnicholas/bunfold)(创建 2026-08-27,公开,非 GitHub fork 关系、`fork=false`;分支仅 `feat/server_team` 与 `vendor`;无 tag、无 release)。
-- 本框架侧:[`docs/architecture/memory.md`](../architecture/memory.md)、[ADR-0007](../adr/0007-memory-semantics.md)、[`docs/ROADMAP.md`](../ROADMAP.md)、[issue #12 决议评论](https://github.com/0xnicholas/balsa-framework/issues/12)。
+- 本框架侧:[`docs/architecture/memory.md`](../architecture/memory.md)、[ADR-0007](../adr/0007-memory-semantics.md)、[`docs/ROADMAP.md`](../ROADMAP.md)、[issue #12 决议评论](https://github.com/0xnicholas/balsats-framework/issues/12)。
 - 数字口径:依赖数 = `package.json` 的 `dependencies` 实数;registry 事实 = `registry.npmjs.org` 实测;仓库事实 = GitHub API / 仓库文件原文(见文末来源)。
 
 ## 2. 项目盘面(上游 + fork)
@@ -116,7 +116,7 @@ MemoryCore 的 27 个直接依赖(逐条,来源 [`MemoryCore/package.json`](http
 
 ## 8. 与本框架 memory seam 的对账(事实映射 + 缺口登记)
 
-**本框架侧基线**(来源:[`docs/architecture/memory.md`](../architecture/memory.md)、[ADR-0007](../adr/0007-memory-semantics.md)、[`CONTEXT.md`](../../CONTEXT.md)、[#12 决议](https://github.com/0xnicholas/balsa-framework/issues/12)):
+**本框架侧基线**(来源:[`docs/architecture/memory.md`](../architecture/memory.md)、[ADR-0007](../adr/0007-memory-semantics.md)、[`CONTEXT.md`](../../CONTEXT.md)、[#12 决议](https://github.com/0xnicholas/balsats-framework/issues/12)):
 
 - 身份 = `thread`(会话隔离)+ `resource`(跨会话稳定锚);消息格式 = vendor prompt 类型 + `{id, threadId, resourceId, createdAt}` 信封;**消息不可变**。
 - `MemoryStore` port = 6 必备(`getThreadById` / `saveThread` upsert / `deleteThread` 级联 / `listThreads` / `listMessages` / `saveMessages`)+ 2 条件(`getResource` / `saveResource`,仅 WM 启用时要求)。
@@ -209,5 +209,5 @@ MemoryCore 的 27 个直接依赖(逐条,来源 [`MemoryCore/package.json`](http
 本框架(仓库内):
 
 - [`docs/architecture/memory.md`](../architecture/memory.md)、[`docs/adr/0007-memory-semantics.md`](../adr/0007-memory-semantics.md)、[`CONTEXT.md`](../../CONTEXT.md)、[`docs/ROADMAP.md`](../ROADMAP.md)
-- [决策:Memory 子系统(issue #12)决议评论](https://github.com/0xnicholas/balsa-framework/issues/12)(bunfold 探查要点、MemoryStore 6+2、时序钉点)
-- [调研:mastra Memory 子系统(issue #5)](https://github.com/0xnicholas/balsa-framework/issues/5)
+- [决策:Memory 子系统(issue #12)决议评论](https://github.com/0xnicholas/balsats-framework/issues/12)(bunfold 探查要点、MemoryStore 6+2、时序钉点)
+- [调研:mastra Memory 子系统(issue #5)](https://github.com/0xnicholas/balsats-framework/issues/5)

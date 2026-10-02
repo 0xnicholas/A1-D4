@@ -1,5 +1,5 @@
 /**
- * Balsa otlp-collector example — a traced agent run lands in a local OTLP collector as GenAI
+ * Balsats otlp-collector example — a traced agent run lands in a local OTLP collector as GenAI
  * semconv spans.
  *
  * One script, no external services: a **local collector** (`node:http`) plays the OTLP backend —
@@ -9,11 +9,11 @@
  *
  * 1. **The run is traced** — `createApp({ tracer })` distributes the tracer to the desk agent;
  *    the run produces the framework's automatic spans: `agent-run` → `agent-step` → `tool-call`.
- * 2. **The collector receives semconv, not Balsa shapes** — the kernel's own span model never
+ * 2. **The collector receives semconv, not Balsats shapes** — the kernel's own span model never
  *    leaves the process: the `@balsats/otlp` exporter rebuilds every span for backends —
  *    `invoke_agent refund-desk`, `chat scripted-mini` (CLIENT kind; `gen_ai.*` request / usage /
  *    response attributes; messages as parts), `execute_tool checkOrder` (arguments / result) —
- *    plus `balsa.span.type` / `balsa.run_id` for Balsa-side correlation.
+ *    plus `balsats.span.type` / `balsats.run_id` for Balsats-side correlation.
  * 3. **The failure face** — with the collector unreachable the run still completes: `export()`
  *    never throws. Only an explicit `flush()` surfaces the transport failure, straight from the
  *    official exporter stack.
@@ -244,7 +244,7 @@ function printSpans(spans: readonly CollectedSpan[]): void {
     const parent = span.parentSpanId === undefined ? 'root' : span.parentSpanId.slice(0, 8);
     console.log(`  ${span.name.padEnd(28)} kind=${span.kind}  trace=${span.traceId.slice(0, 8)}  parent=${parent}`);
     const interesting = Object.entries(span.attributes).filter(([key]) =>
-      key.startsWith('gen_ai.') || key.startsWith('balsa.'),
+      key.startsWith('gen_ai.') || key.startsWith('balsats.'),
     );
     for (const [key, value] of interesting) {
       const text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -292,8 +292,8 @@ async function main(): Promise<void> {
     assert.equal(tool.parentSpanId, chats[0]!.spanId, 'tool-call hangs under the step that asked');
 
     // The contract's payoff attributes — the shape Langfuse / LangSmith / OTel backends read.
-    assert.equal(root.attributes['balsa.span.type'], 'agent-run');
-    assert.equal(typeof root.attributes['balsa.run_id'], 'string', 'runId rides the root span');
+    assert.equal(root.attributes['balsats.span.type'], 'agent-run');
+    assert.equal(typeof root.attributes['balsats.run_id'], 'string', 'runId rides the root span');
 
     const firstChat = chats[0]!;
     assert.equal(firstChat.kind, 3, 'agent-step maps to OTLP CLIENT kind');
@@ -320,7 +320,7 @@ async function main(): Promise<void> {
       tool.attributes['gen_ai.tool.call.result'],
       '{"orderId":"A-4471","eligible":true,"reason":"duplicate charge"}',
     );
-    console.log('  ✓ span tree, kinds, and gen_ai.* / balsa.* attributes all asserted');
+    console.log('  ✓ span tree, kinds, and gen_ai.* / balsats.* attributes all asserted');
 
     // ── Act 2: the failure face — a dead collector never breaks the run ────────────────────────
     console.log('\n──────── Act 2 — the collector is unreachable; the run still completes ────────');

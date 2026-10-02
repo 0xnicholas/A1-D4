@@ -1,6 +1,6 @@
 # `@balsats/core`
 
-The core package of [Balsa](https://github.com/0xnicholas/balsa-framework) — an ultralight
+The core package of [Balsats](https://github.com/0xnicholas/balsats-framework) — an ultralight
 TypeScript agent framework: model contract, agents, tools, memory, workflows, observability,
 signals, durable agents and schedules, each behind its own subpath export. Compose only what you
 use: what you don't import costs you nothing, not in the dependency tree and not in concept space.
@@ -35,11 +35,11 @@ for await (const chunk of result) {
 console.log(await result.finishReason, await result.usage);
 ```
 
-- Framework README: [balsa-framework](https://github.com/0xnicholas/balsa-framework#readme) — quick start, examples, capability packages
-- Specs: [`docs/architecture/`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/README.md) — one per subsystem
-- Decisions: [`docs/adr/`](https://github.com/0xnicholas/balsa-framework/tree/main/docs/adr) — the decisions behind the specs
-- Glossary: [`CONTEXT.md`](https://github.com/0xnicholas/balsa-framework/blob/main/CONTEXT.md) — every domain term, defined once
-- Example: [`examples/minimal-agent`](https://github.com/0xnicholas/balsa-framework/tree/main/examples/minimal-agent) — one agent, one tool, streaming, console tracing
+- Framework README: [balsats-framework](https://github.com/0xnicholas/balsats-framework#readme) — quick start, examples, capability packages
+- Specs: [`docs/architecture/`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/README.md) — one per subsystem
+- Decisions: [`docs/adr/`](https://github.com/0xnicholas/balsats-framework/tree/main/docs/adr) — the decisions behind the specs
+- Glossary: [`CONTEXT.md`](https://github.com/0xnicholas/balsats-framework/blob/main/CONTEXT.md) — every domain term, defined once
+- Example: [`examples/minimal-agent`](https://github.com/0xnicholas/balsats-framework/tree/main/examples/minimal-agent) — one agent, one tool, streaming, console tracing
 
 ## Install
 
@@ -91,11 +91,11 @@ is first-class, with zero span overhead. Explicit assembly wins: a config that b
 ## Lightweight
 
 - runtime dependencies: none — the zero-dependency redline is a hard CI gate over both the manifest
-  and the built output ([ADR-0015](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0015-ci-lightweight-redlines.md))
+  and the built output ([ADR-0015](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0015-ci-lightweight-redlines.md))
 - first-party code: the minified baseline lives in `byte-budget.json` and is checked on every PR —
-  an internal regression reference, not a public budget ([ADR-0001](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0001-lightweight-definition.md))
+  an internal regression reference, not a public budget ([ADR-0001](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0001-lightweight-definition.md))
 - the capability packages ship separately, so a deployment installs only what it uses
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsa-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)

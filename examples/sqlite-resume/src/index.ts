@@ -1,5 +1,5 @@
 /**
- * Balsa sqlite-resume example — a durable run that outlives the process that made it.
+ * Balsats sqlite-resume example — a durable run that outlives the process that made it.
  *
  * One script, two processes, one SQLite file (`@balsats/sqlite`). The parent re-execs itself as a
  * **worker**: the worker builds the refund desk, the model asks for the gated `issueRefund`, the
@@ -28,7 +28,7 @@
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
  *     pnpm --filter @balsats/example-sqlite-resume start
  *
- * The database file defaults to a fresh temp directory; set `BALSA_SQLITE_EXAMPLE_DB` to keep it.
+ * The database file defaults to a fresh temp directory; set `BALSATS_SQLITE_EXAMPLE_DB` to keep it.
  * The script self-asserts (`node:assert/strict`): any violated payoff exits 1.
  */
 import assert from 'node:assert/strict';
@@ -61,9 +61,9 @@ const RESULT_PREFIX = 'SQLITE_RESUME_RESULT=';
 
 /** The SQLite file: the parent picks one, the worker is handed it. */
 function databasePath(): string {
-  const fromEnv = process.env.BALSA_SQLITE_EXAMPLE_DB;
+  const fromEnv = process.env.BALSATS_SQLITE_EXAMPLE_DB;
   if (fromEnv !== undefined && fromEnv !== '') return fromEnv;
-  return join(mkdtempSync(join(tmpdir(), 'balsa-sqlite-resume-')), 'balsa.db');
+  return join(mkdtempSync(join(tmpdir(), 'balsats-sqlite-resume-')), 'balsats.db');
 }
 
 /** The gated tool's ledger — what "money moves" means in this example. */
@@ -105,8 +105,8 @@ function desk(storage: SqliteStorage, ledger: number[]): { durable: DurableAgent
 // ── Worker: run to the suspension, hand the run id over, exit ────────────────────────────────────
 
 async function worker(): Promise<void> {
-  const path = process.env.BALSA_SQLITE_EXAMPLE_DB;
-  assert.ok(path !== undefined && path !== '', 'the worker needs BALSA_SQLITE_EXAMPLE_DB');
+  const path = process.env.BALSATS_SQLITE_EXAMPLE_DB;
+  assert.ok(path !== undefined && path !== '', 'the worker needs BALSATS_SQLITE_EXAMPLE_DB');
   const storage = createSqliteStorage({ path });
   storage.init();
   try {
@@ -148,7 +148,7 @@ async function parent(): Promise<void> {
     process.execPath,
     ['--experimental-strip-types', fileURLToPath(import.meta.url)],
     {
-      env: { ...process.env, BALSA_SQLITE_EXAMPLE_ROLE: 'worker', BALSA_SQLITE_EXAMPLE_DB: path },
+      env: { ...process.env, BALSATS_SQLITE_EXAMPLE_ROLE: 'worker', BALSATS_SQLITE_EXAMPLE_DB: path },
       encoding: 'utf8',
     },
   );
@@ -261,7 +261,7 @@ async function parent(): Promise<void> {
   }
 }
 
-if (process.env.BALSA_SQLITE_EXAMPLE_ROLE === 'worker') {
+if (process.env.BALSATS_SQLITE_EXAMPLE_ROLE === 'worker') {
   await worker();
 } else {
   await parent();

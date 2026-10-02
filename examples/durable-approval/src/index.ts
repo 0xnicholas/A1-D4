@@ -1,5 +1,5 @@
 /**
- * Balsa durable-approval example — a refund desk where money moves only after a human says so.
+ * Balsats durable-approval example — a refund desk where money moves only after a human says so.
  *
  * A scripted, non-interactive run drives one durable agent over a real OpenAI model and shows the
  * M4 approval gate end to end: the model's tool calls reach the loop's step boundary, a call whose

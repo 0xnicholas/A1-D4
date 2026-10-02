@@ -59,7 +59,7 @@ adapter 自拥连接生命周期:可选暴露 `init?()` / `close?()`;**核心永
 ### 工厂面
 
 ```ts
-const storage = createSqliteStorage({ path: 'balsa.db', busyTimeoutMs: 5_000 })
+const storage = createSqliteStorage({ path: 'balsats.db', busyTimeoutMs: 5_000 })
 
 storage.memory              // MemoryStore(条件对已实现 → supportsWorkingMemory 为真)
 storage.workflowSnapshots   // WorkflowSnapshotStore + compareAndSave / deleteSnapshot / listSnapshots

@@ -1,5 +1,5 @@
 /**
- * Balsa MCP paired example — one script, both capability packages.
+ * Balsats MCP paired example — one script, both capability packages.
  *
  * The server side (`@balsats/mcp-server`) serves a small tool container over MCP; the client side
  * (`@balsats/mcp-client`) connects and bridges the remote tools back into a `Record<string, Tool>`
@@ -56,11 +56,11 @@ const failing = createTool({
 
 const container = { echo, weather, failing };
 
-const server = createMcpServer({ name: 'balsa-example-tools', version: '1.0.0', tools: container });
+const server = createMcpServer({ name: 'balsats-example-tools', version: '1.0.0', tools: container });
 
 // --- role split: stdio child mode ----------------------------------------------------------
 
-if (process.env.BALSA_MCP_EXAMPLE_ROLE === 'stdio-server') {
+if (process.env.BALSATS_MCP_EXAMPLE_ROLE === 'stdio-server') {
   server.serveStdio(); // stdin/stdout is the JSON-RPC channel; logs below go to stderr
   console.error('[mcp-tools] stdio server child up');
 } else {
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
           type: 'stdio' as const,
           command: process.execPath,
           args: ['--experimental-strip-types', fileURLToPath(import.meta.url)],
-          env: { BALSA_MCP_EXAMPLE_ROLE: 'stdio-server' },
+          env: { BALSATS_MCP_EXAMPLE_ROLE: 'stdio-server' },
         }
       : { type: 'http' as const, url: await serveHttp() };
 

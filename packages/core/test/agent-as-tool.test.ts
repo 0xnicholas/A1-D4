@@ -56,7 +56,7 @@ function findSpan(spans: readonly ExportedSpan[], type: string, name: string): E
 
 describe('委派即一次普通工具调用', () => {
   it('父模型调用委派工具:子 agent 完成 generate,文本结果经普通工具结果回喂', async () => {
-    const childModel = fakeModel([{ text: 'Balsa is a lightweight TypeScript agent framework.' }]);
+    const childModel = fakeModel([{ text: 'Balsats is a lightweight TypeScript agent framework.' }]);
     const researcher = new Agent({
       name: 'researcher',
       instructions: RESEARCHER_INSTRUCTIONS,
@@ -66,10 +66,10 @@ describe('委派即一次普通工具调用', () => {
     const parentModel = fakeModel([
       {
         toolCalls: [
-          { toolCallId: 'delegate-1', toolName: 'researcher', input: { prompt: 'What is balsa?' } },
+          { toolCallId: 'delegate-1', toolName: 'researcher', input: { prompt: 'What is balsats?' } },
         ],
       },
-      { text: 'Balsa is a lightweight framework.' },
+      { text: 'Balsats is a lightweight framework.' },
     ]);
     const coordinator = new Agent({
       name: 'coordinator',
@@ -79,7 +79,7 @@ describe('委派即一次普通工具调用', () => {
       tools: async (ctx) => ({ researcher: await asTool(researcher)(ctx) }),
     });
 
-    const result = await coordinator.generate('Tell me about balsa.', { tenant: 'acme' });
+    const result = await coordinator.generate('Tell me about balsats.', { tenant: 'acme' });
 
     // 委派 = 普通工具调用:父模型收到的工具列表带包装处解析出的 description 与 input schema
     expect(parentModel.streamCalls[0]?.tools).toEqual([
@@ -95,7 +95,7 @@ describe('委派即一次普通工具调用', () => {
     expect(childModel.streamCalls).toHaveLength(1);
     expect(childModel.streamCalls[0]?.prompt).toEqual([
       { role: 'system', content: RESEARCHER_INSTRUCTIONS },
-      { role: 'user', content: [{ type: 'text', text: 'What is balsa?' }] },
+      { role: 'user', content: [{ type: 'text', text: 'What is balsats?' }] },
     ]);
 
     // 子 run 的结果作为普通工具结果回喂:父模型第二步的 prompt 末尾是 tool 消息
@@ -109,21 +109,21 @@ describe('委派即一次普通工具调用', () => {
           output: {
             type: 'json',
             value: expect.objectContaining({
-              text: 'Balsa is a lightweight TypeScript agent framework.',
+              text: 'Balsats is a lightweight TypeScript agent framework.',
             }),
           },
         },
       ],
     });
 
-    expect(result.text).toBe('Balsa is a lightweight framework.');
+    expect(result.text).toBe('Balsats is a lightweight framework.');
     expect(result.toolResults).toEqual([
       {
         type: 'tool-result',
         toolCallId: 'delegate-1',
         toolName: 'researcher',
         output: expect.objectContaining({
-          text: 'Balsa is a lightweight TypeScript agent framework.',
+          text: 'Balsats is a lightweight TypeScript agent framework.',
         }),
         isError: false,
       },

@@ -1,8 +1,8 @@
-# Balsa
+# Balsats
 
 Ultralight TypeScript agent framework. Compose only what you use — run anywhere, no runtime baggage.
 
-> **Balsa** is the umbrella brand; this repository — **balsa-framework** — is its framework
+> **Balsats** is the umbrella brand; this repository — **balsats-framework** — is its framework
 > subproject. Packages publish under the `@balsats/*` scope (starting with `@balsats/core`), and future
 > subprojects live alongside it.
 
@@ -12,19 +12,19 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 > `@balsats/*` package is on npm yet — the version is bumped to `0.5.0` and the registry is still
 > empty — and it goes out as a manual owner publish (one `v0.5.0` tag), not a scheduled one. 0.5.0
 > carries all of M1–M5, which is everything this README describes; 0.1.0 / 0.2 / 0.3 are **not**
-> published separately. Until then, use Balsa from this repo (see [Development](#development)),
+> published separately. Until then, use Balsats from this repo (see [Development](#development)),
 > and see [Capability packages](#capability-packages-m5) for the core-external packages.
 
-## Why Balsa
+## Why Balsats
 
-Balsa's differentiating axis is **lightweight**, in two precise senses:
+Balsats's differentiating axis is **lightweight**, in two precise senses:
 
 - **Compose only what you use.** Every subsystem ships behind its own subpath export
   (`@balsats/core/agent`, `/tools`, `/memory`, `/workflows`, …). What you don't import costs you
   nothing — not in the dependency tree (the core has zero runtime dependencies), not in concept
   space.
 - **No runtime burden.** No database, queue, or long-running process is required. Storage ports
-  default to in-memory implementations, and Balsa embeds in your application instead of taking it
+  default to in-memory implementations, and Balsats embeds in your application instead of taking it
   over.
 
 A small mental surface runs through everything: an agent is a handful of fields, a tool is four,
@@ -73,7 +73,7 @@ const agent = new Agent({
   tools: { weather },
 });
 
-// One run, two consumption styles on the same object: `for await` streams Balsa's own chunk
+// One run, two consumption styles on the same object: `for await` streams Balsats's own chunk
 // protocol; the terminal values (text, usage, steps, finishReason) are awaited on it.
 const result = agent.stream('What is the weather in Paris right now?');
 
@@ -175,7 +175,7 @@ const app = createApp({ tracer: createTracer({ exporters: [consoleExporter()] })
 const agent = app.agent({ name, instructions, model, tools });
 ```
 
-Balsa has its own minimal span model (not OTel): every agent run, model step, tool call, workflow
+Balsats has its own minimal span model (not OTel): every agent run, model step, tool call, workflow
 run/step, and memory recall/save is traced, with console and memory exporters built in. OTLP
 (GenAI semantic conventions) ships as a separate capability package. A standalone
 `new Agent({ … })` with no app and no tracer stays fully first-class — zero overhead, no span
@@ -248,9 +248,9 @@ and the registry still has nothing under `@balsats` (a manual owner publish, see
 
 | Package | What it gives you | Spec |
 | --- | --- | --- |
-| `@balsats/otlp` | an OTLP exporter: Balsa spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
+| `@balsats/otlp` | an OTLP exporter: Balsats spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
 | `@balsats/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
-| `@balsats/mcp-client` | another MCP server's tools, as Balsa tools | [tools.md](docs/architecture/tools.md) |
+| `@balsats/mcp-client` | another MCP server's tools, as Balsats tools | [tools.md](docs/architecture/tools.md) |
 | `@balsats/sqlite` | a SQLite adapter for all four storage ports | [storage.md](docs/architecture/storage.md) |
 | `@balsats/ai-sdk` | AI SDK UI message stream interop and a `useChat` route | [model.md](docs/architecture/model.md) |
 | `@balsats/croner` | cron expressions as the injected `next` function | [harness.md](docs/architecture/harness.md) |

@@ -1,9 +1,9 @@
 # signals-desk
 
-Balsa's signals subsystem in one scripted session: one support **thread** that everything lands in —
+Balsats's signals subsystem in one scripted session: one support **thread** that everything lands in —
 a customer message that wakes an idle run, a message **injected** into the run while it is live, two
 queued messages that keep their order, a typed **system signal**, and a **scheduled trigger** fired
-by the schedules primitive. Balsa is an ultralight TypeScript agent framework — compose only what you
+by the schedules primitive. Balsats is an ultralight TypeScript agent framework — compose only what you
 use, run anywhere, no runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It drives a
