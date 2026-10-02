@@ -9,11 +9,11 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 > **Status:** pre-1.0. Agents, memory, workflows, the harness trio — durable agents, signals,
 > schedules — and the six M5 capability packages are implemented and verified
 > ([roadmap](docs/ROADMAP.md)). **The first release is 0.5.0, and it is still pending**: no
-> `@balsats/*` package is on npm yet — the version is still `0.0.0` and the registry is empty —
-> and it goes out as a manual owner publish (one `v0.5.0` tag), not a scheduled one. 0.5.0 carries
-> all of M1–M5, which is everything this README describes; 0.1.0 / 0.2 / 0.3 are **not** published
-> separately. Until then, use Balsa from this repo (see [Development](#development)), and see
-> [Capability packages](#capability-packages-m5) for the core-external packages.
+> `@balsats/*` package is on npm yet — the version is bumped to `0.5.0` and the registry is still
+> empty — and it goes out as a manual owner publish (one `v0.5.0` tag), not a scheduled one. 0.5.0
+> carries all of M1–M5, which is everything this README describes; 0.1.0 / 0.2 / 0.3 are **not**
+> published separately. Until then, use Balsa from this repo (see [Development](#development)),
+> and see [Capability packages](#capability-packages-m5) for the core-external packages.
 
 ## Why Balsa
 
@@ -243,9 +243,8 @@ Capability packages that carry external dependencies ship as separate `@balsats/
 packages — install only what you use. All six are implemented and verified: unit tests in
 `pnpm verify`, five end-to-end examples covering all six (see [Examples](#examples)), and
 minified byte budgets plus dependency-closure baselines where there is a dependency to measure
-([roadmap](docs/ROADMAP.md), M5). They are **not on npm yet** — the
-version is still `0.0.0` and the registry has nothing under `@balsats` (a manual owner publish, see
-[Status](#status)):
+([roadmap](docs/ROADMAP.md), M5). They are **not on npm yet** — the version is bumped to `0.5.0`
+and the registry still has nothing under `@balsats` (a manual owner publish, see [Status](#status)):
 
 | Package | What it gives you | Spec |
 | --- | --- | --- |
