@@ -13,14 +13,14 @@ import type { Tool } from '../tools/index.js';
 import type { Processor } from './processors.js';
 
 /**
- * The Agent surface (`docs/architecture/agent.md`): the five definition fields — `name`,
+ * The Agent surface: the five definition fields — `name`,
  * `instructions`, `model`, optional `tools`, optional `description` — plus the optional `memory`
- * subsystem (a first-class optional field of the same surface, `docs/architecture/memory.md`), and
+ * subsystem (a first-class optional field of the same surface), and
  * the `tracer` / `processors` seams. Nothing beyond them.
  *
- * `tracer` is not a sixth definition field: it is the observability injection seam of
- * `docs/architecture/observability.md`「组合根分发」— a cross-cutting dependency the composition
- * root hands to the subsystem (`createApp({ tracer })`), which a standalone `new` may also pass
+ * `tracer` is not a sixth definition field: it is the observability injection seam — a
+ * cross-cutting dependency the composition root hands to the subsystem (`createApp({ tracer })`),
+ * which a standalone `new` may also pass
  * explicitly. Not attaching it leaves the whole observability subsystem at zero overhead.
  *
  * Every config field accepts a static value or a resolver (`DynamicArgument`), resolved again for
@@ -44,8 +44,8 @@ export interface AgentConfig {
   /** Shown to an upstream model when the agent is composed as a tool (`resolveDynamicArgument`). */
   readonly description?: DynamicArgument<string>;
   /**
-   * The memory subsystem instance this agent's runs read and write through (`docs/architecture/memory.md`
-   * 「配置表面」): message history lands in the thread/resource named by the per-call `memory`
+   * The memory subsystem instance this agent's runs read and write through (the configuration
+   * surface): message history lands in the thread/resource named by the per-call `memory`
    * option — recalled once per run before `processInput`, saved once per step after
    * `processOutputStep`. A run that passes no per-call `memory` performs no memory I/O, so a
    * memory-configured agent keeps stateless runs available; the same instance may be shared by
@@ -58,8 +58,8 @@ export interface AgentConfig {
    */
   readonly tracer?: Tracer | undefined;
   /**
-   * The processors of this agent's runs — the cross-cutting extension point of
-   * `docs/architecture/agent.md`「扩展点:Processor」(ADR-0005). Guardrails, evals, redaction and
+   * The processors of this agent's runs — the cross-cutting extension point (ADR-0005). Guardrails,
+   * evals, redaction and
    * rate limiting live here, never in Agent fields. Hooks run in declaration order, each seeing the
    * previous one's rewrite; absent = no processor runs.
    *
@@ -81,7 +81,7 @@ export type ModelSettings = Omit<
 >;
 
 /**
- * The context of one run, resolved per call (`docs/architecture/agent.md`「定义表面」): the
+ * The context of one run, resolved per call (the definition surface): the
  * framework writes `signal` and `runId`, everything else is the user's per-call open bag. A plain
  * object — no `Map` class, no generic context parameter.
  *
@@ -98,7 +98,7 @@ export interface RequestContext {
 }
 
 /**
- * The shape every Agent config field accepts (`docs/architecture/agent.md`「定义表面」): the value
+ * The shape every Agent config field accepts (the definition surface): the value
  * itself, or a resolver that answers per request context — each run resolves its fields again, so a
  * per-call context changes behavior without rebuilding the agent.
  *
@@ -108,7 +108,7 @@ export interface RequestContext {
 export type DynamicArgument<T> = T | ((ctx: RequestContext) => T | Promise<T>);
 
 /**
- * The `model` field's accepted shapes (`docs/architecture/model.md`「model 字段形状」): a model
+ * The `model` field's accepted shapes: a model
  * instance satisfying the contract, an array of instances forming a fallback chain, or a resolver
  * that picks either per request context.
  *
@@ -133,9 +133,9 @@ export interface AgentRunOptions {
   /** Cancels the run — propagated to the model call, the tool loop and every tool context. */
   readonly signal?: AbortSignal;
   /**
-   * The step cap: how many model calls one run may make (`docs/architecture/agent.md`「Agent
-   * loop」). When the cap is reached while the model still asks for tools, the terminal
-   * `finishReason` is `'tool-calls'`. Defaults to 5.
+   * The step cap: how many model calls one run may make (the agent loop). When the cap is reached
+   * while the model still asks for tools, the terminal `finishReason` is `'tool-calls'`. Defaults
+   * to 5.
    */
   readonly maxSteps?: number;
   /**
@@ -163,20 +163,20 @@ export interface AgentRunOptions {
    * Ask for a structured answer: the schema is sent to the model as JSON Schema (`responseFormat`
    * on every model call of the run), and the run's terminal text is parsed as JSON and validated
    * against it — strictly: an answer that is not JSON, or does not match the schema, fails the run
-   * with `StructuredOutputError` (`docs/architecture/agent.md`「执行语义」). The validated value
+   * with `StructuredOutputError` (execution semantics). The validated value
    * settles the output object's `object`; absent = the run's answer is plain text, `object` is
    * `undefined`.
    */
   readonly structuredOutput?: StructuredOutputConfig | undefined;
   /**
-   * The run's memory identity (`docs/architecture/memory.md`「身份模型」): present = the run recalls
+   * The run's memory identity (the identity model): present = the run recalls
    * from and saves into the agent's `memory` for the named thread/resource; absent = the run does
    * no memory I/O. Passing the option to an agent that has no configured `memory` is an error, as
    * is omitting either field — the identity is explicit, never defaulted.
    */
   readonly memory?: AgentMemoryOptions | undefined;
   /**
-   * The run's step-boundary wiring (`docs/architecture/harness.md`「与其它子系统的关系」): the agent
+   * The run's step-boundary wiring (the harness's relations to the other subsystems): the agent
    * loop's only harness extension point — the hook surface the durable approval gate
    * (`beforeToolCalls`) and the signals injector (`beforeNextStep`) hang on. Absent = the loop
    * runs untouched: no hook is consulted, nothing is copied, the bare agent's behavior is
@@ -185,8 +185,8 @@ export interface AgentRunOptions {
    */
   readonly stepBoundary?: AgentStepBoundary | undefined;
   /**
-   * Continue a suspended run from its snapshot — the harness wrappers' re-entry (`AgentRunResume`,
-   * `docs/architecture/harness.md`「Durable agents」). With it, `input` is the suspended run's own
+   * Continue a suspended run from its snapshot — the harness wrappers' re-entry (`AgentRunResume`).
+   * With it, `input` is the suspended run's own
    * message list: the resumed run's prompt, used verbatim, so prompt assembly is skipped — no
    * instructions, no memory recall, no working memory, no `processInput` (the list already carries
    * what the suspended run saw, the input processors included). A resumed run's memory identity
@@ -198,11 +198,11 @@ export interface AgentRunOptions {
 }
 
 /**
- * The agent loop's step-boundary seam (`docs/architecture/harness.md`「Signals」+「与其它子系统的
- * 关系」): the one loop change the harness spec allows — per-run wiring the harness wrappers
+ * The agent loop's step-boundary seam (signals and the harness's relations to the other
+ * subsystems): the one loop change the harness spec allows — per-run wiring the harness wrappers
  * (`createDurableAgent` / `createSignals`) pass as `AgentRunOptions.stepBoundary`. Absent = the loop
  * runs exactly as before: no hook is consulted, nothing is copied, the bare agent's behavior is
- * unchanged (the harness spec's「无 signals 挂接时零开销」guarantee, verbatim for the approval gate).
+ * unchanged (the zero-overhead-without-signals guarantee, verbatim for the approval gate).
  *
  * One seam, two phases, because both harness consumers hang the same region of the loop and no
  * earlier extension point reaches it: the processors' hooks all run after a step's tools have
@@ -213,12 +213,12 @@ export interface AgentRunOptions {
  * - `beforeToolCalls` — after the step's model output has fully streamed (the caller has seen its
  *   finish chunk), before the framework executes the step's pending tool calls. The durable
  *   approval gate decides here. The event carries the snapshot surface the wrapper persists
- *   (messages + stepIndex + trace continuation); a suspend decision ends the run at this boundary
- *   — a normal terminal outcome, never an error. The loop itself keeps no snapshot
- *   (`docs/architecture/agent.md`:核心 loop 保持无快照) — the wrapper builds one from the event.
+ * (messages + stepIndex + trace continuation); a suspend decision ends the run at this boundary
+ * — a normal terminal outcome, never an error. The loop itself keeps no snapshot — the wrapper
+ *   builds one from the event.
  * - `beforeNextStep` — before every model call of the run, the first included. The signals
  *   injector drains its queue here; the messages it returns are appended to the prompt and take
- *   part in that model call (活跃 = 注入当前 run,下一 step 生效).
+ *   part in that model call (injected into the current run, taking effect at the next step).
  */
 export interface AgentStepBoundary {
   /**
@@ -273,8 +273,8 @@ export interface AgentToolCallsBoundaryEvent extends AgentStepBoundaryEvent {
  * The decision a `beforeToolCalls` hook returns to end the run at that boundary: the pending calls
  * do not execute, the step never completes (no processor hook, no memory save, nothing appended to
  * the prompt), and the run settles normally with `finishReason: 'suspended'` — suspension is a
- * terminal outcome, not an error (`docs/architecture/harness.md`「Durable agents」+「Observability
- * 锚点」: the `agent-run` span ends normal under a `status: 'suspended'` attribute). What is
+ * terminal outcome, not an error (durable agents: the `agent-run` span ends normal under a
+ * `status: 'suspended'` attribute). What is
  * persisted alongside — the snapshot, its `suspendPayload` — is the wrapper's own state: the hook
  * and the wrapper share a closure, and the loop keeps no snapshot of its own.
  */
@@ -285,7 +285,7 @@ export interface AgentStepBoundaryDecision {
 
 /**
  * The continue-from-snapshot seed (`AgentRunOptions.resume`): how a harness wrapper re-enters a
- * suspended run (`docs/architecture/harness.md`「Durable agents」— the durable wrapper's `resume`).
+ * suspended run (the durable wrapper's `resume`).
  * The run's message list carries everything the suspended run saw; this seed replays the one thing
  * a message list cannot reconstruct — the calls the suspended step held back, and how each of them
  * is answered.
@@ -311,13 +311,13 @@ export interface AgentRunResume {
   readonly toolCalls: readonly ToolCallChunk[];
   /**
    * Pre-supplied answers: a call whose id appears here is answered with the given result instead of
-   * executing — the approval gate's「用户拒绝」path. Calls without an answer execute.
+   * executing — the approval gate's user-rejected path. Calls without an answer execute.
    */
   readonly answers?: readonly ToolResultChunk[] | undefined;
 }
 
 /**
- * The per-call memory identity of a run (`docs/architecture/memory.md`「身份模型」): the thread the
+ * The per-call memory identity of a run (the identity model): the thread the
  * run reads history from and appends to, plus the resource that owns it. Both fields are required —
  * an identity missing one fails at call time, before any model call.
  */
@@ -335,7 +335,7 @@ export interface AgentMemoryOptions {
 }
 
 /**
- * The `structuredOutput` run option (`docs/architecture/agent.md`「执行语义」): the shape the model's
+ * The `structuredOutput` run option (execution semantics): the shape the model's
  * final answer must have, as a Standard Schema dual interface (ADR-0003).
  *
  * One schema, no other switches: the validation strategy of v1 is fixed at strict (a non-conforming
@@ -350,7 +350,7 @@ export interface StructuredOutputConfig<TSchema extends StandardSchema = Standar
 
 /**
  * One step of a run: a single model call and the chunks the chunk protocol carried for it
- * (`docs/architecture/agent.md`「steps[]」). The step's tool calls are recorded as the protocol
+ * (the `steps[]` protocol). The step's tool calls are recorded as the protocol
  * saw them; the built-in loop executes the client-side ones and appends their results to this same
  * step (results belong to the step whose calls they answer, even though they arrive after its
  * `finish` chunk).
@@ -368,11 +368,11 @@ export interface AgentStep {
 
 /**
  * The output object returned by `stream()`: one run, two consumption styles, one chunk pass
- * (`docs/architecture/agent.md`「输出对象」).
+ * (the output object).
  *
  * - `for await (const chunk of result)` yields the core's own chunk protocol — never an AI SDK
  *   stream format (ADR-0004). The chunk stream is single-consumption; leaving the loop early
- *   (`break`) does not cancel the run, the terminal values still settle (cancellation is the
+ * (`break`) does not cancel the run, the terminal values still settle (cancellation is the
  *   per-call `signal`'s job).
  * - The terminal promises resolve with the run's final values. Reading one starts the run if it
  *   has not started yet; terminal values that are never read are never created, so a consumer
@@ -386,7 +386,7 @@ export interface AgentStreamResult<TObject = unknown> extends AsyncIterable<Chun
   readonly text: Promise<string>;
   /**
    * The run's structured output: the final step's text parsed as JSON and validated against
-   * `structuredOutput.schema` (`docs/architecture/agent.md`「执行语义」). Resolves `undefined` when
+   * `structuredOutput.schema` (execution semantics). Resolves `undefined` when
    * the run was not asked for one; rejects with `StructuredOutputError` when the answer is not JSON
    * or does not match the schema (strict), and with the run's own error when the run failed.
    */

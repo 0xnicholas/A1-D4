@@ -8,7 +8,7 @@ import { walk } from './walker.js';
 import type { WalkTraceContinuation, WorkflowDefinition } from './walker.js';
 
 /**
- * The run surface (`docs/architecture/workflows.md`「Run」「流式事件」「suspend/resume 与快照」):
+ * The run surface (the run lifecycle, its streaming events, and suspend/resume with snapshots):
  * `createRun({ runId? })` gives a run identity, `start({ inputData, requestContext?, signal? })`
  * returns the output object, and `resume({ step, resumeData? })` re-enters a suspended run. This is
  * the workflow's parallel implementation of the agent's mental model: one execution backs both
@@ -60,7 +60,7 @@ export interface WorkflowCreateRunOptions {
   /**
    * The trace the run's first segment continues, for a run that hangs under a trace started
    * elsewhere (an incoming `traceparent`, a parent run) — the agent's run options' convention
-   * (`docs/architecture/observability.md`「外部 trace 延续」). Empty strings mean "no trace": an
+   * (external trace continuation). Empty strings mean "no trace": an
    * empty `traceId` voids the pair, an empty `parentSpanId` only drops the parent. A resumed
    * segment continues the trace its snapshot pinned, never this pair.
    */
@@ -95,7 +95,7 @@ export interface WorkflowResumeOptions {
 }
 
 /**
- * The output object `start` returns (`docs/architecture/workflows.md`「Run」「流式事件」): the run's
+ * The output object `start` returns (the run lifecycle and its streaming events): the run's
  * terminal values and its lifecycle event stream, backed by one execution. `await out.result`
  * resolves the outcome envelope on success or suspension (rejects when the run fails); `for await`
  * walks the run / step boundary events as they happen. Reading either starts the run.
@@ -110,7 +110,7 @@ export interface WorkflowRunOutput<TOutput = unknown> extends AsyncIterable<Work
 }
 
 /**
- * One execution lifecycle of a committed workflow (`docs/architecture/workflows.md`「Run」):
+ * One execution lifecycle of a committed workflow (the run lifecycle):
  * `createRun` mints its identity, `start` begins the single execution, and `resume` continues a run
  * that suspended — the run it was started on, or (the durable path) a fresh run object over the same
  * `runId` and store. A run executes once: `start` refuses a second call, and `resume` continues the
@@ -133,11 +133,11 @@ export interface WorkflowRun<TInputData = unknown, TOutput = unknown> {
 const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
- * The in-process resume lock (`docs/architecture/workflows.md`「suspend/resume 与快照」): one resume
+ * The in-process resume lock (suspend/resume and snapshots): one resume
  * per run at a time. A concurrent resume of the same run joins the one in flight instead of loading
  * the same suspended snapshot twice; the lock clears when that resume settles, so a run that
  * suspended again can be resumed again. Cross-process safety is the store's concern (CAS is the
- * adapter's optional extension, `docs/architecture/storage.md`), not the core's.
+ * adapter's optional extension), not the core's.
  */
 const resumeLocks = new Map<string, Promise<WorkflowRunOutcome>>();
 

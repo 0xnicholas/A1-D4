@@ -1,5 +1,5 @@
 /**
- * Cancellation (`docs/architecture/workflows.md`「错误、重试与状态机」): a run's `AbortSignal` fails
+ * Cancellation (errors, retries and the state machine): a run's `AbortSignal` fails
  * the run — there is no `canceled` state of its own, and `failed` is where an aborted run lands.
  * These three helpers are the whole vocabulary: the error an abort means, the boundary check every
  * walk step goes through, and the one wait cancellation cuts short (`.sleep()` and the fixed retry
@@ -29,8 +29,7 @@ export function throwIfAborted(signal: AbortSignal): void {
 /**
  * Waits `durationMs` in-process (`setTimeout`), cut short by the signal: aborting rejects with the
  * abort's error right away and clears the timer. Not durable — a dying process drops the wait, and
- * a durable sleep is an external runner's business (`docs/architecture/workflows.md`
- * 「砍单与承载缝」).
+ * a durable sleep is an external runner's business.
  */
 export function abortableSleep(durationMs: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortError(signal));

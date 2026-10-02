@@ -30,8 +30,9 @@ import type { WorkflowRunOutcome } from './run.js';
 import { executeWithRetries } from './retry.js';
 
 /**
- * The semantic kernel (`docs/architecture/workflows.md`「Workflow 与 builder」「Run」「控制流算子」
- * 「suspend/resume 与快照」): a `for` loop over the workflow's flat entry list, interpreting entry by
+ * The semantic kernel — workflow definitions and builders, the run lifecycle, control-flow
+ * operators and suspend/resume with snapshots: a `for` loop over the workflow's flat entry list,
+ * interpreting entry by
  * entry — there is no DAG. Each entry receives the previous entry's output (the run's input for the
  * first one) and its output becomes the next entry's value: `then` pipes a step's output through,
  * `parallel` runs every step concurrently and keys the outputs by step id, `branch` runs the first
@@ -68,7 +69,7 @@ export type WorkflowDefinition<TInputSchema extends StandardSchema = StandardSch
 };
 
 /**
- * The point a resumed walk re-enters from (`docs/architecture/workflows.md`「suspend/resume 与快照」):
+ * The point a resumed walk re-enters from (suspend/resume and snapshots):
  * what the snapshot says about the suspension — the suspended step, its raw `resumeData` (validated
  * here, at the third IO boundary), the entry position (`startIdx` equivalent) and the records the
  * completed part of the run left behind.
@@ -119,7 +120,7 @@ export interface WalkOptions {
    */
   readonly trace?: WalkTraceContinuation | undefined;
   /**
-   * The lifecycle event sink (`docs/architecture/workflows.md`「流式事件」): the output object's
+   * The lifecycle event sink (streaming events): the output object's
    * buffer on a start, nothing on a resume (which is a promise, not a stream). Absent = the events
    * are built and dropped.
    */
@@ -205,7 +206,7 @@ export async function walk(
     resumeSite: undefined,
     emit: options.emit ?? dropEvent,
     // The run's root span is opened before the entry boundary so a rejected start is recorded too;
-    // it ends on every exit path below (`docs/architecture/observability.md`「自动埋点」).
+    // it ends on every exit path below (automatic instrumentation).
     tracing: toWorkflowTracing(workflow, options),
   };
 
@@ -349,8 +350,8 @@ async function runWalk(state: WalkState, options: WalkOptions): Promise<Workflow
 }
 
 /**
- * Interprets one entry: the dispatch the walk's `for` loop runs (`docs/architecture/workflows.md`
- * 「控制流算子」). `sleep` consumes and produces nothing, so it hands the tip straight back.
+ * Interprets one entry: the dispatch the walk's `for` loop runs (control-flow operators). `sleep`
+ * consumes and produces nothing, so it hands the tip straight back.
  */
 async function runEntry(state: WalkState, entry: WorkflowEntry, value: unknown): Promise<unknown> {
   switch (entry.type) {
@@ -379,8 +380,8 @@ async function runEntry(state: WalkState, entry: WorkflowEntry, value: unknown):
 }
 
 /**
- * Written at every fixed persistence point (`docs/architecture/workflows.md`「suspend/resume 与
- * 快照」): a fresh table each time — records are replaced, never mutated, so a shallow copy is
+ * Written at every fixed persistence point (suspend/resume and snapshots): a fresh table each time
+ * — records are replaced, never mutated, so a shallow copy is
  * enough — with the run's validated input and the entry position to re-enter from.
  */
 async function persist(
@@ -399,8 +400,8 @@ async function persist(
     // The iteration site rides only a suspension-inside-a-block snapshot (#54): running and
     // terminal snapshots have none — the walk has left the block, or never had one.
     ...(iterationSite === undefined ? {} : { iterationSite }),
-    // The trace rides the snapshot so a resumed segment continues it (`docs/architecture/
-    // observability.md`「suspend/resume」). An untraced run — or a trace the sampler rejected,
+    // The trace rides the snapshot so a resumed segment continues it. An untraced run — or a trace
+    // the sampler rejected,
     // whose NoOpSpan carries no id — writes none.
     ...(traceId === undefined || traceId === '' ? {} : { traceId }),
   };
@@ -669,7 +670,7 @@ async function executeStep(
 }
 
 /**
- * Starts one step's span (`docs/architecture/observability.md`「自动埋点」): hanging under the run's
+ * Starts one step's span (automatic instrumentation): hanging under the run's
  * root span (explicit propagation, no AsyncLocalStorage). The name is the step id; the table's
  * `workflow-step` attributes are empty. A run without a tracer creates no span object at all.
  */
@@ -723,7 +724,7 @@ function suspendOutsideStep(): never {
 }
 
 /**
- * `.parallel([a, b])` (`docs/architecture/workflows.md`「控制流算子」): every step receives the same
+ * `.parallel([a, b])` (control-flow operators): every step receives the same
  * value (the previous entry's output) and runs concurrently — no concurrency cap. The block is a
  * synchronization point in full (#54): it waits for every arm to settle before leaving — a
  * suspend snapshot must say which arms completed, so a still-running arm's output is not lost to a
@@ -776,7 +777,7 @@ async function runParallel(
 }
 
 /**
- * `.branch([[cond, step], …])` (`docs/architecture/workflows.md`「控制流算子」): conditions are
+ * `.branch([[cond, step], …])` (control-flow operators): conditions are
  * evaluated in definition order with the same context bag a step receives (`inputData` = the
  * previous entry's output), and the first truthy one runs its step — later conditions are not
  * evaluated at all. Output = a keyed object whose only key is the executed step's id; when no
@@ -836,7 +837,7 @@ async function reenterRecordedArm(
 }
 
 /**
- * `.foreach(step, { concurrency })` (`docs/architecture/workflows.md`「控制流算子」): the previous
+ * `.foreach(step, { concurrency })` (control-flow operators): the previous
  * entry's output must be an array; every element is one iteration of the same step (validated at
  * the step boundary like any other input) and the outputs are collected in index order.
  * `concurrency` (resolved at definition time, an integer ≥ 1) is the gate width: `1` runs the
@@ -929,7 +930,7 @@ async function runForeach(state: WalkState, entry: ForeachEntry, inputData: unkn
 }
 
 /**
- * `.dowhile(step, cond)` / `.dountil(step, cond)` (`docs/architecture/workflows.md`「控制流算子」):
+ * `.dowhile(step, cond)` / `.dountil(step, cond)` (control-flow operators):
  * the same loop with two condition checkpoints — `dowhile` checks **before** every iteration
  * (a condition false at `iterationCount: 0` runs the step zero times, the tip passing through
  * untouched), `dountil` checks **after** every iteration (the step always runs at least once).
@@ -1019,12 +1020,12 @@ async function loopConditionHolds(
 }
 
 /**
- * `.sleep(ms | fn)` (`docs/architecture/workflows.md`「控制流算子」「错误、重试与状态机」): an
+ * `.sleep(ms | fn)` (control-flow operators; errors, retries and the state machine): an
  * in-process wait, cut short by the run's signal. The run keeps its `running` reading while it
  * waits — the framework has no `waiting` state — and the wait is not durable: a dying process drops
  * it. The tip passes through untouched and nothing is recorded: a sleep is a delay, not a step.
  *
- * The duration is a `DynamicArgument` (`CONTEXT.md`「动态参数」): milliseconds, or a resolver the
+ * The duration is a `DynamicArgument`: milliseconds, or a resolver the
  * run calls with its `RequestContext` (`signal` / `runId` reachable, the agent config fields'
  * convention) — not a step context, since a delay consumes and produces no value. It must be a
  * finite number of milliseconds; anything else is a broken computation and fails the run loudly. A

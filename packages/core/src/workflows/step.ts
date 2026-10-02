@@ -2,7 +2,7 @@ import type { RequestContext } from '../agent/types.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 
 /**
- * The context one step executes with (`docs/architecture/workflows.md`「定义表面」): the seven
+ * The context one step executes with (the definition surface): the seven
  * pieces the framework guarantees at every step boundary — the same bag the control-flow
  * conditions receive, read-only in spirit there.
  *
@@ -40,7 +40,7 @@ export interface StepContext<TInputData = unknown, TResumeData = undefined, TSus
 }
 
 /**
- * A workflow step (`docs/architecture/workflows.md`「Step」): id + input/output schemas + optional
+ * A workflow step (the step shape): id + input/output schemas + optional
  * resume/suspend schemas and `retries`, plus `execute`. The id is the key snapshots and
  * parallel/branch output objects use.
  *
@@ -68,7 +68,7 @@ export interface Step<
   /** `suspend(payload)` payload schema. */
   readonly suspendSchema?: TSuspendSchema | undefined;
   /**
-   * Fixed-interval retry count (`docs/architecture/workflows.md`「错误、重试与状态机」): `n` buys
+   * Fixed-interval retry count (errors, retries and the state machine): `n` buys
    * up to `n` extra attempts at the one fixed interval (`retry.ts`), the last error surfacing
    * verbatim when they run out. A non-negative integer; anything else is a definition error.
    */

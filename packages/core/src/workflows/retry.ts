@@ -2,17 +2,16 @@ import { abortableSleep } from './abort.js';
 import { isSuspendSignal } from './suspend.js';
 
 /**
- * The fixed interval between a step's retry attempts (`docs/architecture/workflows.md`
- * 「错误、重试与状态机」): `retries` buys that many *extra* attempts at one fixed spacing — no
- * backoff, whose policy object is the field's reserved additive extension. The wait is an
- * in-process one like `.sleep()`, so cancellation cuts it short.
+ * The fixed interval between a step's retry attempts: `retries` buys that many *extra* attempts at
+ * one fixed spacing — no backoff, whose policy object is the field's reserved additive extension.
+ * The wait is an in-process one like `.sleep()`, so cancellation cuts it short.
  */
 export const STEP_RETRY_INTERVAL_MS = 1000;
 
 /**
  * Runs one step's `execute` up to `retries + 1` times, waiting `STEP_RETRY_INTERVAL_MS` between
  * attempts, and rethrows the last error verbatim — never wrapped, never aggregated
- * (`docs/architecture/workflows.md`「错误、重试与状态机」).
+ * (errors, retries and the state machine).
  *
  * Retrying wraps `execute` only: the step boundary's IO validation happens once, before this is
  * called, because an input its schema rejects will not start passing on a second look. A suspend is

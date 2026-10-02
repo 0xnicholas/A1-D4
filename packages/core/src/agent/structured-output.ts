@@ -4,7 +4,7 @@ import { formatIssues, messageOf, toJsonSchema, validateSchema } from '../standa
 import type { StructuredOutputConfig } from './types.js';
 
 /**
- * The structured-output feature (`docs/architecture/agent.md`「执行语义」, run option
+ * The structured-output feature (execution semantics, run option
  * `structuredOutput: { schema }`): one schema does two jobs at the two ends of the run.
  *
  * - **Down**: the schema's JSON Schema (`~standard.jsonSchema`, the draft-07 target — the same
@@ -20,7 +20,7 @@ import type { StructuredOutputConfig } from './types.js';
 
 /**
  * Thrown when a run asked for `structuredOutput` and its terminal text did not become the schema's
- * value — strict, the only validation strategy (`docs/architecture/agent.md`「执行语义」): a model
+ * value — strict, the only validation strategy (execution semantics): a model
  * that ignores the requested shape fails the run instead of silently answering something else.
  *
  * The run's terminal text is kept unparsed (`text`), so the caller can see what the model actually

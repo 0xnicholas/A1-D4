@@ -1,6 +1,5 @@
 /**
- * `createChatRoute` — the web-standard `useChat()` route
- * (spec: `docs/architecture/model.md`「路由:`createChatRoute`」).
+ * `createChatRoute` — the web-standard `useChat()` route.
  *
  * One handler shape — `(request: Request) => Promise<Response>` — for a bare agent or a durable
  * one, on any web-standard host (Next, Hono, plain `node:http` via a thin adapter). POST only.

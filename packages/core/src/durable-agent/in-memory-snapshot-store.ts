@@ -11,7 +11,7 @@ import type { AgentRunSnapshot, AgentRunSnapshotStore } from './snapshot.js';
  * backend. What that enforces is isolation, not the JSON-only rule: `structuredClone` rejects
  * functions but happily carries values JSON cannot (Map / Set / Date, cycles), so a snapshot the
  * core accepts here could still fail an adapter with a JSON backend. The JSON-only constraint stays
- * the port's contract (`docs/architecture/storage.md`「扩展面」), not something this default checks.
+ * the port's contract, not something this default checks.
  */
 export function createInMemoryAgentRunSnapshotStore(): AgentRunSnapshotStore {
   const snapshots = new Map<string, AgentRunSnapshot>();

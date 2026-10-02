@@ -17,7 +17,7 @@ export default {
 };
 ```
 
-- Spec: [`docs/architecture/model.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/model.md) —「AI SDK 互操作能力包(M5 设计冻结)」
+- Spec: [`docs/architecture/model.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/model.md)
 - Protocol facts this package builds on: [`docs/research/ai-sdk-ui-stream-protocol.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/ai-sdk-ui-stream-protocol.md)
 - Decisions: [ADR-0004](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0004-model-layer-dual-track.md) (model layer), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 

@@ -18,7 +18,7 @@ await tracer.flush();
 await tracer.shutdown();
 ```
 
-- Spec: [`docs/architecture/observability.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/observability.md) —「OTLP 能力包(M5 设计冻结)」
+- Spec: [`docs/architecture/observability.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/observability.md)
 - Wire facts this package builds on: [`docs/research/otlp-js-packages.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/otlp-js-packages.md)
 - Decisions: [ADR-0009](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0009-observability-tracing.md) (observability), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 - Example: [`examples/otlp-collector`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/otlp-collector) — a traced agent run lands in a local OTLP collector

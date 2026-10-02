@@ -16,7 +16,7 @@ export function missingFinishError(): ModelContractError {
 }
 
 /**
- * The run behind an output object (`docs/architecture/agent.md`「执行语义」「输出对象」).
+ * The run behind an output object.
  *
  * One pass over the core chunk protocol serves both consumption styles: the `for await` iterator
  * and the terminal promises, so the two can be mixed freely and always describe the same run.

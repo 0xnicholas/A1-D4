@@ -1,5 +1,5 @@
 /**
- * Value-domain rules (`docs/architecture/observability.md`「值域与兜底规则」): OTel attributes
+ * Value-domain rules: OTel attributes
  * only carry primitives — primitives pass, primitive arrays pass with null/undefined members
  * stripped (an array stripped empty drops the attribute), anything else JSON-serializes to the
  * same key; a serialization failure drops the value and counts in `droppedAttributesCount`.

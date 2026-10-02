@@ -1,5 +1,5 @@
 /**
- * The `ReadableSpan` synthesis (`docs/architecture/observability.md`「三事件 → OTLP 桥法」):
+ * The `ReadableSpan` synthesis (the three-event OTLP bridge):
  * each ended span becomes a plain object structurally satisfying `ReadableSpan` — no SDK
  * Tracer/Provider/Span involved — and goes straight to `BatchSpanProcessor.onEnd()`. Timestamps
  * convert `Date` → `HrTime`; an `isEvent` span ends when it starts (zero duration); synthesized

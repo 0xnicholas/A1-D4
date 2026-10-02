@@ -16,12 +16,14 @@ import type { Tracer } from '../observability/index.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 
 /**
- * The signals subsystem (`docs/architecture/harness.md`「Signals」): the thread-directed interaction
- * primitive — inject into the active run, wake an idle thread, queue in order — over an in-process
- * registry of「thread → 活跃 run」and an in-memory pubsub for chunk subscribers.
+ * The signals subsystem: the thread-directed interaction primitive — inject into the active run,
+ * wake an idle thread, queue in order — over an in-process registry of thread → active run and an
+ * in-memory pubsub for chunk subscribers.
  *
- * 语义固定三句(verbatim from the spec):活跃 = 注入当前 run(下一 step 生效);空闲 = 唤醒新 run;
- * queueMessage = 排队保序。Those sentences act on the runs started through this wrapper
+ * Three fixed rules (verbatim from the spec): on an active thread a message is injected into the
+ * current run, taking effect at the next step; on an idle thread it wakes a new run; and
+ * `queueMessage` queues it in arrival order. Those rules act on the runs started through this
+ * wrapper
  * (`stream` / `generate` with a per-call `memory` identity) and on the runs the wrapper starts
  * itself (wakes, continuations); a bare `agent.stream(...)` call knows nothing about signals.
  *
@@ -33,11 +35,11 @@ import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 
 /** The `createSignals` config. */
 export interface SignalsConfig {
-  /** The agent whose runs the three sentences act on. */
+  /** The agent whose runs signals act on. */
   readonly agent: Agent;
   /**
    * The memory instance injected/woken content lands in, as ordinary messages of message history
-   * (复用 `MemoryStore`,零新存储). Must be the same instance the agent is configured with
+   * (reusing `MemoryStore`, no new storage). Must be the same instance the agent is configured with
    * (`AgentConfig.memory`): woken runs carry their thread identity as the per-call `memory`
    * option, which an agent without a configured memory rejects. Absent = waking starts a new run
    * with no history at all (documented: nothing is persisted, nothing is recalled) and injections
@@ -90,8 +92,8 @@ export interface Signals {
   ): Promise<AgentGenerateResult<StandardSchemaV1.InferOutput<TSchema>>>;
   generate(input: string | ModelMessage[], options?: AgentRunOptions): Promise<AgentGenerateResult>;
   /**
-   * Sends a message to a thread (活跃 = 注入当前 run,下一 step 生效;空闲 = 唤醒新 run). The
-   * content lands in message history as an ordinary message — saved here when injected (no run
+   * Sends a message to a thread — active = injected into the current run, idle = wakes a new run.
+   * The content lands in message history as an ordinary message — saved here when injected (no run
    * would ever persist it), saved by the woken run itself when it wakes one. Resolves once the
    * message is delivered — persisted and buffered for injection, or the run started — never
    * awaits a woken run's completion.
@@ -99,8 +101,8 @@ export interface Signals {
   sendMessage(target: AgentMemoryOptions, input: string | ModelMessage[]): Promise<void>;
   /**
    * Queues a message for a thread: it waits for the current run to end, then lands as the input
-   * of one continuation run, in arrival order with everything queued before it (排队保序). On an
-   * idle thread it is simply a wake. The queue is process 内存 — the process dying drops it
+   * of one continuation run, in arrival order with everything queued before it. On an
+   * idle thread it is simply a wake. The queue is process memory — the process dying drops it
    * (documented single-process semantics).
    */
   queueMessage(target: AgentMemoryOptions, input: string | ModelMessage[]): Promise<void>;
@@ -147,8 +149,7 @@ interface Subscriber {
 const DONE: IteratorResult<Chunk> = { value: undefined, done: true };
 
 /**
- * Creates the signals entry object. See `Signals` for the per-method semantics and
- * `docs/architecture/harness.md`「Signals」for the spec.
+ * Creates the signals entry object. See `Signals` for the per-method semantics.
  */
 export function createSignals(config: SignalsConfig): Signals {
   const { agent, memory, tracer } = config;
@@ -253,9 +254,9 @@ export function createSignals(config: SignalsConfig): Signals {
 
   /**
    * Drains the thread's injection buffer at a step boundary: the buffered messages become the
-   * tail of the run's next model call (注入当前 run,下一 step 生效). An injection landing with a
-   * tracer attached and a traced run hangs as one `isEvent` span off the live `agent-run` span —
-   * the boundary event's continuation ids, the anchor of harness.md「Observability 锚点」.
+   * tail of the run's next model call (injected into the run, effective next step). An injection
+   * landing with a tracer attached and a traced run hangs as one `isEvent` span off the live
+   * `agent-run` span — the boundary event's continuation ids, the observability anchor.
    */
   function drainPending(
     state: ThreadState,
@@ -267,7 +268,7 @@ export function createSignals(config: SignalsConfig): Signals {
       tracer.startSpan({
         name: 'signal',
         // An open span-type literal, deliberately not one of the framework's seven constants
-        // (the anchor: 不新增 span 类型常量 — `SpanType` is an open string by design).
+        // (the anchor: no new span-type constant — `SpanType` is an open string by design).
         type: 'signal',
         isEvent: true,
         traceId: event.traceId,
@@ -329,10 +330,11 @@ export function createSignals(config: SignalsConfig): Signals {
   }
 
   /**
-   * Delivers a message (or rendered signal): 活跃 = 注入当前 run,空闲 = 唤醒新 run. The inject
-   * path buffers first — the message is committed to the run, and a run ending while the history
-   * save is still in flight folds the buffer into its continuation (`settleRun`) — then persists
-   * it as an ordinary message (no run would ever save an injected message; a woken run saves its
+   * Delivers a message (or rendered signal): active = injected into the current run, idle = wakes
+   * a new run. The inject path buffers first — the message is committed to the run, and a run
+   * ending while the history save is still in flight folds the buffer into its continuation
+   * (`settleRun`) — then persists it as an ordinary message (no run would ever save an injected
+   * message; a woken run saves its
    * own input with its first step, so the wake path does not double-save).
    */
   async function deliver(target: AgentMemoryOptions, messages: readonly ModelMessage[]): Promise<void> {
@@ -349,7 +351,7 @@ export function createSignals(config: SignalsConfig): Signals {
   }
 
   /**
-   * Queues a message: on a live thread it joins the continuation queue (保序, in arrival order);
+   * Queues a message: on a live thread it joins the continuation queue (in arrival order);
    * on an idle thread it is simply a wake.
    */
   function queue(target: AgentMemoryOptions, messages: readonly ModelMessage[]): Promise<void> {

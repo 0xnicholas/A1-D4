@@ -3,7 +3,7 @@ import { formatIssues, validateSchema } from '../standard-schema-runtime.js';
 import type { Step } from './step.js';
 
 /**
- * The engine's IO validation (`docs/architecture/workflows.md`「IO 校验」): the fixed boundaries
+ * The engine's IO validation: the fixed boundaries
  * every run passes — the start input (`inputData` against the workflow's `inputSchema`), every
  * step's input (the upstream value against that step's `inputSchema`) and a resume's `resumeData`
  * (against the suspended step's `resumeSchema`). There is no validation switch: always on.
@@ -71,7 +71,7 @@ export async function validateStepInput(
 
 /**
  * Validates a resume's `resumeData` against the suspended step's `resumeSchema` and returns the
- * schema's value — the third fixed IO boundary (`docs/architecture/workflows.md`「IO 校验」), so its
+ * schema's value — the third fixed IO boundary (IO validation), so its
  * defaults and transforms take effect exactly like the other two. The step's id rides the error.
  *
  * A step that declares no `resumeSchema` has no data to validate: a resume must not carry any (the

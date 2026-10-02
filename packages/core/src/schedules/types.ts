@@ -3,16 +3,16 @@ import type { ModelMessage } from '../model/contract.js';
 import type { SignalPayload } from '../signals/index.js';
 
 /**
- * Record shapes of the schedules subsystem (`docs/architecture/harness.md`「Schedules」节). Records
+ * Record shapes of the schedules subsystem. Records
  * are the JSON-serializable state line the `ScheduleStore` persists — the `next` function that
  * computes occurrences is *not* part of the record (functions do not serialize): it is registered
  * in-process by `createSchedules().save()` and paired with the persisted record by id.
- * Evolution of the ports is additive-only (ADR-0010, `docs/architecture/storage.md`).
+ * Evolution of the ports is additive-only (ADR-0010).
  */
 
 /**
  * Threadless targets: the trigger runs the named agent once, isolated — `agents[name].generate(input)`,
- * no memory identity, no thread (the mastra 「threadless」mode). Message history is untouched.
+ * no memory identity, no thread (the mastra threadless mode). Message history is untouched.
  */
 export interface ScheduleAgentTarget {
   /** The agent to run, by name in `createSchedules({ agents })`. */
@@ -24,8 +24,8 @@ export interface ScheduleAgentTarget {
 /**
  * Threaded targets: the trigger injects a signal into a conversation — `signals.sendSignal({ thread,
  * resource }, payload)` — so the run wakes (or an active one receives it) exactly as any other
- * signal（复用基础 signals;the facade requires a `signals` instance to accept this shape）. The
- * payload is the caller's, `type` included: the core adds nothing to it.
+ * signal (reusing the base signals; the facade requires a `signals` instance to accept this
+ * shape). The payload is the caller's, `type` included: the core adds nothing to it.
  */
 export interface ScheduleSignalTarget {
   /** The thread the signal lands in (a `Memory` thread id, or id plus creation fields). */
@@ -37,7 +37,7 @@ export interface ScheduleSignalTarget {
 }
 
 /**
- * What a trigger does (`harness.md`「Schedules」: target 两形态). The two forms are distinguished by
+ * What a trigger does (schedules: the two target forms). The two forms are distinguished by
  * their fields: a `thread` selects the threaded (signals) form, `agent` the threadless one.
  */
 export type ScheduleTarget = ScheduleAgentTarget | ScheduleSignalTarget;

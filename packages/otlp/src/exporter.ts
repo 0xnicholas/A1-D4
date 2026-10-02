@@ -1,5 +1,5 @@
 /**
- * The exporter factory (`docs/architecture/observability.md`「包面」): one `createOtlpExporter`
+ * The exporter factory (the package surface): one `createOtlpExporter`
  * wrapping the official OTLP exporter (protocol-selected: protobuf by default, JSON via option or
  * this package's own `OTEL_EXPORTER_OTLP_PROTOCOL` face) behind the official `BatchSpanProcessor`.
  * Configuration priority is explicit option > env > official defaults — unset items pass through
@@ -27,7 +27,7 @@ export interface OtlpExporterBatchOptions {
   readonly exportTimeoutMillis?: number;
 }
 
-/** `createOtlpExporter` options (`docs/architecture/observability.md`「包面」). */
+/** `createOtlpExporter` options (the package surface). */
 export interface OtlpExporterOptions {
   /** Transport protocol; defaults to `protobuf` (option > `OTEL_EXPORTER_OTLP_PROTOCOL` > default). */
   readonly protocol?: 'protobuf' | 'json';

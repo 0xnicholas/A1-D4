@@ -1,10 +1,10 @@
 /**
- * The frozen v1 schema (`docs/architecture/storage.md`「表结构(v1,六表)」): six STRICT tables,
+ * The frozen v1 schema: six STRICT tables,
  * three indexes, nothing else — no triggers, no views, no `AUTOINCREMENT`.
  *
  * Migrations are forward-only and additive-only. There is no migration table: the ordered array
  * below is the only registry and `PRAGMA user_version` is the ledger it advances. Growth adds
- * tables / columns / indexes and never reshapes what exists (`storage.md`「迁移纪律」).
+ * tables / columns / indexes and never reshapes what exists (migration discipline).
  */
 import type { DatabaseSync } from 'node:sqlite';
 

@@ -1,5 +1,5 @@
 /**
- * The seven-type mapping contract (`docs/architecture/observability.md`「映射契约(七类 + 兜底)」):
+ * The seven-type mapping contract:
  * every mapped span's name is rebuilt from its template, carries `gen_ai.operation.name` where the
  * type has one and `balsa.span.type` always; `agent-step` alone is CLIENT kind and carries the
  * request/usage/response attributes. Open types pass their name through untouched. GenAI semconv

@@ -1,5 +1,5 @@
 /**
- * Prompt-payload mapping (`docs/architecture/observability.md`「载荷映射」): `ModelMessage[]`
+ * Prompt-payload mapping: `ModelMessage[]`
  * splits into `gen_ai.system_instructions` (system messages) and `gen_ai.input.messages`
  * (user / assistant / tool), both as the JSON-text form the span attributes allow; parts convert
  * to the GenAI semconv part vocabulary, unrecognized parts degrade to a text part of their JSON.
@@ -27,7 +27,7 @@ function asTextOrJson(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-/** Reduces one `ModelToolResultOutput` member to text or JSON text (「同规则降为文本或 JSON 文本」). */
+/** Reduces one `ModelToolResultOutput` member to text or JSON text. */
 function toolResultText(output: unknown): string {
   if (typeof output !== 'object' || output === null) return asTextOrJson(output);
   const { type, ...rest } = output as { type?: string; [field: string]: unknown };

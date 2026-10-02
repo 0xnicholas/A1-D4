@@ -37,7 +37,7 @@
  * opens `workflow-run` / `workflow-step` spans at the same
  * boundaries (run span: input = the validated trigger input, output = the outcome envelope; step
  * span: name = step id, one per execution), and an absent tracer means no span object is ever
- * created. Spec: `docs/architecture/workflows.md`.
+ * created.
  */
 export { createStep } from './step.js';
 export type { ResumeDataOf, Step, StepConfig, StepContext, SuspendPayloadOf } from './step.js';

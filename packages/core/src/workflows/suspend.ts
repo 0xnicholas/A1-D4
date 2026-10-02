@@ -1,7 +1,7 @@
 import type { WorkflowIterationSite } from './snapshot.js';
 
 /**
- * The suspend control signal (`docs/architecture/workflows.md`「suspend/resume 与快照」): calling
+ * The suspend control signal (suspend/resume and snapshots): calling
  * `suspend(payload)` never returns — it throws this branded signal, which unwinds the step and every
  * block around it (retries never re-run it, `foreach` and the loops never record it as a failure) up
  * to the walker's entry loop. There the walker turns it into the run's `suspended` outcome and a

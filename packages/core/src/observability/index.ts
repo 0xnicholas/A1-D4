@@ -8,7 +8,7 @@
  * exporters: console (development debugging) and memory (ring buffer, the assertion surface).
  * OTel mapping does not live here — it is a capability package (ADR-0009).
  *
- * Spec: `docs/architecture/observability.md`; decisions: ADR-0009.
+ * Decisions: ADR-0009.
  */
 export { createTracer } from './tracer.js';
 export type { ParentSpanRef, Sampler, StartSpanOptions, Tracer, TracerConfig } from './tracer.js';

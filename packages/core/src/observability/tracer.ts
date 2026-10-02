@@ -14,7 +14,7 @@ export interface ParentSpanRef {
 }
 
 /**
- * The sampling modes (`docs/architecture/observability.md`): which roots are traced. Decided once
+ * The sampling modes: which roots are traced. Decided once
  * when a root span is created; every descendant inherits the decision, and a rejected root yields
  * `NoOpSpan` for the whole subtree.
  */
@@ -25,9 +25,9 @@ export type Sampler =
   | ((parent: ParentSpanRef | undefined) => boolean);
 
 /**
- * What one manual span is started with. `parent` is the explicit context propagation of
- * `docs/architecture/observability.md`: the framework passes the live parent span down the
- * execution tree — no AsyncLocalStorage, and a user-created span inside a tool does the same.
+ * What one manual span is started with. `parent` is explicit context propagation: the framework
+ * passes the live parent span down the execution tree — no AsyncLocalStorage, and a user-created
+ * span inside a tool does the same.
  */
 export interface StartSpanOptions {
   /** Human-readable operation name. */
@@ -66,7 +66,7 @@ export interface StartSpanOptions {
   hideOutput?: boolean;
 }
 
-/** The tracer (`docs/architecture/observability.md`「Tracer」). */
+/** The tracer. */
 export interface Tracer {
   /** Starts a span and returns its live handle. */
   startSpan(options: StartSpanOptions): Span;
@@ -94,7 +94,7 @@ export interface TracerConfig {
 }
 
 /**
- * The observability entry point (`docs/architecture/observability.md`): one tracer per application
+ * The observability entry point: one tracer per application
  * (or per composition root), injected into the subsystems that instrument. Subsystems never reach
  * for a global.
  */

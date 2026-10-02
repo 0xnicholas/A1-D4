@@ -1,6 +1,5 @@
 /**
- * The closed frame vocabulary of the AI SDK interop package (spec: `docs/architecture/model.md`
- * 「AI SDK 互操作能力包(M5 设计冻结)」).
+ * The closed frame vocabulary of the AI SDK interop package.
  *
  * The target protocol is the `ai@7` generation of the UI message stream — its vocabulary plus the
  * wire-level `x-vercel-ai-ui-message-stream: v1` header — and nothing else: one generation, no

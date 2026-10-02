@@ -5,7 +5,7 @@ import type { FinishReason, Usage } from '../model/chunks.js';
  *
  * `type` is an open string: users name their own spans freely. The framework writes exactly these
  * seven, each at its documented automatic-instrumentation boundary
- * (`docs/architecture/observability.md`「自动埋点」).
+ * (automatic instrumentation).
  */
 export const AGENT_RUN_SPAN = 'agent-run';
 export const AGENT_STEP_SPAN = 'agent-step';
@@ -15,7 +15,7 @@ export const WORKFLOW_STEP_SPAN = 'workflow-step';
 export const MEMORY_RECALL_SPAN = 'memory-recall';
 export const MEMORY_SAVE_SPAN = 'memory-save';
 
-/** A span type: an open string (`docs/architecture/observability.md`). */
+/** A span type: an open string. */
 export type SpanType = string;
 
 /**
@@ -90,7 +90,7 @@ export type SpanError = {
 };
 
 /**
- * The data fields of a span (`docs/architecture/observability.md`「Span 模型」) — id / traceId are
+ * The data fields of a span (the span model) — id / traceId are
  * OTel-compatible hex, input/output are first-class citizens (a prompt is the main subject of LLM
  * debugging), `attributes` are narrowed by type and `metadata` is the user's open bag.
  */

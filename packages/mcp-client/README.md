@@ -24,7 +24,7 @@ await client.refresh();                      // re-list remotely, swap the snaps
 await client.close();                        // tear down (idempotent)
 ```
 
-- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/tools.md) —「MCP client 能力包」
+- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/tools.md)
 - SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
 - Decisions: [ADR-0008](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 - Paired example (server + client in one script): [`examples/mcp-tools`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/mcp-tools)

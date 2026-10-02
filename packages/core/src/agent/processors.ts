@@ -3,7 +3,7 @@ import type { ModelPrompt } from '../model/contract.js';
 import type { AgentStep, RequestContext } from './types.js';
 
 /**
- * The Processor surface (`docs/architecture/agent.md`「扩展点:Processor」, ADR-0005): the Agent's
+ * The Processor surface (the Processor extension point, ADR-0005): the Agent's
  * only cross-cutting extension point. Guardrails, evals, redaction, rate limiting and the like are
  * processors — never fields of the Agent class.
  *

@@ -1,6 +1,5 @@
 /**
- * The adapter's one connection and the lifecycle around it (`docs/architecture/storage.md`
- * 「SQLite 参考 adapter(M5 设计冻结)」生命周期与并发口径): open → `journal_mode=WAL` /
+ * The adapter's one connection and the lifecycle around it: open → `journal_mode=WAL` /
  * `synchronous=NORMAL` / `foreign_keys=ON` / busy timeout → migrations. One connection per storage
  * instance, never a pool, never exposed — a host wanting raw SQL opens its own connection on the
  * same path (WAL makes that safe).
@@ -10,9 +9,9 @@
  *
  * The busy timeout is set with the `PRAGMA` rather than the constructor's `timeout` option alone:
  * the option only landed in Node 22.16 and is **silently ignored** on the engines floor (22.13,
- * ADR-0002 M5 修订), which would leave cross-process writes with no wait at all. The option is
- * still passed — on newer Nodes it arms the busy handler from the moment the file opens — and the
- * pragma then holds the same value on every supported runtime.
+ * the floor ADR-0002 froze for M5), which would leave cross-process writes with no wait at all. The
+ * option is still passed — on newer Nodes it arms the busy handler from the moment the file opens —
+ * and the pragma then holds the same value on every supported runtime.
  */
 import { DatabaseSync } from 'node:sqlite';
 import { LATEST_VERSION, MIGRATIONS } from './schema.js';
@@ -98,7 +97,7 @@ export function createLifecycle(path: string, busyTimeoutMs: number): SqliteLife
   };
 }
 
-/** Open → pragmas → readback guard (`storage.md`「生命周期与并发口径」). */
+/** Open → pragmas → readback guard (the connection lifecycle and concurrency). */
 function configure(db: DatabaseSync, path: string, busyTimeoutMs: number): void {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');

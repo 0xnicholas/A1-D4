@@ -13,9 +13,6 @@
  * validation / execute throw / output validation) into `isError` results, and owns the wire.
  * This package only synthesizes the six-piece `ToolContext`, projects results
  * (`structuredContent` + text), and validates tool names at construction.
- *
- * Spec: `docs/architecture/tools.md`「MCP server 能力包」. Facts on the SDK surface:
- * `docs/research/mcp-v2-sdk-surface.md`.
  */
 
 import { createMcpHandler, McpServer as SdkMcpServer } from '@modelcontextprotocol/server';
@@ -81,13 +78,12 @@ export interface McpServer {
 }
 
 /**
- * Creates an MCP server for a tool container (spec: `docs/architecture/tools.md`「MCP server
- * 能力包」).
+ * Creates an MCP server for a tool container.
  *
  * Tool names are validated up front — `[A-Za-z0-9_.-]{1,128}`, the MCP spec's SHOULD charset —
  * and an illegal key throws here, before any request is served: a key legal in the agent domain
- * is not necessarily legal over MCP. The fact base `docs/research/mcp-v2-sdk-surface.md` found no
- * charset validation in the SDK itself, so the check lives here.
+ * is not necessarily legal over MCP. The SDK itself does no charset validation, so the check
+ * lives here.
  *
  * Each request/connection gets a fresh SDK server with the whole container registered (the SDK
  * factory model); the factory is cheap and side-effect free, and the container is snapshotted at
@@ -137,7 +133,7 @@ const MCP_TOOL_NAME = /^[A-Za-z0-9_.-]{1,128}$/;
 function assertMcpToolName(name: string): void {
   if (MCP_TOOL_NAME.test(name)) return;
   throw new Error(
-    `Tool name "${name}" is not valid over MCP: expected 1-128 characters from [A-Za-z0-9_.-] (docs/architecture/tools.md「MCP server 能力包」).`,
+    `Tool name "${name}" is not valid over MCP: expected 1-128 characters from [A-Za-z0-9_.-].`,
   );
 }
 
@@ -182,7 +178,7 @@ async function invokeTool(tool: Tool, input: unknown, ctx: ServerContext): Promi
 }
 
 /**
- * The six pieces MCP can supply (spec:「ToolContext 合成」): `signal` is the request's, and
+ * The six pieces MCP can supply: `signal` is the request's, and
  * `toolCallId` is the JSON-RPC request id stringified (an identity across the connection, not a
  * stable one). `runId` / `traceId` / `spanId` have no MCP counterpart and stay empty, the same
  * encoding as no-attached-tracer runs; `requestContext` is the frozen empty bag with the
@@ -202,7 +198,7 @@ function toolContext(ctx: ServerContext): ToolContext {
 }
 
 /**
- * The text rendered alongside `structuredContent` (spec:「结果与错误投影」): a string passes
+ * The text rendered alongside `structuredContent`: a string passes
  * through verbatim, everything else is JSON; a stringify miss (`undefined`, functions, symbols)
  * degrades to `String(value)` so the text block is never absent.
  */

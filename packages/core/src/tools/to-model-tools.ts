@@ -4,7 +4,7 @@ import type { Tool } from './tool.js';
 
 /**
  * Turns the Agent's tool container into the tool list the model receives: one provider function
- * tool per `Record` entry, its key being the tool name (`docs/architecture/tools.md`).
+ * tool per `Record` entry, its key being the tool name.
  *
  * `inputSchema` is asked for JSON Schema through the Standard JSON Schema interface — the
  * draft-07 target, matching the model contract's tool schema subset — and passed through

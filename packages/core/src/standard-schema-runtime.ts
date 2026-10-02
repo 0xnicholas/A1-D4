@@ -7,8 +7,8 @@ import type { StandardSchema, StandardSchemaV1 } from './standard-schema.js';
  * output — runs that validation through here, and every boundary that hands a schema to a model
  * asks this module for its JSON Schema. One implementation keeps the answer the same everywhere.
  *
- * Internal seam — not exported from any entry. Consumers: `docs/architecture/tools.md`「校验与错误语义」
- * (tool input / output schemas) and `docs/architecture/agent.md`「执行语义」(structured output).
+ * Internal seam — not exported from any entry. Consumers: tool input / output schema validation
+ * and structured output.
  */
 
 /** A validation outcome: the schema's value, or the issues that rejected the input. */

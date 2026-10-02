@@ -1,5 +1,5 @@
 /**
- * `MemoryStore` over SQLite (`docs/architecture/storage.md`「查询的 SQL 形状」): the core's
+ * `MemoryStore` over SQLite (the SQL shape of the queries): the core's
  * in-memory store is the semantic reference and these queries are its translation — same ordering,
  * same cursor rules, same `limit` anchoring, same upserts. Both conditional resource methods are
  * implemented, so the object is a `WorkingMemoryStore` and `supportsWorkingMemory` reads true.
@@ -10,7 +10,7 @@
  * - `messages.thread_id` is a real foreign key with `ON DELETE CASCADE`. The memory write path
  *   always creates the thread first, so the happy path never notices; a direct port caller that
  *   skips `saveThread` gets the constraint error where the reference would have accepted the row
- *   (the spec's「须知的语义分歧」).
+ * (the semantic divergences worth knowing).
  */
 import type {
   ListMessagesQuery,

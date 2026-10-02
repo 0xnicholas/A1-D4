@@ -11,9 +11,6 @@
  * occurrence *strictly after* `from` — milliseconds stripped, `null` when the schedule is
  * exhausted — which is the framework's occurrence semantics exactly. Validation happens once, at
  * construction (see `cron`), and `next` is a pure computation afterwards.
- *
- * Spec: `docs/architecture/harness.md`「croner 封装能力包」. Facts on croner's API and DST
- * behavior: `docs/research/croner.md`.
  */
 import { Cron } from 'croner';
 

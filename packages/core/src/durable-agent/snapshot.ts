@@ -2,8 +2,8 @@ import type { ToolCallChunk } from '../model/chunks.js';
 import type { ModelMessage } from '../model/contract.js';
 
 /**
- * The durable run's snapshot shapes and their storage port (`docs/architecture/harness.md`
- * 「Durable agents」/「AgentRunSnapshotStore」;ADR-0010). Shapes are spec-pinned and JSON-only: the
+ * The durable run's snapshot shapes and their storage port (the durable agent's snapshot storage,
+ * ADR-0010). Shapes are pinned and JSON-only: the
  * store receives serializable values — large data is referenced, never embedded.
  *
  * Durable suspension happens at one boundary only — the approval gate of a tool-calling step — and
@@ -19,7 +19,7 @@ import type { ModelMessage } from '../model/contract.js';
 
 /**
  * What a suspended run held back at its suspension point — the wrapper's own state, persisted
- * alongside the message list (`harness.md`「挂起点」). It is what `resume` reads: the held calls
+ * alongside the message list (the suspension point). It is what `resume` reads: the held calls
  * are the ones the loop executes (or answers) when the run continues, no model round trip spent
  * re-deriving them from the assistant message the prompt already ends with.
  */
@@ -40,12 +40,12 @@ export interface AgentRunSuspendPayload {
 }
 
 /**
- * One run's JSON-serializable state at its suspension point (`harness.md`「AgentRunSnapshotStore」):
+ * One run's JSON-serializable state at its suspension point (the snapshot-store port):
  * the run identity (the key `resume(runId)` loads by), the message list the run stopped at — the
  * loop's prompt plus the suspended step's own raw assistant message (its text, its calls, any
  * provider-executed results) — the count of steps the run had completed, the suspension payload,
  * and the trace the run's spans were exported under, so a resume continues the same trace
- * (`docs/architecture/observability.md`:一次 HITL 交互 = 同 trace 多 span).
+ * (one HITL interaction is several spans on one trace).
  * The shape is frozen: evolution of the port is additive-only (ADR-0010).
  */
 export interface AgentRunSnapshot {
@@ -68,7 +68,7 @@ export interface AgentRunSnapshot {
 }
 
 /**
- * The durable run snapshot storage port (`harness.md`「AgentRunSnapshotStore」): two methods,
+ * The durable run snapshot storage port (the snapshot-store port): two methods,
  * JSON-only snapshots, isomorphic to `WorkflowSnapshotStore`. Core ships an in-memory default — a
  * durable agent without storage keeps its snapshots for this process only. Evolution is
  * additive-only (ADR-0010): new capabilities arrive as optional methods plus capability flags

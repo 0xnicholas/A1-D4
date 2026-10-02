@@ -21,7 +21,7 @@ storage.init();             // idempotent: open + pragmas (WAL / synchronous NOR
 await storage.close();      // idempotent; after it every port method throws
 ```
 
-- Spec: [`docs/architecture/storage.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/storage.md) —「SQLite 参考 adapter(M5 设计冻结)」
+- Spec: [`docs/architecture/storage.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/storage.md)
 - Driver facts this package builds on: [`docs/research/sqlite-driver-landscape.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/sqlite-driver-landscape.md)
 - Decisions: [ADR-0010](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0010-storage-port-strategy.md) (storage ports), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 - Example: [`examples/sqlite-resume`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/sqlite-resume) — a durable run suspends in one process and a new process resumes it from the file

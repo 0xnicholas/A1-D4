@@ -4,7 +4,7 @@ import type { Tool } from '../tools/index.js';
 import type { Memory } from './memory.js';
 
 /**
- * Working memory (spec: `docs/architecture/memory.md`「工作记忆(可选,resource 作用域)」): one small
+ * Working memory: one small
  * block of structured data per resource — a user profile, preferences, current goals — that persists
  * across conversations and is updated by the model through a tool call.
  *
@@ -59,7 +59,7 @@ export async function loadRunWorkingMemory(
 }
 
 /**
- * The merge semantics of working memory (spec「工作记忆」): patch objects merge deeply into the
+ * The merge semantics of working memory: patch objects merge deeply into the
  * current value, a `null` field deletes the field, arrays are replaced whole, and every other value
  * is overwritten. A field the patch does not mention — or carries as `undefined` — keeps its value.
  *
@@ -81,7 +81,7 @@ export function mergeWorkingMemory(current: unknown, patch: unknown): unknown {
 }
 
 /**
- * The framework-attached update tool (spec「更新只走 tool-call」): the model's only write path to
+ * The framework-attached update tool: the model's only write path to
  * working memory. Its arguments are the patch itself (`updateWorkingMemory({ tone: 'terse' })`);
  * its result is the merged, schema-validated value — the model reads back what its patch produced.
  *
@@ -110,8 +110,7 @@ function updateWorkingMemoryTool(memory: Memory, resource: string, schema: Stand
  * The passthrough is what merge semantics need: the tool's arguments are a *patch*, partial by
  * design, which the configured schema — the shape of the *complete* value — cannot judge. The
  * merged value is validated inside the tool's `execute` instead, where a failure becomes the usual
- * error tool result fed back to the model (the MCP-bridge pattern of
- * `docs/architecture/tools.md`「桥接工具的 schema」).
+ * error tool result fed back to the model (the MCP-bridge pattern).
  */
 function updateWorkingMemorySchema(schema: StandardSchema): StandardSchema {
   const standard = schema['~standard'];
@@ -130,7 +129,7 @@ function updateWorkingMemorySchema(schema: StandardSchema): StandardSchema {
 }
 
 /**
- * The working memory as the model receives it (spec「注入」): a system message of its own, appended
+ * The working memory as the model receives it: a system message of its own, appended
  * after the instructions — the instructions themselves are never rewritten. JSON is the shape the
  * schema describes; the pointer line is what makes the update tool discoverable.
  */

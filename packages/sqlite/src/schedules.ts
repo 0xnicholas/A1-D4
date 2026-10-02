@@ -1,5 +1,5 @@
 /**
- * `ScheduleStore` over SQLite (`docs/architecture/storage.md`「查询的 SQL 形状」): the in-memory
+ * `ScheduleStore` over SQLite (the SQL shape of the queries): the in-memory
  * reference's `nextFireAt ?? Infinity` ordering is translated with a sentinel —
  * `ORDER BY (next_fire_at IS NULL) ASC, next_fire_at ASC, id ASC` for the order and
  * `(COALESCE(next_fire_at, 9223372036854775807), id) > (COALESCE(?, sentinel), ?)` for the cursor,

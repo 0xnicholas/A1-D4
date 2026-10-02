@@ -7,7 +7,7 @@ import type { WorkflowSnapshotStore } from './snapshot.js';
 import type { Step } from './step.js';
 
 /**
- * The workflow definition surface (`docs/architecture/workflows.md`「Workflow 与 builder」):
+ * The workflow definition surface (workflow definitions and the builder):
  * a mutable chainable builder whose seven operators each push one flat `{ type, … }` entry, and
  * `.commit()` freezing the definition. There is no DAG — execution is a `for` loop over the entry
  * list (`walker.ts`).
@@ -29,7 +29,7 @@ export interface WorkflowConfig<
   /** The workflow's declared output schema. */
   readonly outputSchema: TOutputSchema;
   /**
-   * Tracer the run and its step spans hang under (`docs/architecture/observability.md`); absent =
+   * Tracer the run and its step spans hang under; absent =
    * no span object is ever created.
    */
   readonly tracer?: Tracer | undefined;
@@ -62,7 +62,7 @@ export interface Workflow<
   /** The frozen, flat entry list the walker interprets. */
   readonly entries: readonly WorkflowEntry[];
   /**
-   * Creates a run of this workflow (`docs/architecture/workflows.md`「Run」): identity now, execution
+   * Creates a run of this workflow (the run lifecycle): identity now, execution
    * on `start`. The workflow's declared IO schemas type the run's input and output.
    */
   createRun(

@@ -33,8 +33,7 @@ import type { WorkflowBuilder, WorkflowConfig } from './workflows/workflow.js';
  * without a slot adds nothing to the objects it builds (a missing storage slot means the core's
  * in-memory default, not a wider contract).
  *
- * Specs: `docs/architecture/observability.md`「组合根分发」 + `docs/architecture/storage.md`
- *「组合根」;decision: ADR-0002.
+ * Decisions: ADR-0002.
  */
 
 /**
@@ -113,7 +112,7 @@ export interface App {
 }
 
 /**
- * Creates the composition root (`docs/architecture/observability.md`「组合根分发」): the optional
+ * Creates the composition root: the optional
  * thin assembly point that distributes cross-cutting dependencies to the subsystems attached to
  * it. Distributing does not replace any subsystem's standalone surface — the same objects remain
  * fully usable via explicit `new` without an app.

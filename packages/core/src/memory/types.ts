@@ -1,7 +1,7 @@
 import type { ModelMessage } from '../model/contract.js';
 
 /**
- * Stored record shapes of the memory subsystem (spec: `docs/architecture/memory.md` 存储 port 节).
+ * Stored record shapes of the memory subsystem.
  *
  * Timestamps are caller-owned: the port persists records exactly as given, so every adapter sees
  * the same contract (`saveThread` / `saveResource` are upserts of full records).

@@ -2,7 +2,7 @@ import type { RequestContext } from '../agent/types.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 
 /**
- * The context a tool's `execute` receives (`docs/architecture/tools.md`「执行上下文」): the
+ * The context a tool's `execute` receives (the tool execution context): the
  * six pieces the framework guarantees inside an agent loop. The model-generated `input` and the
  * framework-provided `ctx` are two separate parameters on purpose — no in-bag mixing (unlike the
  * workflow `StepContext`).
@@ -32,7 +32,7 @@ export interface ToolContext {
 }
 
 /**
- * The tool definition surface (`docs/architecture/tools.md`): four fields — `description`,
+ * The tool definition surface: four fields — `description`,
  * optional `inputSchema` / `outputSchema`, and `execute` — nothing beyond it (ADR-0008).
  *
  * Tools carry no id/name: the name of a tool is its key in the Agent's `Record<string, Tool>`
@@ -90,7 +90,7 @@ export type SchemaOutput<TSchema> = TSchema extends StandardSchema
 
 /**
  * Defines a tool — a factory for typing only, returning a frozen plain object. Hand-written
- * literals are equally valid (`docs/architecture/tools.md`), but only the factory infers
+ * literals are equally valid, but only the factory infers
  * `execute`'s input/output from the schemas: with it, an object literal in `inputSchema`
  * determines the type of `input`.
  *

@@ -7,10 +7,10 @@ import type {
 } from './types.js';
 
 /**
- * The memory storage port (spec: `docs/architecture/memory.md` 存储 port 节): six required
+ * The memory storage port: six required
  * methods plus the conditional resource pair, required only when working memory is enabled.
  *
- * Evolution discipline is additive-only (ADR-0010, `docs/architecture/storage.md`): required
+ * Evolution discipline is additive-only (ADR-0010): required
  * signatures never change; new capabilities arrive as optional methods whose existence is the
  * capability declaration — see `supportsWorkingMemory` for the detection convention.
  */
@@ -40,7 +40,7 @@ export interface WorkingMemoryStore extends MemoryStore {
 }
 
 /**
- * The capability-flag detection convention (`docs/architecture/storage.md` 扩展面): the
+ * The capability-flag detection convention (the port extension surface): the
  * conditional resource methods count as a pair — a store declares working-memory support only
  * when both exist; a half implementation is treated as absent (the caller degrades or throws).
  */

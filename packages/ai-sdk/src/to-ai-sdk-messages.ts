@@ -1,6 +1,5 @@
 /**
- * `toAISdkMessages` — thread history read back as UI messages
- * (spec: `docs/architecture/model.md`「历史回读:`toAISdkMessages`」).
+ * `toAISdkMessages` — thread history read back as UI messages.
  *
  * A user message maps to one UI message; the maximal assistant/tool run after it folds into a
  * single assistant UI message — `step-start` parts separate its assistant turns, tool parts carry

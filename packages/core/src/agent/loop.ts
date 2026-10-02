@@ -24,7 +24,7 @@ import type { Processor } from './processors.js';
 import { toStructuredObject } from './structured-output.js';
 import type { AgentGenerateResult, AgentRunResume, AgentStep, AgentStepBoundary, AgentStepBoundaryEvent, RequestContext, StructuredOutputConfig } from './types.js';
 
-/** How many model calls one run may make when the caller pins no `maxSteps` (`agent.md`「执行语义」). */
+/** How many model calls one run may make when the caller pins no `maxSteps` (execution semantics). */
 export const DEFAULT_MAX_STEPS = 5;
 
 /** Everything the built-in loop needs for one run. */
@@ -32,7 +32,7 @@ export interface AgentLoopOptions {
   /**
    * The run's fallback chain, in array order — at least one candidate (a run with a single model is
    * a one-element chain). Every model call walks it: a candidate is abandoned for the next one only
-   * when it fails before producing a chunk (`docs/architecture/model.md`「model 字段形状」).
+   * when it fails before producing a chunk (the accepted `model` shapes).
    */
   readonly models: readonly Model[];
   /** The run's initial prompt (instructions + input); the loop extends it with each round trip. */
@@ -54,7 +54,7 @@ export interface AgentLoopOptions {
   readonly requestContext: RequestContext;
   /**
    * The run's step-boundary seam (`AgentRunOptions.stepBoundary`) — the harness wrappers' single
-   * loop extension point (`docs/architecture/harness.md`). Absent = the loop runs exactly as
+   * loop extension point. Absent = the loop runs exactly as
    * before: the zero-overhead guarantee the harness spec pins on the bare agent.
    */
   readonly boundary?: AgentStepBoundary | undefined;
@@ -69,9 +69,9 @@ export interface AgentLoopOptions {
   /**
    * The run's structured-output option (`AgentRunOptions.structuredOutput`), present only when the
    * run asked for one: the run's terminal text is parsed as JSON and validated against the schema,
-   * strictly, and the validated value settles the run's `object` (`docs/architecture/agent.md`
-   *「执行语义」). The schema is also what the run's model calls carry as `responseFormat` — built by
-   * the agent before the loop starts.
+   * strictly, and the validated value settles the run's `object` (execution semantics). The schema
+   * is also what the run's model calls carry as `responseFormat` — built by the agent before the
+   * loop starts.
    */
   readonly structuredOutput?: StructuredOutputConfig | undefined;
   /**
@@ -86,7 +86,7 @@ export interface AgentLoopOptions {
 }
 
 /**
- * The run's memory wiring (`docs/architecture/memory.md`「身份模型」+「消息历史」): the instance,
+ * The run's memory wiring (the identity model and message history): the instance,
  * the thread/resource identity of the run, and the run's own input messages — persisted with the
  * first step's record, so a recall never loses what the user said. Assembled by the agent from
  * `AgentConfig.memory` and the per-call `memory` option; absent = no memory I/O.
@@ -105,7 +105,7 @@ export interface AgentRunMemory {
 }
 
 /**
- * The observability wiring of one run (`docs/architecture/observability.md`「自动埋点」): the tracer
+ * The observability wiring of one run (automatic instrumentation): the tracer
  * plus the run's root span. The agent creates it before memory recall — the root span has to exist
  * for the recall span to hang under it — and owns its lifecycle (error / end) at the run boundary;
  * the loop hangs its step / tool / memory-save spans under it and reports the run's terminal output
@@ -119,7 +119,7 @@ export interface AgentTracing {
 }
 
 /**
- * The built-in agent loop (`docs/architecture/agent.md`「Agent loop」), as a generator over the
+ * The built-in agent loop, as a generator over the
  * core's chunk protocol.
  *
  * One step at a time: call the model, yield its chunks, then — if the step asked for client-side
@@ -131,7 +131,7 @@ export interface AgentTracing {
  * `finish` chunk is reported as `'tool-calls'` — the terminal reason for a cap-truncated run
  * (`chunks.ts`).
  *
- * **Fallback chain** (`docs/architecture/model.md`「model 字段形状」): a step's model call walks
+ * **Fallback chain** (the accepted `model` shapes): a step's model call walks
  * `models` in array order, and abandons a candidate for the next one only while it has produced no
  * chunk yet. A mid-stream failure propagates instead — partial output has already reached the
  * caller, and switching would splice two models' answers together — and so does the failure of a
@@ -139,7 +139,7 @@ export interface AgentTracing {
  * step whose whole chain failed ends with the last attempt's error when there was only one, or with
  * a `ModelFallbackError` carrying every candidate's own error otherwise.
  *
- * Errors never abort a run (`docs/architecture/tools.md`「校验与错误语义」): input validation
+ * Errors never abort a run (validation and error semantics): input validation
  * failures, `execute` throws, output validation failures and calls to tools the container does not
  * hold all become an `isError` tool result fed back to the model, which decides whether to recover
  * or give up.
@@ -147,7 +147,7 @@ export interface AgentTracing {
  * Provider-executed tool calls are not executed again: a call whose `toolCallId` already has a
  * result in the step (the provider executed it) is skipped.
  *
- * **Processors** (`docs/architecture/agent.md`「扩展点:Processor」): `processOutputStep` runs once per
+ * **Processors** (the Processor extension point): `processOutputStep` runs once per
  * completed step, after its tools, and the record it returns is the run's authoritative one — it is
  * what the next prompt is built from and what the generator's return value reports. `processError`
  * runs where an error would surface: a model-call failure that ends the step (never a cancelled run)
@@ -177,7 +177,7 @@ export async function* runAgentLoop(
    * pending, or by the cap's last step. The run's terminal values are built after the loop, outside
    * the step boundary: a structured run validates its terminal text there, so a text that does not
    * become the schema's value fails the run without marking the model call that produced it (the
-   * call succeeded; the run's output contract did not — `docs/architecture/agent.md`「执行语义」).
+   * call succeeded; the run's output contract did not — execution semantics).
    */
   let settled: FinishReason | undefined;
 
@@ -235,9 +235,9 @@ export async function* runAgentLoop(
       // run span (see `startToolCallSpan` below).
       stepSpan = undefined;
     } else {
-      // The injection half of the step-boundary seam (`docs/architecture/harness.md`「Signals」): the
-      // queue check every step boundary — before each model call of the run, the first included
-      // (活跃 = 注入当前 run,下一 step 生效). Absent seam = no call, no copy, no spread: the bare
+      // The injection half of the step-boundary seam (signals): the queue check at every step
+      // boundary — before each model call of the run, the first included (injected into the current
+      // run, taking effect at the next step). Absent seam = no call, no copy, no spread: the bare
       // loop's behavior is untouched. The messages a hook returns ride at the end of the prompt —
       // after the event's snapshot — so they take part in the model call this step is about to make,
       // and in the step span's recorded input, which copies the prompt below.
@@ -381,8 +381,8 @@ export async function* runAgentLoop(
         pending.length > 0 && lastStep ? { ...finishChunk, finishReason: 'tool-calls' } : finishChunk;
       yield terminalFinish;
 
-      // The approval half of the step-boundary seam (`docs/architecture/harness.md`「Durable
-      // agents」): after the step's model output has fully streamed and before the framework
+      // The approval half of the step-boundary seam (durable agents): after the step's model output
+      // has fully streamed and before the framework
       // executes its pending calls — the only point where a gate can still hold them back. Absent
       // seam = the calls run exactly as before. The event's `messages` are the snapshot surface the
       // durable wrapper persists: the prompt plus this step's own vendor-shaped assistant message
@@ -413,8 +413,8 @@ export async function* runAgentLoop(
           pendingCalls: pending,
         });
         if (decision?.suspend === true) {
-          // Suspension is a normal terminal outcome, never an error (harness.md「Observability
-          // 锚点」): the pending calls do not execute, the step never completes — no processor hook,
+          // Suspension is a normal terminal outcome, never an error: the pending calls do not
+          // execute, the step never completes — no processor hook,
           // no memory save, nothing appended to the prompt — and the run settles with the pre-wired
           // `'suspended'` reason (`chunks.ts`), its root span ending normal under a status
           // attribute. The snapshot itself is the wrapper's to build and persist; the loop keeps
@@ -430,8 +430,9 @@ export async function* runAgentLoop(
       for (const call of pending) {
         const preAnswered = answers?.get(call.toolCallId);
         if (preAnswered !== undefined) {
-          // Answered by a resume's decision instead of executing — the approval gate's「用户拒绝」
-          // path. The result is the wrapper's, the loop only carries it into the record, the model
+          // Answered by a resume's decision instead of executing — the approval gate's
+          // user-rejected path. The result is the wrapper's; the loop only carries it into the
+          // record, the model
           // feedback and memory; nothing ran, so no tool span is created for it.
           results.push(preAnswered);
           yield preAnswered;
@@ -478,14 +479,14 @@ export async function* runAgentLoop(
       );
       steps.push(record);
       // The run span carries the run's terminal text — the processed record, same as the output
-      // object's `text` (`observability.md`「自动埋点」; the step span keeps the model's response).
+      // object's `text` (automatic instrumentation; the step span keeps the model's response).
       runSpan?.update({ output: record.text });
 
-      // Memory save (`memory.md`「消息历史」时机): once per completed step, after
+      // Memory save (message-history timing): once per completed step, after
       // `processOutputStep` — a processor's rewrite (redaction) is what lands in storage — with
       // the run's own input messages carried by the first step's save. A run with no memory
       // wiring does no I/O here at all; with one, the save gets its own `memory-save` span under
-      // the step's span (`observability.md`「自动埋点」).
+      // the step's span (automatic instrumentation).
       if (loopMemory !== undefined) {
         const stepMessages = toStepMessages(record, rawAnswered);
         await saveStepMessages(
@@ -528,14 +529,14 @@ export async function* runAgentLoop(
 
   const outcome = await runOutcome(steps, settled, structuredOutput);
   // A structured run's span reports the structured result — it is what the caller consumes
-  // (`observability.md`「自动埋点」: agent-run output is the terminal text or the structured result).
+  // (automatic instrumentation: agent-run output is the terminal text or the structured result).
   if (structuredOutput !== undefined) runSpan?.update({ output: outcome.object });
   return outcome;
 }
 
 /**
- * Persists one step's messages (`docs/architecture/memory.md`「消息历史」时机), wrapped in the
- * step's `memory-save` span (`docs/architecture/observability.md`「自动埋点」): the span hangs under
+ * Persists one step's messages (message-history timing), wrapped in the
+ * step's `memory-save` span (automatic instrumentation): the span hangs under
  * the span of the step that produced the messages — the explicit parent passed down, no
  * AsyncLocalStorage — carrying the batch as input and the messages as persisted (envelope
  * included) as output. A failed save records the error on the span and propagates, so the run
@@ -594,7 +595,7 @@ function stepBoundaryEvent(
 }
 
 /**
- * Starts one step span (`docs/architecture/observability.md`「自动埋点」): one model call of the
+ * Starts one step span (automatic instrumentation): one model call of the
  * run, hanging under the run's root span. Every attempt of a fallback chain gets its own span — a
  * failed attempt carries the failure, the attempt that serves the step carries its usage /
  * finishReason. The step's tool calls hang under the serving attempt's span, so that span stays
@@ -622,7 +623,7 @@ function startStepSpan(
 }
 
 /**
- * Starts one tool call's span (`docs/architecture/observability.md`「自动埋点」): a single tool
+ * Starts one tool call's span (automatic instrumentation): a single tool
  * execution inside the step that requested it. The span is the source of the tool context's
  * `traceId` / `spanId`, so an as-tool delegation can hang its run under it (ADR-0012).
  */
@@ -643,7 +644,7 @@ function startToolCallSpan(
 }
 
 /**
- * Runs one tool call under the normalized error semantics of `docs/architecture/tools.md`「校验与错误语义」:
+ * Runs one tool call under the normalized error semantics:
  * never throws, always answers the call — with the tool's result, or with the failure an error tool
  * result will answer. The failure is not formatted here: the loop hands its error through
  * `processError` first, then builds the model-facing message with the failure's own recipe.
@@ -723,7 +724,7 @@ interface ToolFailure {
 }
 
 /**
- * The six-piece context of a tool call (`docs/architecture/tools.md`「执行上下文」). Trace ids come
+ * The six-piece context of a tool call (the tool execution context). Trace ids come
  * from the call's span — real ids when a tracer is attached and the trace is sampled, empty strings
  * when there is no tracer or the sampler rejected the trace (`NoOpSpan` semantics); `toolCallId` is
  * the provider's real id.
@@ -899,7 +900,7 @@ function toJsonValue(value: unknown): JsonValue {
  * A structured run (`structuredOutput`) also settles `object` here: the very text `text` reports is
  * parsed as JSON and validated against the schema — strictly, so a terminal text that does not
  * become the schema's value fails the run with `StructuredOutputError`
- * (`docs/architecture/agent.md`「执行语义」). Validating the processed record keeps one truth: what a
+ * (execution semantics). Validating the processed record keeps one truth: what a
  * `processOutputStep` rewrote is both the run's text and the text the structured output is read from.
  */
 async function runOutcome(

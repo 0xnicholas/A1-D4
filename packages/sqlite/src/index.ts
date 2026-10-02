@@ -1,6 +1,6 @@
 /**
- * `@balsats/sqlite` — the first-party SQLite reference adapter (`docs/architecture/storage.md`
- * 「SQLite 参考 adapter(M5 设计冻结)」). One factory, one embedded file, all four storage ports:
+ * `@balsats/sqlite` — the first-party SQLite reference adapter. One factory, one embedded file, all
+ * four storage ports:
  * `memory` / `workflowSnapshots` / `agentRunSnapshots` / `schedules`, each a port the core defines
  * and this package implements — the core's types are untouched and every declared port extension is
  * implemented here (the package exports the extended interfaces).
@@ -11,7 +11,7 @@
  * same path (WAL makes that safe). `init()` (open + pragmas + migrations) and `close()` are
  * idempotent; the underlying driver is synchronous, so they are plain `void` methods — `await
  * storage.init()` from older docs still resolves immediately. Port methods throw until `init()` ran
- * and again after `close()`; the core never calls either (`storage.md`「连接生命周期」).
+ * and again after `close()`; the core never calls either (the connection lifecycle).
  *
  * Cross-process use: one file, WAL, busy timeout — writers serialize, readers don't block. Resume
  * de-duplication across processes rests on the caller using `compareAndSave`; the adapter keeps no

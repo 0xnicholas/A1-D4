@@ -1,6 +1,6 @@
 /**
- * The two snapshot ports and their full extension face (`docs/architecture/storage.md`
- * 「扩展实现(全做,签名冻结)」): `save` writes the whole snapshot as one JSON payload plus a
+ * The two snapshot ports and their full extension face (every extension method implemented, its
+ * signature frozen): `save` writes the whole snapshot as one JSON payload plus a
  * storage-side `updated_at` (write moment, list ordering / cursors only — never the record shape,
  * never CAS), `load` parses the payload back.
  *
@@ -11,7 +11,8 @@
  * (documented in the README; no version counters or hash columns exist).
  *
  * `list*` never projects `status`: the workflow snapshot status is read out of the payload with
- * `json_extract` (「记录能告诉你的不落列」), ordering is newest-suspended-first and the cursor is a
+ * `json_extract` (columns a record already implies are not stored), ordering is
+ * newest-suspended-first and the cursor is a
  * run id.
  */
 import type { AgentRunSnapshot, AgentRunSnapshotStore } from '@balsats/core/durable-agent';

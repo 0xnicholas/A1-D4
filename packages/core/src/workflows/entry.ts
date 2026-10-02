@@ -2,7 +2,7 @@ import type { DynamicArgument } from '../agent/types.js';
 import type { Step, StepContext } from './step.js';
 
 /**
- * The flat entry list (`docs/architecture/workflows.md`「Workflow 与 builder」): every builder
+ * The flat entry list (workflow definitions and the builder): every builder
  * operator pushes one `{ type, … }` entry, and the walker is a `for` loop over this array — there
  * is no DAG. The entries carry the definition's child steps; execution semantics live in the
  * walker (`walker.ts`), not here.
@@ -13,7 +13,7 @@ import type { Step, StepContext } from './step.js';
  */
 
 /**
- * A branch condition (`docs/architecture/workflows.md`「控制流算子」): the same parameter bag a
+ * A branch condition (control-flow operators): the same parameter bag a
  * step's `execute` receives, read-only in spirit; branches are evaluated in definition order and
  * the first truthy one runs.
  */
@@ -24,7 +24,7 @@ export type BranchCondition<TInputData = unknown> = (
 /**
  * A loop condition: the branch-condition bag plus `iterationCount` — the number of iterations
  * already completed — so a condition can cap the loop by throwing or by counting
- * (`docs/architecture/workflows.md`「控制流算子」). Its `inputData` is the value of the checkpoint:
+ * (control-flow operators). Its `inputData` is the value of the checkpoint:
  * the pending input for `dowhile` (checked before each iteration), the last output for `dountil`
  * (checked after each iteration).
  */
@@ -34,8 +34,8 @@ export type LoopCondition<TInputData = unknown> = (
 
 /**
  * A sleep duration: milliseconds, or a `DynamicArgument` resolver — the framework's dynamic
- * argument convention (`CONTEXT.md`「动态参数」), resolved once per sleep entry against the run's
- * request context so the `signal` reaches it. The tip is not visible to it: a delay consumes and
+ * argument convention, resolved once per sleep entry against the run's request context so the
+ * `signal` reaches it. The tip is not visible to it: a delay consumes and
  * produces no value.
  */
 export type SleepDuration = DynamicArgument<number>;

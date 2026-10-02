@@ -1,11 +1,11 @@
 import type { ScheduleListQuery, ScheduleRecord } from './types.js';
 
 /**
- * The schedules storage port (`docs/architecture/harness.md`「ScheduleStore」): the five methods
+ * The schedules storage port: the five methods
  * records live through, JSON-only records, isomorphic to the other three ports. Core ships an
  * in-memory default (`in-memory-store.ts`); real backends arrive as adapters of the unified family.
  *
- * Evolution is additive-only (ADR-0010, `docs/architecture/storage.md`): new capabilities arrive as
+ * Evolution is additive-only (ADR-0010): new capabilities arrive as
  * optional methods plus capability flags, never by changing these signatures.
  *
  * The port owns storage, not firing: no CAS, no claim, no lease — `tick` reads due records and the

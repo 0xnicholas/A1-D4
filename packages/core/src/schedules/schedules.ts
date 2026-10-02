@@ -6,7 +6,7 @@ import type { ScheduleStore } from './store.js';
 import type { ScheduleRecord, ScheduleSaveInput, ScheduleTarget } from './types.js';
 
 /**
- * The schedules subsystem (`docs/architecture/harness.md`「Schedules」): the record CRUD + `tick`
+ * The schedules subsystem: the record CRUD + `tick`
  * primitive. A schedule pairs a JSON-only record — persisted through the `ScheduleStore` port — with
  * the occurrence function that computes its `nextFireAt`; the function is registered in-process by
  * `save` (cron parsing is injected this way, so the core needs no cron dependency).
@@ -30,7 +30,7 @@ export interface SchedulesConfig {
   /**
    * The signals instance threaded targets ride (`ScheduleSignalTarget`). Required to save a threaded
    * target at all; the trigger then injects exactly as any other signal — wake the idle thread, or
-   * inject into the active run (`docs/architecture/harness.md`「Signals」).
+   * inject into the active run (signals).
    */
   readonly signals?: Signals;
 }
@@ -84,8 +84,7 @@ export interface Schedules {
 }
 
 /**
- * Creates the schedules entry object. See `Schedules` for the per-method semantics and
- * `docs/architecture/harness.md`「Schedules」for the spec.
+ * Creates the schedules entry object. See `Schedules` for the per-method semantics.
  */
 export function createSchedules(config: SchedulesConfig): Schedules {
   const { agents, signals } = config;

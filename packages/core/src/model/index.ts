@@ -5,7 +5,7 @@
  * plus the thin normalization layer that turns a model-native stream into chunks of the core's own
  * vocabulary.
  *
- * Spec: `docs/architecture/model.md`; decisions: ADR-0004.
+ * Decisions: ADR-0004.
  */
 export type {
   JsonObject,

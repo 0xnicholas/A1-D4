@@ -91,12 +91,11 @@ export class Agent {
    *
    * The built-in loop executes the tool calls a step requests (in call order), feeds the results
    * back to the model and repeats until a step requests no tool call or `maxSteps` is reached;
-   * per-call behavior is controlled through `AgentRunOptions` — see `docs/architecture/agent.md`
-   *「Agent loop」.
+   * per-call behavior is controlled through `AgentRunOptions`.
    *
    * `structuredOutput` asks for a structured answer: the model calls carry the schema as JSON
    * Schema and the run's terminal text must validate against it, strictly — the validated value is
-   * the result's `object` (`docs/architecture/agent.md`「执行语义」).
+   * the result's `object` (execution semantics).
    */
   stream<TSchema extends StandardSchema>(
     input: string | ModelMessage[],
@@ -144,16 +143,15 @@ export class Agent {
         options.memory,
         resumedPrompt === undefined ? inputMessages : [],
       );
-      // The run's root span is created before memory recall
-      // (`docs/architecture/observability.md`「自动埋点」): the recall span hangs under it, so the
+      // The run's root span is created before memory recall: the recall span hangs under it, so the
       // boundary has to exist first. The run owns the span's lifecycle from here — including the
       // exit paths that never reach the loop (recall, working-memory load and the input processors
       // all run below).
       const tracing = toTracing(tracer, options, name, requestContext.runId);
       const runSpan = tracing?.runSpan;
       try {
-        // Message history is recalled once per run, before the input processors run (`memory.md`
-        // 「消息历史」时机): the history is part of the prompt the model sees, and of what
+        // Message history is recalled once per run, before the input processors run: the history is
+        // part of the prompt the model sees, and of what
         // `processInput` observes. A run with no memory identity recalls nothing. Working memory is
         // loaded at the same boundary — it is the other half of what a memory-enabled run injects.
         const [history, workingMemory] = await Promise.all([
@@ -296,7 +294,7 @@ function toCallOptions(
 }
 
 /**
- * The request context of one run (`docs/architecture/agent.md`「定义表面」): the user's per-call
+ * The request context of one run (the definition surface): the user's per-call
  * properties plus framework-written `signal` / `runId`, which are written last so a per-call
  * property cannot hijack them. The framework-owned run options (`maxSteps` / `modelSettings` /
  * `providerOptions` / `stepBoundary` / `resume`) are execution controls, not context, and are left
@@ -352,7 +350,7 @@ function toMaxSteps(maxSteps: number | undefined): number {
  * Empty-string continuation ids mean "no trace", not a parent with an empty id: the tool context
  * encodes an untraced call as `traceId: ''` / `spanId: ''` (`NoOpSpan` / no tracer), and an as-tool
  * delegation passes them through verbatim — such a run starts its own trace instead of hanging off
- * a nonexistent parent (`docs/architecture/agent.md`「多 agent 组合」). An empty trace id voids the
+ * a nonexistent parent (multi-agent composition). An empty trace id voids the
  * whole pair (a parent outside a trace means nothing); an empty parent id only drops the parent.
  * A real parent id without any trace id is still left for the tracer to reject loudly.
  */
@@ -406,7 +404,7 @@ function withRunTools(
 }
 
 /**
- * Builds the run's prompt (`docs/architecture/agent.md`「执行语义」): the resolved instructions as
+ * Builds the run's prompt (execution semantics): the resolved instructions as
  * the system message, then working memory and the recalled message history — themselves system and
  * prompt messages — then the run's own input: the order the model sees and the input processors may
  * rewrite. The instructions are a message of their own and are never folded into another one.
@@ -428,8 +426,8 @@ function toPrompt(
 /**
  * Normalizes the run's input to prompt messages: a string becomes one user text message (the exact
  * shape the prompt carries), an array is kept as given. These are also the messages the first
- * memory save persists alongside the first step's record — `memory.md`「消息历史」时机:首轮含用户
- * 输入消息。
+ * memory save persists alongside the first step's record — message-history timing: the first turn
+ * carries the user's input messages.
  */
 function toInputMessages(input: string | ModelMessage[]): ModelMessage[] {
   return typeof input === 'string'
@@ -459,8 +457,8 @@ function toResumedPrompt(
 }
 
 /**
- * Resolves the run's memory wiring (`AgentConfig.memory` × the per-call `memory` option,
- * `docs/architecture/memory.md`「身份模型」): no instance and no option = a stateless run, no
+ * Resolves the run's memory wiring (`AgentConfig.memory` × the per-call `memory` option): no
+ * instance and no option = a stateless run, no
  * instance but an option = a call-time error, instance plus option = the run's memory identity.
  * A `memory` option with either field missing is rejected the same way — the identity is explicit,
  * never defaulted.
@@ -490,7 +488,7 @@ function toRunMemory(
 
 /**
  * Recalls the run's message history, wrapped in its `memory-recall` span
- * (`docs/architecture/observability.md`「自动埋点」): once per run, before the input processors. The
+ * (automatic instrumentation): once per run, before the input processors. The
  * span hangs under the run's root span — the explicit parent passed down the execution tree, no
  * AsyncLocalStorage — carrying the query as input and the recalled messages as output (storage
  * envelope included). A failed recall records the error on the span and propagates, so the run

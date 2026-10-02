@@ -9,7 +9,7 @@ export interface MemoryExporterOptions {
 
 /**
  * The memory exporter: keeps the tracing events in a bounded ring buffer, for tests and in-process
- * assertions (`docs/architecture/observability.md`「Exporter 清单」). It is the specified assertion
+ * assertions (the exporter inventory). It is the specified assertion
  * surface for the observability kernel — tests assert event order, span trees and lifetimes here.
  */
 export interface MemoryExporter extends ObservabilityExporter {
@@ -25,7 +25,7 @@ export interface MemoryExporter extends ObservabilityExporter {
 }
 
 /**
- * Creates the memory exporter (`docs/architecture/observability.md`「Exporter 清单」): a ring buffer
+ * Creates the memory exporter (the exporter inventory): a ring buffer
  * with `capacity` slots (default 1000). Once full, each new event evicts the oldest.
  */
 export function memoryExporter(options: MemoryExporterOptions = {}): MemoryExporter {

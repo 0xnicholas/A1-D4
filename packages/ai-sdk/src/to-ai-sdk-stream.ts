@@ -1,6 +1,5 @@
 /**
- * `toAISdkStream` — the core's chunk stream as UI message stream body frames
- * (spec: `docs/architecture/model.md`「转换器:`toAISdkStream`」).
+ * `toAISdkStream` — the core's chunk stream as UI message stream body frames.
  *
  * The converter takes any `AsyncIterable<Chunk>` — an agent run, a durable run, a signals
  * subscription, all the same face — and yields this package's closed frame union. It produces

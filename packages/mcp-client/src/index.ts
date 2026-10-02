@@ -16,9 +16,6 @@
  * era negotiation (default raised to `'auto'`: probe `server/discover`, fall back to the 2025
  * handshake), the 60s per-request timeout, `inputRequired.autoFulfill: false` — is the SDK's
  * own semantics, configured once here and never re-wrapped.
- *
- * Spec: `docs/architecture/tools.md`「MCP client 能力包」. Facts on the SDK surface:
- * `docs/research/mcp-v2-sdk-surface.md`.
  */
 
 import { createRequire } from 'node:module';
@@ -97,8 +94,7 @@ export interface McpClient {
 }
 
 /**
- * Connects to an MCP server and bridges its tools into the framework's Tool container
- * (spec: `docs/architecture/tools.md`「MCP client 能力包」).
+ * Connects to an MCP server and bridges its tools into the framework's `Tool` container.
  *
  * The connection happens up front: a failed handshake (era negotiation, 401/403, probe timeout)
  * rejects here, never later. On success `tools` already holds the first snapshot.
@@ -208,7 +204,7 @@ function buildSnapshot(
 }
 
 /**
- * The result projection (spec:「结果投影」): `structuredContent !== undefined` returns that
+ * The result projection: `structuredContent !== undefined` returns that
  * value verbatim (any JSON flows — `ToolResultChunk.output` is `unknown`); otherwise the text
  * blocks join on newlines with non-text blocks degrading to placeholder text — the tool-result
  * channel carries no multimodal parts, an honest v1 boundary; an empty result is `''`. An
@@ -231,7 +227,7 @@ function contentText(content: ReadonlyArray<ContentBlock> | undefined): string {
 }
 
 /**
- * The JSON Schema pass-through wrapper (spec:「桥接工具的 schema」) — an internal factory, not
+ * The JSON Schema pass-through wrapper — an internal factory, not
  * exported. `validate` always succeeds synchronously (validation is the remote's business; a
  * failure comes back through the execute error path), `jsonSchema.input` returns the remote
  * document verbatim — same reference, target ignored: remote schemas are commonly 2020-12 while

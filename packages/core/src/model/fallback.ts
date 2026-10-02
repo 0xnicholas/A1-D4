@@ -2,7 +2,7 @@ import type { Model } from './contract.js';
 import { ModelContractError, assertModel } from './resolve.js';
 
 /**
- * The model fallback chain (`docs/architecture/model.md`「model 字段形状」): an array of models
+ * The model fallback chain (the accepted `model` shapes): an array of models
  * tried in order, accepted anywhere the `model` field is — as a static value or returned by a
  * dynamic argument.
  *

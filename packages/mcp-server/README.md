@@ -30,7 +30,7 @@ Servers speak both protocol generations by default: the 2026-07-28 per-request m
 for stdio) to serve modern only. Legacy **sessionful** serving is out of scope — wire it yourself
 with the official `McpServer.connect(transport)` when you need it.
 
-- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/tools.md) —「MCP server 能力包」
+- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/tools.md)
 - SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
 - Decisions: [ADR-0008](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
 

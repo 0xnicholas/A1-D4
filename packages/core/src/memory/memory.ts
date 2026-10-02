@@ -9,7 +9,7 @@ import { mergeWorkingMemory } from './working-memory.js';
 
 /**
  * The `Memory` class — the memory subsystem's public object on top of the `MemoryStore` port
- * (spec: `docs/architecture/memory.md` 消息历史节 + 工作记忆节 + 配置表面节).
+ * (message history, working memory and the configuration surface).
  *
  * Message history is the one mechanism on by default: `save` persists messages for a
  * thread/resource pair and `recall` is the single query entry point, returning messages in the
@@ -19,10 +19,10 @@ import { mergeWorkingMemory } from './working-memory.js';
  * Working memory is the optional second mechanism: resource-scoped, schema-validated structured
  * data, read through `getWorkingMemory` and merged/persisted through `updateWorkingMemory`. Both
  * live on the same instance and the same store; enabling working memory requires the store's
- * conditional resource pair (`docs/architecture/storage.md` 扩展面).
+ * conditional resource pair (the port extension surface).
  */
 
-/** `lastMessages` default — the recent-window size of message history (spec 消息历史节). */
+/** `lastMessages` default — the recent-window size of message history. */
 const DEFAULT_LAST_MESSAGES = 10;
 
 /**
@@ -42,7 +42,7 @@ export type MemoryThreadRef =
 export type SaveMessage = ModelMessage & { id?: string; createdAt?: Date };
 
 /**
- * Working-memory configuration (spec「配置表面」): enabled by its presence, shaped by the schema.
+ * Working-memory configuration: enabled by its presence, shaped by the schema.
  * The schema is the contract of the memory's value — a Standard Schema dual interface (ADR-0003),
  * so the core neither reads nor rewrites it beyond validation and the JSON Schema it emits.
  */
@@ -51,14 +51,14 @@ export interface WorkingMemoryConfig {
   schema: StandardSchema;
 }
 
-/** The `new Memory(...)` config surface (spec 配置表面节): every entry optional. */
+/** The `new Memory(...)` config surface: every entry optional. */
 export interface MemoryConfig {
   /** The storage port to persist through; absent = the core's in-memory default. */
   readonly storage?: MemoryStore | undefined;
   /** The default `recall` window size; absent = 10. */
   readonly lastMessages?: number | undefined;
   /**
-   * Enables working memory for this instance (spec「工作记忆」): the schema-only, resource-scoped
+   * Enables working memory for this instance: the schema-only, resource-scoped
    * block agents maintain through the `updateWorkingMemory` tool. Requires a store that declares
    * the conditional resource pair (`getResource` / `saveResource`) — enabling it without that
    * capability throws here, before any run.
@@ -66,7 +66,7 @@ export interface MemoryConfig {
   readonly workingMemory?: WorkingMemoryConfig | undefined;
 }
 
-/** The `recall` query: the thread plus the port's paging knobs (spec 消息历史节「单一查询入口」). */
+/** The `recall` query: the thread plus the port's paging knobs. */
 export interface RecallQuery {
   /** The thread to read history from. */
   readonly threadId: string;
@@ -90,7 +90,7 @@ export interface SaveInput {
 
 /** The memory subsystem's entry object. */
 export class Memory {
-  /** The default `recall` window size (spec: message history is truncated by count only). */
+  /** The default `recall` window size (history is truncated by count only). */
   readonly lastMessages: number;
 
   /** The working-memory config; `undefined` = this instance carries message history alone. */
@@ -111,7 +111,7 @@ export class Memory {
       'Memory: lastMessages',
     );
     this.workingMemory = config.workingMemory;
-    // Capability flag (`docs/architecture/storage.md` 扩展面): the conditional resource pair is the
+    // Capability flag (the port extension surface): the conditional resource pair is the
     // port's working-memory declaration; a store without it cannot carry the feature, and finding
     // that out per run (or silently storing nothing) is worse than failing here.
     this.workingMemoryStore =
@@ -119,7 +119,7 @@ export class Memory {
   }
 
   /**
-   * The single query entry of message history (spec 消息历史节): returns the thread's messages
+   * The single query entry of message history: returns the thread's messages
    * with the storage envelope, in chronological order by default — directly feedable to a model.
    * Without an explicit `limit` the instance's `lastMessages` window applies; `before` pages
    * towards older history. Unknown threads read as an empty history.
@@ -143,7 +143,7 @@ export class Memory {
    * `crypto.randomUUID()`, `createdAt` from this instance's stamp sequence) and stamps `threadId`
    * / `resourceId` from the call. Returns the messages as persisted, envelope included.
    *
-   * A thread belongs to exactly one resource (no ownership migration, spec 身份模型节): a call
+   * A thread belongs to exactly one resource: a call
    * naming an existing thread with a different `resource` throws before anything is written.
    */
   async save(input: SaveInput): Promise<StoredMessage[]> {
@@ -200,7 +200,7 @@ export class Memory {
   }
 
   /**
-   * The working memory currently stored for a resource (spec「工作记忆」) — schema-validated at
+   * The working memory currently stored for a resource — schema-validated at
    * write time, so it is returned as stored; `undefined` when the resource has none yet. Working
    * memory is resource-scoped: unrelated to threads and untouched by `deleteThread`. Reading does
    * not re-validate: a record written under another schema (or by another writer) is injected as
@@ -214,7 +214,7 @@ export class Memory {
 
   /**
    * Merges a patch into a resource's working memory, validates the result against the configured
-   * schema and persists it (spec「工作记忆」: objects merge deeply, `null` deletes a field, arrays
+   * schema and persists it: objects merge deeply, `null` deletes a field, arrays
    * are replaced whole). Returns the validated value — what was stored, exactly.
    *
    * This is the semantic path behind the `updateWorkingMemory` tool and the programmatic write

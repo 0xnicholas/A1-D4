@@ -110,7 +110,7 @@ export function normalizePart(part: ModelStreamPart): Chunk[] {
  *
  * Malformed JSON is passed through as the raw string: the tool boundary then fails input
  * validation and feeds the failure back to the model, which stays in the loop instead of the run
- * aborting (see `docs/architecture/tools.md`).
+ * aborting.
  */
 function parseToolInput(input: string): unknown {
   try {

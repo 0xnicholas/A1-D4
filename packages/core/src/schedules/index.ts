@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/schedules` — schedules subsystem (Harness 三件套之一).
+ * `@balsats/core/schedules` — schedules subsystem (one of the three harness subsystems).
  *
  * `createSchedules({ storage?, agents, signals? })`: the record CRUD + `tick` primitive — records
  * carry a `next` occurrence function (cron parsing injected, so the core stays zero-dependency) and
@@ -7,7 +7,6 @@
  * Platform cron hitting an endpoint that calls `tick` is the first-class shape; `startTicker` is the
  * optional in-process convenience (single-process semantics). The `ScheduleStore` port (5 methods,
  * JSON-only records; the in-memory default ships with the core) is the persistence seam.
- * Spec: `docs/architecture/harness.md`「Schedules」.
  */
 export { createSchedules } from './schedules.js';
 export type {

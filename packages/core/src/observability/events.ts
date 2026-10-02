@@ -1,7 +1,7 @@
 import type { ExportedSpan } from './span.js';
 
 /**
- * The three lifecycle events of the tracing bus (`docs/architecture/observability.md`「事件与导出」).
+ * The three lifecycle events of the tracing bus (events and export).
  * Each carries the span's exported form at the moment of the event.
  */
 export type TracingEvent =
@@ -26,7 +26,7 @@ export interface ObservabilityExporter {
 }
 
 /**
- * The synchronous per-event shaping seam (`docs/architecture/observability.md`): every event passes
+ * The synchronous per-event shaping seam: every event passes
  * through the processors in order before it reaches the exporters. A processor rewrites the event
  * in place (or returns a replacement) and returns it, or returns `undefined` to drop the event —
  * a processor that rewrites in place must therefore return the event, not fall through.

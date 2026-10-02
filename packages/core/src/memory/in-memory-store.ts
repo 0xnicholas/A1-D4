@@ -11,7 +11,7 @@ import type { WorkingMemoryStore } from './store.js';
  * The core's in-memory default `MemoryStore` (Map-backed, zero runtime burden): attach no storage
  * and memory is purely in-process. It doubles as the semantic reference for adapter authors —
  * reads return deep copies and writes deep-copy too, so stored state changes only through the
- * port, exactly like a serializing backend (spec: `docs/architecture/memory.md`).
+ * port, exactly like a serializing backend.
  *
  * Pinned semantics (enforced by `test/memory-store.test.ts`):
  * - Timestamps are caller-owned; records are persisted exactly as given.

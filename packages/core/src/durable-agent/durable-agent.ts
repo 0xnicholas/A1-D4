@@ -18,25 +18,25 @@ import { createInMemoryAgentRunSnapshotStore } from './in-memory-snapshot-store.
 import type { AgentRunSnapshot, AgentRunSnapshotStore, AgentRunSuspendPayload } from './snapshot.js';
 
 /**
- * Durable agents (`docs/architecture/harness.md`「Durable agents」): the agent wrapped so a run may
- * suspend at a tool-calling boundary and be resumed with a human's approval decision.
+ * Durable agents: the agent wrapped so a run may suspend at a tool-calling boundary and be resumed
+ * with a human's approval decision.
  *
  * The approval declaration lives here, never on `Tool` (`#13` keeps the core permission-free): a
  * call whose tool name is on the list does not execute — the run suspends instead, its loop
  * snapshot goes to the `AgentRunSnapshotStore`, and `finishReason` settles `'suspended'`. `resume`
  * loads the snapshot and continues the run: `approved: true` executes the held calls, `approved:
- * false` answers them with a「用户拒绝」error result and lets the model replan — the run is not
+ * false` answers them with a user-rejected error result and lets the model replan — the run is not
  * terminated by a rejection. Suspension exists in this wrapper alone: a bare agent run never
  * produces `'suspended'` (`agent/loop.ts` keeps no snapshot and holds no approval state).
  *
  * Single-process semantics where it matters: the store's in-memory default keeps snapshots for this
  * process, and concurrent resumes of one run are deduplicated in process. The port is the
  * deployment surface — attaching a durable store and clearing a consumed snapshot are the
- * application's side (no CAS, no cross-process recovery: harness.md「AgentRunSnapshotStore」).
+ * application's side (no CAS, no cross-process recovery).
  */
 
 /**
- * The approval declaration (`harness.md`「Durable agents」): the tool names whose calls must not run
+ * The approval declaration (durable agents): the tool names whose calls must not run
  * until a resume approves them. Declared on the wrapper, not on the tool — a call whose name is on
  * the list suspends the run at the boundary where the model's calls are known and none has run.
  */
@@ -88,7 +88,7 @@ export interface DurableRunOutcome<TObject = unknown> extends AgentGenerateResul
  * persisted with the snapshot, so pass it again to hold the run's original shape.
  */
 export interface DurableResumeOptions extends AgentRunOptions {
-  /** `true` executes the held calls, `false` answers them with a「用户拒绝」tool result. */
+  /** `true` executes the held calls, `false` answers them with a user-rejected tool result. */
   readonly approved: boolean;
 }
 
@@ -136,18 +136,17 @@ interface RunState {
 }
 
 /**
- * Creates the durable agent. See `DurableAgent` for the run surface and
- * `docs/architecture/harness.md`「Durable agents」for the spec.
+ * Creates the durable agent. See `DurableAgent` for the run surface.
  */
 export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
   const { agent } = config;
   const storage = config.storage ?? createInMemoryAgentRunSnapshotStore();
   const gate = new Set(config.approval?.tools ?? []);
   /**
-   * The in-process resume lock (`workflows.md`「suspend/resume 与快照」的同一手法): one resume per
+   * The in-process resume lock (the same technique as the workflow engine): one resume per
    * run at a time. A concurrent resume of the same run joins the one in flight instead of loading
    * the same suspended snapshot twice; the lock clears when that resume settles. Cross-process
-   * safety is the store's concern — there is no CAS (`harness.md`「AgentRunSnapshotStore」).
+   * safety is the store's concern — there is no CAS (the snapshot-store port).
    */
   const resumes = new Map<string, Promise<DurableRunOutcome>>();
 
@@ -258,7 +257,7 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
     return locked;
   }
 
-  /** One run's resume: the load → decide → re-enter path of `harness.md`「resume 语义」. */
+  /** One run's resume: the load → decide → re-enter path. */
   async function continueRun(
     runId: string,
     options: DurableResumeOptions,
@@ -283,7 +282,7 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
     const outcome = startRun(
       runId,
       // The resumed segment continues the trace the suspended run was exported under
-      // (`harness.md`「Observability 锚点」): the traceId travels through the existing run option,
+      // (the observability anchor): the traceId travels through the existing run option,
       // the only thing a resume takes from the snapshot besides the messages and the seed.
       [...snapshot.messages],
       snapshot.traceId === undefined ? runOptions : { ...runOptions, traceId: snapshot.traceId },
@@ -339,7 +338,7 @@ function toSnapshot(runId: string, suspension: Suspension): AgentRunSnapshot {
   };
 }
 
-/** The「用户拒绝」result a rejected call is answered with (fed back like a tool failure). */
+/** The user-rejected result a rejected call is answered with (fed back like a tool failure). */
 function toRejection(call: ToolCallChunk): ToolResultChunk {
   return {
     type: 'tool-result',

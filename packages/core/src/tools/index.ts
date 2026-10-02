@@ -6,9 +6,7 @@
  * every `execute` receives, and the Standard Schema dual interface the four fields speak
  * (ADR-0003). The Agent turns the container into the provider tool list and normalizes tool
  * failures (input validation / throw / output validation) into error results fed back to the
- * model (`docs/architecture/tools.md`).
- *
- * Spec: `docs/architecture/tools.md`.
+ * model.
  */
 export { createTool } from './tool.js';
 export type { SchemaInput, SchemaOutput, Tool, ToolConfig, ToolContext } from './tool.js';

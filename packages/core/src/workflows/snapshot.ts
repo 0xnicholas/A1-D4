@@ -1,6 +1,6 @@
 /**
- * The workflow snapshot shapes and the snapshot storage port (`docs/architecture/workflows.md`
- * 「suspend/resume 与快照」、「storage port」;ADR-0010). Shapes are spec-pinned and JSON-only: the
+ * The workflow snapshot shapes and the snapshot storage port (suspend/resume and snapshots; the
+ * storage port behind them, ADR-0010). Shapes are pinned and JSON-only: the
  * store receives serializable values — large data is referenced, never embedded.
  *
  * The port is the wiring slot `createWorkflow({ storage })` reserves: attach an adapter, or attach
@@ -60,10 +60,10 @@ export type WorkflowIterationSite =
     };
 
 /**
- * One run's JSON-serializable state (`docs/architecture/workflows.md`「suspend/resume 与快照」):
+ * One run's JSON-serializable state (suspend/resume and snapshots):
  * the run identity, its status, the input it started with, the per-step results and the flat entry
  * position to re-enter from — the `startIdx` equivalent — plus the trace the run's spans belong to,
- * so a resumed segment continues the same trace (`docs/architecture/observability.md`).
+ * so a resumed segment continues the same trace.
  */
 export interface WorkflowRunSnapshot {
   /** Identity of the run this snapshot belongs to. */
@@ -92,7 +92,7 @@ export interface WorkflowRunSnapshot {
 }
 
 /**
- * The workflow snapshot storage port (`docs/architecture/workflows.md`「storage port」): two
+ * The workflow snapshot storage port: two
  * methods, JSON-only snapshots. Core ships an in-memory default — a workflow without storage runs
  * purely in memory. Evolution is additive-only (ADR-0010): new capabilities arrive as optional
  * methods plus capability flags, never by changing these signatures.

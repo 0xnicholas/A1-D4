@@ -1,5 +1,5 @@
 /**
- * The run's lifecycle events (`docs/architecture/workflows.md`「流式事件」) — the workflow's
+ * The run's lifecycle events (streaming events) — the workflow's
  * minimal streaming vocabulary. One envelope with the chunk protocol (a discriminated union on
  * `type`, kebab-case words), at run / step boundary granularity, carrying the values that cross
  * each boundary: the run's input and terminal value, every step's input and output.
@@ -71,7 +71,7 @@ export interface WorkflowRunEndEvent {
   readonly output?: unknown;
 }
 
-/** One event of the core's lifecycle event stream (`docs/architecture/workflows.md`「流式事件」). */
+/** One event of the core's lifecycle event stream (streaming events). */
 export type WorkflowEvent =
   | WorkflowRunStartEvent
   | WorkflowStepStartEvent

@@ -7,7 +7,7 @@ export interface ConsoleExporterOptions {
 }
 
 /**
- * The console exporter (`docs/architecture/observability.md`「Exporter 清单」): pretty-prints every
+ * The console exporter (the exporter inventory): pretty-prints every
  * event for development debugging — one header line per event (kind, type, name, ids, duration,
  * error flag) plus indented detail lines for input / output / attributes / metadata / error.
  */
