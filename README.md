@@ -8,12 +8,12 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 
 > **Status:** pre-1.0. Agents, memory, workflows, the harness trio — durable agents, signals,
 > schedules — and the six M5 capability packages are implemented and verified
-> ([roadmap](docs/ROADMAP.md)). **The first release is 0.5.0, and it is still pending**: no
-> `@balsats/*` package is on npm yet — the version is bumped to `0.5.0` and the registry is still
-> empty — and it goes out as a manual owner publish (one `v0.5.0` tag), not a scheduled one. 0.5.0
-> carries all of M1–M5, which is everything this README describes; 0.1.0 / 0.2 / 0.3 are **not**
-> published separately. Until then, use Balsats from this repo (see [Development](#development)),
-> and see [Capability packages](#capability-packages-m5) for the core-external packages.
+> ([roadmap](docs/ROADMAP.md)). **0.5.0 is published**: all seven `@balsats/*` packages are on npm
+> ([`@balsats/core`](https://www.npmjs.com/package/@balsats/core) plus the six capability
+> packages), out together under a single `v0.5.0` tag. It carries all of M1–M5, which is
+> everything this README describes; 0.1.0 / 0.2 / 0.3 are **not** published separately. Install the
+> published packages with the command below, and see
+> [Capability packages](#capability-packages-m5) for the core-external packages.
 
 ## Why Balsats
 
@@ -43,7 +43,7 @@ from the AI SDK provider ecosystem — no adapters, no registries.
 npm install @balsats/core zod @ai-sdk/openai
 ```
 
-Not on npm yet — see [Status](#status). Until then, clone this repo and follow
+See [Status](#status) for what 0.5.0 covers. To work on this repo itself, follow
 [Development](#development).
 
 ## Quick start
@@ -183,9 +183,10 @@ objects.
 
 ### Signals — `@balsats/core/signals`
 
-`createSignals()` is the thread-directed interaction primitive: inject user input into an active
-run, wake an idle thread into a new run, or queue in order — injected content lands in the message
-history. Single-process semantics; cross-instance distribution belongs to capability packages.
+`createSignals({ agent, memory? })` is the thread-directed interaction primitive: inject user input
+into an active run, wake an idle thread into a new run, or queue in order — injected content lands
+in the message history. Single-process semantics; cross-instance distribution belongs to capability
+packages.
 
 ### Durable agents — `@balsats/core/durable-agent`
 
@@ -243,8 +244,8 @@ Capability packages that carry external dependencies ship as separate `@balsats/
 packages — install only what you use. All six are implemented and verified: unit tests in
 `pnpm verify`, five end-to-end examples covering all six (see [Examples](#examples)), and
 minified byte budgets plus dependency-closure baselines where there is a dependency to measure
-([roadmap](docs/ROADMAP.md), M5). They are **not on npm yet** — the version is bumped to `0.5.0`
-and the registry still has nothing under `@balsats` (a manual owner publish, see [Status](#status)):
+([roadmap](docs/ROADMAP.md), M5). All six ship in the `0.5.0` release — all seven `@balsats/*`
+packages went out together (see [Status](#status)):
 
 | Package | What it gives you | Spec |
 | --- | --- | --- |

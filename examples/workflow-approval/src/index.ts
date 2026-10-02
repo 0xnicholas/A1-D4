@@ -113,7 +113,7 @@ const receipt = z.object({
 
 // The composition root is the optional thin assembly point (ADR-0002): one tracer is assembled
 // here and handed to the agent built through the app. The workflow takes the same tracer through
-// its own `tracer` seam — the composition root has no workflow slot yet (docs/ROADMAP.md M4/M5).
+// its own `tracer` seam — the composition root has no workflow slot yet.
 const tracer = createTracer({ exporters: [consoleExporter()] });
 
 const app = createApp({ tracer });

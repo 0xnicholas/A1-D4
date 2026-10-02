@@ -78,8 +78,8 @@ const userProfile = z.object({
 });
 
 // The core's in-memory store is the default; the example holds onto it only to show the threads
-// the runs created. Message history lives in the store — swapping in an adapter changes nothing
-// above this line (docs/architecture/storage.md).
+// the runs created. Message history lives in the store — swapping in a persistent adapter changes
+// nothing above this line.
 const store = createInMemoryStore();
 
 // One Memory instance serves every run below. `lastMessages` defaults to 10; naming a schema
@@ -92,7 +92,7 @@ const memory = new Memory({
 
 // The composition root is the optional thin assembly point (ADR-0002): one tracer is assembled
 // here and handed to the agent built through the app. Memory needs no separation wiring — both
-// memory spans appear on any memory-enabled run of a traced agent (docs/architecture/observability.md).
+// memory spans appear on any memory-enabled run of a traced agent.
 const app = createApp({
   tracer: createTracer({ exporters: [consoleExporter()] }),
 });
