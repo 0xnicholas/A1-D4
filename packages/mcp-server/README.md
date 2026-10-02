@@ -155,11 +155,12 @@ rewrites no message. An unknown tool is a protocol error instead, as MCP require
 
 ## Lightweight
 
-Same axis as the rest of Balsa — install only what you use, and the numbers are baselines:
+Same axis as the rest of Balsa — install only what you use:
 
-- dependency closure: **3 packages / ~13.9 MB unpacked** (`@modelcontextprotocol/server` plus
-  its core/zod closure), recorded in `deps-budget.json`
-- first-party code: **1,671 B** minified, recorded in `byte-budget.json`
+- dependency closure: `@modelcontextprotocol/server` plus its core / zod closure, recorded in
+  `deps-budget.json`, where count and unpacked size are watched in CI
+- first-party code: the minified baseline is recorded in `byte-budget.json` and checked on every
+  PR — a warning, not a merge gate or a public budget
 - `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License

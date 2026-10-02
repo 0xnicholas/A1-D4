@@ -20,5 +20,6 @@ pnpm monorepo。**核心单包**以子路径导出各子系统入口(如 `core/a
   - **版本与发布**:1.0 前能力包与核心**锁步同一发布列车**——M5 发布时全部 `@balsa/*` 为 `0.5.0`、peer 范围 `^0.5.0`;单 tag `v0.5.0` + 单 GitHub Release(notes 按包分节,沿既有 changelog 约定);发布动作 owner 手工(沿 #45):bump → tag → `pnpm -r publish --access public`(pnpm 拓扑序 core 先发、自动重写 `workspace:^` 为 `^0.5.0`);每包一个最小英文 README(npm 门面,公共面英文沿 ADR-0013)。
   - **测试与 example 落位**:能力包单测进 `pnpm verify`(`packages/*/test/**` 已被根 vitest 收集;无网络/外部服务的硬约束见 ADR-0015 修订);端到端验证落 `examples/<名>`(workspace 成员、不进 verify),每包 ≥1 个 example 归实施。脚本/测试/example 的实现产物不在本决策范围。
 - **修订(M5 SQLite 参考 adapter 冻结,2026-09-30)**:清单字段的 engines 先例自 `>=22.12.0` 抬至 **`>=22.13.0`**(root `engines` 与 CI `node-version` 同步),依据 [决策:SQLite 参考 adapter](https://github.com/0xnicholas/balsa-framework/issues/76)——`node:sqlite` 免 flag 基线;其余清单字段与上条 M5 口径不变。
+- **修订(随身 LICENSE 副本,2026-10-02)**:清单字段先例**补一项**——每包目录随身一份根 `LICENSE` 的 Apache-2.0 全文副本(`packages/<名>/LICENSE`),使 npm tarball(npm 的分发单元,只含包目录内文件)自带许可证文本(字段面 `license: "Apache-2.0"` 照旧,包页按字段渲染);七包副本与根 `LICENSE` 内容实测全等。依据 [实施:发布前置公开面](https://github.com/0xnicholas/balsa-framework/issues/100) 决议评论。
 
 (来源:wayfinder ticket #8)

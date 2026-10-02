@@ -114,12 +114,12 @@ On modern HTTP connections the SDK must drop tools whose `x-mcp-header` declarat
 
 ## Lightweight
 
-Same axis as the rest of Balsa — install only what you use, and the numbers are baselines:
+Same axis as the rest of Balsa — install only what you use:
 
-- dependency closure: **13 packages / ~14.8 MB unpacked** (`@modelcontextprotocol/client` plus its
-  OAuth/SSE/stdio closure; one 2014-era package lacks registry size metadata, so the byte count
-  is a lower bound in that spirit), recorded in `deps-budget.json`
-- first-party code: **2,286 B** minified, recorded in `byte-budget.json`
+- dependency closure: everything `@modelcontextprotocol/client` pulls in — its OAuth / SSE / stdio
+  closure — recorded in `deps-budget.json`, where count and unpacked size are watched in CI
+- first-party code: the minified baseline is recorded in `byte-budget.json` and checked on every
+  PR — a warning, not a merge gate or a public budget
 - `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License

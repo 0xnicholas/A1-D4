@@ -31,9 +31,9 @@ npm install @balsats/otlp @balsats/core
 
 `@balsats/core` is a peer dependency (one core instance by design). The package brings the official
 OpenTelemetry exporter stack (`exporter-trace-otlp-proto` / `-http`, `sdk-trace`, `resources`,
-`api` — five pinned dependencies; `semantic-conventions` rides the tree transitively but is never
-imported — `gen_ai.*` keys are written as string literals, so semconv drift changes this package,
-never the core).
+`api` — exact-pinned, closure watched in CI rather than promised here; `semantic-conventions`
+rides the tree transitively but is never imported — `gen_ai.*` keys are written as string
+literals, so semconv drift changes this package, never the core).
 
 ## Options
 

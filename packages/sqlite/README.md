@@ -103,8 +103,9 @@ is only correct when the caller uses `compareAndSave`; `':memory:'` databases ar
 
 ## Lightweight
 
-- dependencies: **0** — the driver is built into Node, so there is no `deps-budget.json` to watch
-- first-party code: **11,965 B** minified (3,120 B gzip), recorded in `byte-budget.json`
+- dependencies: none — the driver is built into Node, so there is no `deps-budget.json` to watch
+- first-party code: the minified baseline is recorded in `byte-budget.json` and checked on every
+  PR — a warning, not a merge gate or a public budget
 - `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License

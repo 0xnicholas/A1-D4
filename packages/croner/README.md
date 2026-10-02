@@ -30,10 +30,10 @@ await schedules.tick(); // the platform cron's endpoint calls this
 npm install @balsats/croner
 ```
 
-The wrapper is one exact-pinned dependency (`croner@10.0.1`, MIT, zero transitive packages, engines
-`>=18`). There is **no `@balsats/core` peer**: the fragment is structurally just the `next` +
-`timezone` slice of `ScheduleSaveInput`, so this package stands alone — install `@balsats/core`
-separately when you actually call `schedules.save()`.
+The wrapper depends on nothing beyond `croner`, pinned exactly (`croner@10.0.1`, MIT, engines
+`>=18`), and pulls in nothing further. There is **no `@balsats/core` peer**: the fragment is
+structurally just the `next` + `timezone` slice of `ScheduleSaveInput`, so this package stands
+alone — install `@balsats/core` separately when you actually call `schedules.save()`.
 
 ## The fragment
 

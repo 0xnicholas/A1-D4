@@ -8,11 +8,12 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 
 > **Status:** pre-1.0. Agents, memory, workflows, the harness trio — durable agents, signals,
 > schedules — and the six M5 capability packages are implemented and verified
-> ([roadmap](docs/ROADMAP.md)). **No npm release exists yet**: the package version is still
-> `0.0.0` and the registry has nothing under `@balsats`. The planned versions are 0.1.0 = M1+M2,
-> 0.2 = M1–M3, 0.3 = M1–M4 and 0.5 = M1–M5 (everything this README describes), all pending a
-> manual owner publish — until then, use Balsa from this repo (see [Development](#development))
-> and see [Capability packages](#capability-packages-m5) for the core-external packages.
+> ([roadmap](docs/ROADMAP.md)). **The first release is 0.5.0, and it is still pending**: no
+> `@balsats/*` package is on npm yet — the version is still `0.0.0` and the registry is empty —
+> and it goes out as a manual owner publish (one `v0.5.0` tag), not a scheduled one. 0.5.0 carries
+> all of M1–M5, which is everything this README describes; 0.1.0 / 0.2 / 0.3 are **not** published
+> separately. Until then, use Balsa from this repo (see [Development](#development)), and see
+> [Capability packages](#capability-packages-m5) for the core-external packages.
 
 ## Why Balsa
 

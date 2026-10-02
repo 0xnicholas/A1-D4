@@ -77,10 +77,12 @@ data parts…) is simply not emitted.
 
 ## Lightweight
 
-Same axis as the rest of Balsa — install only what you use, and the numbers are baselines:
+Same axis as the rest of Balsa — install only what you use:
 
-- runtime dependencies: **0** (the declared-dependency gate is enforced in CI)
-- first-party code: **8,253 B** minified, recorded in `byte-budget.json`
+- runtime dependencies: none beyond the `@balsats/core` peer (the declared-dependency gate is
+  enforced in CI)
+- first-party code: the minified baseline is recorded in `byte-budget.json` and checked on every
+  PR — a warning, not a merge gate or a public budget
 - `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License

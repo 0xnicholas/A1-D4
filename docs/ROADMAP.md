@@ -136,8 +136,8 @@
 
 | 差距 | 条件 / 状态 | 承载缝 |
 | --- | --- | --- |
-| 发布 0.1.0 | 已在 [#45](https://github.com/0xnicholas/balsa-framework/issues/45)(owner 手工),非技术触发 | — |
-| 公开上手面(文档站、对外 quick start) | 0.1.0 发布后 | README 已有 quick start |
+| 发布 0.5.0 | 待发:已在 [#45](https://github.com/0xnicholas/balsa-framework/issues/45)(owner 手工),非技术触发 | — |
+| 公开上手面(文档站、对外 quick start) | 0.5.0 发布后 | README 已有 quick start |
 | 适配器生态 | ≥1 个真实第二后端诉求 | 社区 + 作者指南(`docs/architecture/storage.md`) |
 | 公开可检验性(轻量主张的外部证据) | **结案(2026-10-02 身份裁决)**:数字一律不对外——沿 ADR-0001 立场(依赖数/字节数仅内部 CI 回归参考,不作公开承诺),**机制可讲**(零依赖硬闸门、字节预算黄灯等);balsa-website 侧同口径(不写 KB / 测试数) | — |
 
