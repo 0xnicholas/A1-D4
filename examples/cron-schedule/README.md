@@ -55,5 +55,5 @@ an error that fails to surface at `cron()` — each exits non-zero instead of pr
   timezone (croner's default). The example always passes one so its output does not depend on where
   it runs.
 - The script consumes `@balsats/croner` and `@balsats/core` through their built package exports — run
-  `pnpm build` before `start`. Package docs: [`packages/croner`](../../packages/croner/); spec:
-  [`docs/architecture/harness.md`](../../docs/architecture/harness.md) 「croner 封装能力包」.
+  `pnpm build` before `start`. Package docs: [`packages/croner`](../../packages/croner/) — the croner
+  wrapper capability package.

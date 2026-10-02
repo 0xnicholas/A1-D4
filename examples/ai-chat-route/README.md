@@ -48,6 +48,6 @@ second turn that fails to recall — each exits non-zero instead of printing a h
 - The `node:http` adapter is example glue — `createChatRoute` returns a web-standard
   `(request: Request) => Promise<Response>`, so Next.js / Hono / Workers hosts plug in directly.
 - The example consumes `@balsats/core` and `@balsats/ai-sdk` through their built package exports — run
-  `pnpm build` before `start`. Package docs: [`packages/ai-sdk`](../../packages/ai-sdk/); spec:
-  [`docs/architecture/model.md`](../../docs/architecture/model.md) 「AI SDK 互操作能力包」; the
-  suspension/resume semantics under it: [`docs/architecture/harness.md`](../../docs/architecture/harness.md).
+  `pnpm build` before `start`. Package docs: [`packages/ai-sdk`](../../packages/ai-sdk/) — the AI SDK
+  interoperability capability package; the suspension/resume underneath it is the core's durable-agent
+  semantics.

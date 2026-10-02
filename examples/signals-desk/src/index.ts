@@ -3,8 +3,9 @@
  *
  * A scripted, non-interactive run drives one shop's support desk over a real OpenAI model and
  * shows the M4 signals subsystem end to end, with the schedules primitive wired into the same
- * thread. The fixed three sentences are the whole API surface: 活跃 = 注入当前 run(下一 step 生效);
- * 空闲 = 唤醒新 run;queueMessage = 排队保序. Around them, the two observation surfaces: the four
+ * thread. The fixed three sentences are the whole API surface: live = injected into the current run
+ * (effective at the next step); idle = wakes a new run; queueMessage = queued in arrival order —
+ * around them, the two observation surfaces: the four
  * methods, and the chunk subscription a woken run can only be watched through.
  *
  * The acts:
@@ -288,7 +289,7 @@ async function main(): Promise<void> {
   console.log('signals-desk — one support thread that messages and signals both land in.');
   console.log(`Thread '${THREAD.id}' (resource '${RESOURCE}') does not exist yet.`);
 
-  act('Act 1 — 空闲唤醒:sendMessage 打向空闲 thread,自己开一个新 run');
+  act('Act 1 — idle wake: sendMessage to an idle thread starts a new run');
   // The subscription is already attached (above, before any run existed) — with no replay, that is
   // the only way to see the very first run. `sendMessage` resolves once the message is delivered;
   // the run it woke is watched through the subscription's chunks and the run's own span.
@@ -308,7 +309,7 @@ async function main(): Promise<void> {
   );
   console.log(`\n[woken run → ${THREAD.id}] ${reply1}`);
 
-  act('Act 2 — 活跃窗口:sendMessage 注入当前 run,下一 step 生效');
+  act('Act 2 — live window: sendMessage is injected into the run, effective at the next step');
   exporter.clear();
   const page2 = desk.next(); // hold the supervisor page: the desk's run parks on it
   const run2 = signals.stream(
@@ -319,8 +320,8 @@ async function main(): Promise<void> {
   const held2 = await within(30_000, 'page the supervisor', page2);
   console.log(`  parked on    pageSupervisor(${clip(held2.question)})  ← the run is live and waiting`);
 
-  // 活跃 = 注入当前 run: no new run starts, the message lands at the loop's next step boundary and
-  // in message history as an ordinary message.
+  // Live = injected into the current run: no new run starts, the message lands at the loop's next
+  // step boundary and in message history as an ordinary message.
   await signals.sendMessage(
     TARGET,
     'Sending a detail while you check: please have it left with the concierge.',
@@ -355,7 +356,7 @@ async function main(): Promise<void> {
   console.log(`\n[run → ${THREAD.id}] ${reply2.trim()}`);
   await printHistory('History after the injection');
 
-  act('Act 3 — 排队保序:queueMessage 等当前 run 完,两条按到达序作一个续跑 run 的输入');
+  act('Act 3 — queued order: queueMessage waits for the run, both enter one continuation run');
   exporter.clear();
   const page3 = desk.next();
   const run3 = signals.stream('One more check with your supervisor: is the parcel still in Lisbon?', {
@@ -402,7 +403,7 @@ async function main(): Promise<void> {
   console.log(`  continuation ${continuationTurn}  ← one run, both queued messages in order`);
   await printHistory('History after the queue');
 
-  act('Act 4 — 系统信号:sendSignal 的 payload 渲染为一条 [signal] 消息,唤醒 thread');
+  act('Act 4 — system signal: sendSignal payload renders one [signal] message, waking the thread');
   exporter.clear();
   await signals.sendSignal(TARGET, {
     type: 'order-shipped',
@@ -420,7 +421,7 @@ async function main(): Promise<void> {
   console.log(`  rendered     ${rendered}`);
   console.log(`\n[run → ${THREAD.id}] ${reply4}`);
 
-  act('Act 5 — schedules:tick 读到期记录、触发 threaded target、推进 nextFireAt');
+  act('Act 5 — schedules: tick reads due records, fires the threaded target, advances nextFireAt');
   exporter.clear();
   // The record carries the occurrence function the script injects — cron parsing never enters the
   // core — plus a threaded target: firing it is a plain `signals.sendSignal` into this thread.

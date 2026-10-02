@@ -3,7 +3,7 @@
 Balsa's durable agent in one scripted session: a **tool call that needs a human** is held at the
 loop's step boundary, the run's **loop snapshot** goes to an `AgentRunSnapshotStore`, the run lands
 `finishReason: 'suspended'`, and `resume(runId, { approved })` continues it — executing the held
-call, or answering it with a「用户拒绝」result the model replans from. Balsa is an ultralight
+call, or answering it with a rejection result the model replans from. Balsa is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It drives
@@ -27,7 +27,7 @@ one refund desk over a real OpenAI model and walks five acts:
    trace.
 4. **Run B suspends.** A second request, same gate, same shape.
 5. **Resume, rejected.** `{ approved: false }` executes nothing: the held call is answered with a
-   「用户拒绝」tool result — fed back exactly like a tool failure — and the model replans around it.
+   rejection tool result — fed back exactly like a tool failure — and the model replans around it.
    A refusal does not terminate the run, and the ledger is untouched.
 
 ## Observability
@@ -73,8 +73,8 @@ two replies — the approved refund confirmed, the rejected one answered with an
 - The script **asserts its own payoff**: a run that does not suspend, money that moves while a run is
   suspended, a resume that does not reach `'stop'`, or a rejection that executes exits non-zero
   instead of printing a happy face.
-- **The approval list lives on the wrapper, never on the tool** (`docs/architecture/harness.md`
-  「审批闸」): a tool's four fields carry no permission, and `resume` reads the wrapper's list. A bare
+- **The approval list lives on the wrapper, never on the tool**: a tool's four fields carry no
+  permission, and `resume` reads the wrapper's list. A bare
   `agent.generate(...)` — no wrapper — never suspends and keeps no snapshot; the durable semantics
   exist in `createDurableAgent` alone.
 - **`resume` re-supplies the run options, not the state.** The message list, the suspension point and
@@ -84,7 +84,7 @@ two replies — the approved refund confirmed, the rejected one answered with an
   under the default.
 - **A snapshot is not deleted by resuming.** The port has two methods, no CAS and no lifecycle: the
   application owns whether a consumed snapshot is dropped, and where a durable store is used across
-  processes. 「列出待审批 run」(`listSuspended`) is an optional adapter extension, not core.
+  processes. Listing suspended runs (`listSuspended`) is an optional adapter extension, not core.
 - **A second suspension overwrites the same `runId`** — a run that suspends again (another gated
   call) is resumable under the id it always had. This narrative does not stage that; the core's test
   suite does.

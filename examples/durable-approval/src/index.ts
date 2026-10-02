@@ -5,7 +5,7 @@
  * M4 approval gate end to end: the model's tool calls reach the loop's step boundary, a call whose
  * tool name is on the approval list does **not** execute, the run's loop snapshot goes to the
  * `AgentRunSnapshotStore`, `finishReason` settles `'suspended'`, and `resume(runId, { approved })`
- * continues the run — execute the held calls, or answer them with a「用户拒绝」tool result and let
+ * continues the run — execute the held calls, or answer them with a rejection tool result and let
  * the model replan.
  *
  * The acts:
@@ -23,7 +23,7 @@
  *    a fresh `agent-run` span in the *same* trace, so one HITL interaction stays one trace.
  * 4. **Run B suspends** — a second request, same gate, same shape.
  * 5. **Resume, rejected** — `{ approved: false }` runs nothing: the held call is answered with a
- *    「用户拒绝」result, the model receives it as an ordinary tool failure and replans. A refusal
+ *    rejection result, the model receives it as an ordinary tool failure and replans. A refusal
  *    does not terminate the run, and the ledger is untouched.
  *
  * The script asserts its own payoff: a run that does not suspend, a refund that executes while the
@@ -83,7 +83,8 @@ function ledgerSize(): number {
 /**
  * The tool the approval list gates. Its description tells the model that executing it is a
  * commitment, but nothing on the tool itself declares that a human must approve it — the approval
- * list lives on the durable wrapper (`docs/architecture/harness.md`「审批闸」: Tool 四字段定义不动).
+ * list lives on the durable wrapper (`approval` is declared there; a tool's four fields carry no
+ * permission).
  */
 const issueRefund = createTool({
   description:
@@ -308,8 +309,8 @@ for (const call of snapshot.suspendPayload.toolCalls) {
   console.log(`    ${call.toolName}(${clip(call.input, 56)})  toolCallId=${call.toolCallId}`);
 }
 
-// The observability anchor (`harness.md`「Observability 锚点」): suspension is a normal end of the
-// run's `agent-run` span under a status attribute — not an error, not a new span type.
+// The observability anchor: suspension is a normal end of the run's `agent-run` span under a status
+// attribute — not an error, not a new span type.
 const suspended = runSpans().find((span) => attribute(span, 'status') === 'suspended');
 if (suspended === undefined) {
   fail("Expected the suspended run's `agent-run` span to carry attributes.status = 'suspended'.");

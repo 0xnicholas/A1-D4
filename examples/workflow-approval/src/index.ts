@@ -244,9 +244,9 @@ const pickLane = createStep({
 });
 
 /**
- * Entry 5 — the agent, wrapped into a step by hand. The wrapper is one line by design
- * (`docs/architecture/workflows.md`「定义表面」): there is no `createStep(agent)` overload — a step
- * that calls the agent is just a step whose `execute` returns what the model produced.
+ * Entry 5 — the agent, wrapped into a step by hand. The wrapper is one line by design (the definition
+ * surface offers no shorthand): there is no `createStep(agent)` overload — a step that calls the
+ * agent is just a step whose `execute` returns what the model produced.
  */
 const draftMemo = createStep({
   id: 'draft-memo',

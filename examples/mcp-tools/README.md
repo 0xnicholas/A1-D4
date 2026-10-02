@@ -37,8 +37,7 @@ No API key and no network beyond loopback.
 
 - The example consumes `@balsats/core`, `@balsats/mcp-server` and `@balsats/mcp-client` through their built
   package exports — run `pnpm build` before `start`.
-- Server-side docs: [`packages/mcp-server`](../../packages/mcp-server/) (HTTP / Next.js / Hono /
-  `node:http` wiring, Host and Origin protection); client-side docs:
-  [`packages/mcp-client`](../../packages/mcp-client/) (transports and options, snapshot lifecycle, what
-  crosses the bridge). Spec: [`docs/architecture/tools.md`](../../docs/architecture/tools.md)
-  「MCP server 能力包」/「MCP client 能力包」.
+- Server-side docs: [`packages/mcp-server`](../../packages/mcp-server/) — the MCP server capability
+  package (HTTP / Next.js / Hono / `node:http` wiring, Host and Origin protection); client-side docs:
+  [`packages/mcp-client`](../../packages/mcp-client/) — the MCP client capability package (transports
+  and options, snapshot lifecycle, what crosses the bridge).

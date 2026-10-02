@@ -12,8 +12,9 @@ small shop's support desk over a real OpenAI model and walks five acts:
 1. **An idle thread: `sendMessage` wakes a run.** The subscription is attached *before* the first run
    exists — `subscribeToThread` has no replay — and every chunk of every run on the thread flows
    through it, the stream a UI would forward.
-2. **The run is live: `sendMessage` injects it (下一 step 生效).** The desk pages its supervisor and
-   waits; the script plays the supervisor, so the run is *parked mid-tool* when the message arrives.
+2. **The run is live: `sendMessage` injects it (effective at the next step).** The desk pages its
+   supervisor and waits; the script plays the supervisor, so the run is *parked mid-tool* when the
+   message arrives.
    No new run starts: the message lands at the loop's next step boundary — at the tail of the run's
    next model call — and in message history as an ordinary message.
 3. **`queueMessage` keeps the order.** Two messages sent during that window wait for the live run to
@@ -26,10 +27,11 @@ small shop's support desk over a real OpenAI model and walks five acts:
 
 ## The parked window
 
-"活跃 = 注入当前 run" can only be demonstrated while a run really is live, and a script cannot race a
-fast model for that window. So the desk's `pageSupervisor` tool parks on a promise the script
-controls: the script holds the page, sends the message, then answers the page. In a real deployment
-the same window is a downstream call's latency — the example just makes it a fact instead of a race.
+"Live = injected into the current run" can only be demonstrated while a run really is live, and a
+script cannot race a fast model for that window. So the desk's `pageSupervisor` tool parks on a
+promise the script controls: the script holds the page, sends the message, then answers the page. In
+a real deployment the same window is a downstream call's latency — the example just makes it a fact
+instead of a race.
 A page nobody is holding is answered by a standing reply, so a model that pages at an unexpected
 moment never wedges the script.
 
@@ -79,10 +81,9 @@ and at the end, and the schedule record advancing from one 09:00 UTC to the next
   instead of printing a happy face.
 - **A message's history position is its arrival order, not the conversation's.** An injection is
   saved when it is delivered, while a run's own input messages are saved with its first step's record
-  (`docs/architecture/memory.md`「时机」) — so a message injected mid-step appears in history *before*
-  the input of the run it was injected into. The model's *prompt* is unaffected: the injection is
-  appended at the tail of the next call.
-- **Single-process semantics, by design.** The「thread → 活跃 run」registry, the injection buffers and
+  — so a message injected mid-step appears in history *before* the input of the run it was injected
+  into. The model's *prompt* is unaffected: the injection is appended at the tail of the next call.
+- **Single-process semantics, by design.** The thread → live run registry, the injection buffers and
   the queues live in the process: dying drops them (documented). Cross-instance signals (shared
   PubSub + leases) are a capability package, not core. For schedules, the equivalent story is the
   platform cron: `tick` is the primitive, `startTicker({ intervalMs })` the optional in-process

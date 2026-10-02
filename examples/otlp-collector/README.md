@@ -43,5 +43,5 @@ or misparented, a `gen_ai.*` attribute that drifts — each exits non-zero inste
 
 - The **scripted model is defined in the file** — the example runs with no key and no network.
 - The example consumes `@balsats/core` and `@balsats/otlp` through their built package exports — run
-  `pnpm build` before `start`. Package docs: [`packages/otlp`](../../packages/otlp/); spec:
-  [`docs/architecture/observability.md`](../../docs/architecture/observability.md) 「OTLP 能力包」.
+  `pnpm build` before `start`. Package docs: [`packages/otlp`](../../packages/otlp/) — the OTLP
+  capability package (spans mapped to GenAI semantic conventions).

@@ -47,5 +47,5 @@ does not execute the held call — each exits non-zero instead of printing a hap
   `storage.schedules` are handed to the composition root, so the snapshot, the message history and the
   schedule all land in one file that outlives the process.
 - The example consumes `@balsats/core` and `@balsats/sqlite` through their built package exports — run
-  `pnpm build` before `start`. Package docs: [`packages/sqlite`](../../packages/sqlite/); spec:
-  [`docs/architecture/storage.md`](../../docs/architecture/storage.md) 「SQLite 参考 adapter」.
+  `pnpm build` before `start`. Package docs: [`packages/sqlite`](../../packages/sqlite/) — the SQLite
+  reference adapter.
