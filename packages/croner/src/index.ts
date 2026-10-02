@@ -1,5 +1,5 @@
 /**
- * `@balsa/croner` — the croner wrapper capability package: a cron expression as one
+ * `@balsats/croner` — the croner wrapper capability package: a cron expression as one
  * `schedules.save()` fragment.
  *
  * `cron('0 9 * * *', { timezone: 'Asia/Shanghai' })` returns exactly the `next` + `timezone` slice

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePart, normalizeStream } from '@balsa/core/model';
-import type { Chunk, ModelFinishReason, ModelStreamPart, ModelUsage } from '@balsa/core/model';
+import { normalizePart, normalizeStream } from '@balsats/core/model';
+import type { Chunk, ModelFinishReason, ModelStreamPart, ModelUsage } from '@balsats/core/model';
 import { fakeModel } from './helpers/fake-model.js';
 import { collect } from './helpers/collect.js';
 

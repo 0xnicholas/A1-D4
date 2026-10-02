@@ -10,7 +10,7 @@ import * as esbuild from 'esbuild';
 export const RUNTIME_DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies'];
 
 /** 零运行时依赖的包(ADR-0001 硬线):合法集恒为空集,三字段非空即红(ADR-0015 M5)。 */
-export const ZERO_RUNTIME_PACKAGES = ['@balsa/core'];
+export const ZERO_RUNTIME_PACKAGES = ['@balsats/core'];
 
 export function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
@@ -20,7 +20,7 @@ export function readManifest(packageDir) {
   return readJson(join(packageDir, 'package.json'));
 }
 
-/** manifest 运行时字段里声明的包名(去重;`@balsa/core` peer 由调用方决定豁免)。 */
+/** manifest 运行时字段里声明的包名(去重;`@balsats/core` peer 由调用方决定豁免)。 */
 export function declaredRuntimeDependencyNames(manifest) {
   const names = new Set();
   for (const field of RUNTIME_DEPENDENCY_FIELDS) {
@@ -34,7 +34,7 @@ export function declaredRuntimeDependencyNames(manifest) {
 /**
  * 合法导入判定(ADR-0015 M5「仅声明依赖」):合法集 = Node 内置 ∪ 相对/绝对路径 ∪
  * manifest 运行时字段声明的包名(名字精确匹配、含子路径 `pkg/sub`);devDependencies
- * 不在合法集。零运行时依赖的包(@balsa/core)合法集恒为空集——原「零运行时依赖」语义。
+ * 不在合法集。零运行时依赖的包(@balsats/core)合法集恒为空集——原「零运行时依赖」语义。
  */
 export function allowedSpecifierPredicate(declaredNames) {
   return (specifier) => {

@@ -18,7 +18,7 @@ import type {
   ModelStreamPart,
   ModelStreamResult,
   ModelUsage,
-} from '@balsa/core/model';
+} from '@balsats/core/model';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

@@ -19,7 +19,7 @@ import type {
   StoredResource,
   StoredThread,
   WorkingMemoryStore,
-} from '@balsa/core/memory';
+} from '@balsats/core/memory';
 import type { SqliteLifecycle } from './connection.js';
 import { decodeJson, encodeJson, inTransaction } from './connection.js';
 

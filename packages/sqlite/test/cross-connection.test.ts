@@ -5,7 +5,7 @@
  * timeout holds a lock wait for its configured window before `SQLITE_BUSY` comes back unchanged.
  */
 import { describe, expect, it } from 'vitest';
-import type { WorkflowRunSnapshot } from '@balsa/core/workflows';
+import type { WorkflowRunSnapshot } from '@balsats/core/workflows';
 import { caught, fileStorage, messageOf, openStorage, rawConnection } from './helpers.js';
 
 function snapshot(runId: string, marker: number): WorkflowRunSnapshot {

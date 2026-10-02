@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createInMemorySnapshotStore, createStep, createWorkflow } from '@balsa/core/workflows';
+import { createInMemorySnapshotStore, createStep, createWorkflow } from '@balsats/core/workflows';
 import type {
   StepContext,
   Workflow,
@@ -8,7 +8,7 @@ import type {
   WorkflowRunOutcome,
   WorkflowRunSnapshot,
   WorkflowSnapshotStore,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 import { captureRejection, expectAssignable, expectSuccess, expectSuspended } from './helpers/assertions.js';
 
 /**
@@ -22,7 +22,7 @@ import { captureRejection, expectAssignable, expectSuccess, expectSuspended } fr
  * 路径),resume 按 site 重进块内(完成部分按记录回放,洞与挂起点重跑)。事件/记录/快照三处读法
  * 对齐「块内挂起 = 真挂起」:块内 step 的 `step-end` 读 `suspended`。
  *
- * 接缝 = 公开 `@balsa/core/workflows` 子路径:定义 → `createRun` → `run.start` / `run.resume`,
+ * 接缝 = 公开 `@balsats/core/workflows` 子路径:定义 → `createRun` → `run.start` / `run.resume`,
  * 以及 step `execute` 收到的 ctx 与注入的 store 观察到的快照。
  */
 

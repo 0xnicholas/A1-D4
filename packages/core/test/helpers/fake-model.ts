@@ -8,7 +8,7 @@ import type {
   LanguageModelV4StreamResult,
   LanguageModelV4Usage,
 } from '@ai-sdk/provider';
-import type { JsonValue, Model, ModelCallOptions } from '@balsa/core/model';
+import type { JsonValue, Model, ModelCallOptions } from '@balsats/core/model';
 
 /**
  * 脚本化假模型 —— M1 测试的规范接缝(替代一切真实 LLM,见 issue #21 测试决策)。

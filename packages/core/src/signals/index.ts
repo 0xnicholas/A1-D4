@@ -1,5 +1,5 @@
 /**
- * `@balsa/core/signals` — signals subsystem (Harness 基础层).
+ * `@balsats/core/signals` — signals subsystem (Harness 基础层).
  *
  * `createSignals({ agent, memory?, tracer? })`: the thread-directed interaction primitive —
  * sendMessage / queueMessage / sendSignal / subscribeToThread — with the fixed three-sentence

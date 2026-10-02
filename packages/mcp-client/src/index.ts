@@ -1,5 +1,5 @@
 /**
- * `@balsa/mcp-client` — the MCP client capability package: bridge a remote MCP server's tools
+ * `@balsats/mcp-client` — the MCP client capability package: bridge a remote MCP server's tools
  * into the framework's `Record<string, Tool>` container, ready to spread straight into an agent.
  *
  * One connection, one object with three members: `tools` (a getter over the current snapshot),
@@ -30,11 +30,11 @@ import type {
   VersionNegotiationMode,
 } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import type { Tool, ToolContext } from '@balsa/core/tools';
-import type { StandardSchema } from '@balsa/core/tools';
+import type { Tool, ToolContext } from '@balsats/core/tools';
+import type { StandardSchema } from '@balsats/core/tools';
 
 /** The identity this package advertises to servers — its own name and version, not overridable. */
-const CLIENT_NAME = '@balsa/mcp-client';
+const CLIENT_NAME = '@balsats/mcp-client';
 const { version: CLIENT_VERSION } = createRequire(import.meta.url)('../package.json') as { version: string };
 
 /** How to reach the server: a stdio subprocess the SDK owns, or a Streamable HTTP endpoint. */

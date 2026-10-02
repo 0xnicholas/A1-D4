@@ -9,11 +9,11 @@ import { SpanStatusCode, TraceFlags } from '@opentelemetry/api';
 import type { SpanContext } from '@opentelemetry/api';
 import type { Resource } from '@opentelemetry/resources';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace';
-import type { ExportedSpan } from '@balsa/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
 import { mapSpan } from './mapping.js';
 
 /** `instrumentationScope` without a version — the packages release in lockstep anyway. */
-const INSTRUMENTATION_SCOPE = { name: '@balsa/otlp' };
+const INSTRUMENTATION_SCOPE = { name: '@balsats/otlp' };
 
 /** Milliseconds → `HrTime` (UNIX seconds truncated, nanosecond remainder). */
 function toHrTime(date: Date): [number, number] {

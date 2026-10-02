@@ -1,32 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createApp } from '@balsa/core';
-import type { App, AppConfig } from '@balsa/core';
-import { Agent } from '@balsa/core/agent';
-import type { AgentConfig } from '@balsa/core/agent';
+import { createApp } from '@balsats/core';
+import type { App, AppConfig } from '@balsats/core';
+import { Agent } from '@balsats/core/agent';
+import type { AgentConfig } from '@balsats/core/agent';
 import {
   createInMemoryAgentRunSnapshotStore,
-} from '@balsa/core/durable-agent';
-import type { AgentRunSnapshot, AgentRunSnapshotStore, DurableAgent } from '@balsa/core/durable-agent';
-import { createInMemoryStore, Memory } from '@balsa/core/memory';
-import { createInMemoryScheduleStore } from '@balsa/core/schedules';
-import type { ScheduleRecord, ScheduleStore, Schedules } from '@balsa/core/schedules';
-import type { Signals } from '@balsa/core/signals';
+} from '@balsats/core/durable-agent';
+import type { AgentRunSnapshot, AgentRunSnapshotStore, DurableAgent } from '@balsats/core/durable-agent';
+import { createInMemoryStore, Memory } from '@balsats/core/memory';
+import { createInMemoryScheduleStore } from '@balsats/core/schedules';
+import type { ScheduleRecord, ScheduleStore, Schedules } from '@balsats/core/schedules';
+import type { Signals } from '@balsats/core/signals';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import { createInMemorySnapshotStore, createStep } from '@balsa/core/workflows';
+} from '@balsats/core/observability';
+import { createInMemorySnapshotStore, createStep } from '@balsats/core/workflows';
 import type {
   StepContext,
   Workflow,
   WorkflowBuilder,
   WorkflowRunSnapshot,
   WorkflowSnapshotStore,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 import { expectAssignable, expectSuspended } from './helpers/assertions.js';
 import { INSTRUCTIONS } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';

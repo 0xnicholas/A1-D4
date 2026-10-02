@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsa/core/agent';
+import { Agent } from '@balsats/core/agent';
 import type {
   AgentConfig,
   AgentMemoryOptions,
@@ -8,11 +8,11 @@ import type {
   ModelInput,
   Processor,
   RequestContext,
-} from '@balsa/core/agent';
-import { Memory } from '@balsa/core/memory';
-import { ModelContractError, ModelSpecificationVersionError } from '@balsa/core/model';
-import type { Model } from '@balsa/core/model';
-import { createTracer } from '@balsa/core/observability';
+} from '@balsats/core/agent';
+import { Memory } from '@balsats/core/memory';
+import { ModelContractError, ModelSpecificationVersionError } from '@balsats/core/model';
+import type { Model } from '@balsats/core/model';
+import { createTracer } from '@balsats/core/observability';
 import { captureError, expectAssignable } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 

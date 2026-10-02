@@ -13,11 +13,11 @@ _Avoid_: 把"轻量"等同于依赖数/字节数等硬性数字指标(数字仅�
 _Avoid_: "以后需要时"类不可判定的措辞、把重开条件当排期
 
 **核心包 (Core package)**:
-框架的单数核心 npm 包 `@balsa/core`,以子路径导出各子系统入口;自身保持极小,是"按需组合"的载体。
+框架的单数核心 npm 包 `@balsats/core`,以子路径导出各子系统入口;自身保持极小,是"按需组合"的载体。
 _Avoid_: 内核、平台包
 
 **能力包 (Capability package)**:
-因携带外部依赖而与核心包隔离的独立 npm 包(如 MCP、OTel exporter、存储 adapter、AI SDK 互操作),用户按需安装;命名一律 `@balsa/<能力>` 短名词、无类型后缀(如 `@balsa/mcp-server`、`@balsa/otlp`)。
+因携带外部依赖而与核心包隔离的独立 npm 包(如 MCP、OTel exporter、存储 adapter、AI SDK 互操作),用户按需安装;命名一律 `@balsats/<能力>` 短名词、无类型后缀(如 `@balsats/mcp-server`、`@balsats/otlp`)。
 _Avoid_: plugin、integration
 
 **组合根 (Composition root)**:

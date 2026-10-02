@@ -6,11 +6,11 @@
  * `:memory:` is accepted with its own `memory` mode.
  */
 import { describe, expect, it } from 'vitest';
-import type { AgentRunSnapshot } from '@balsa/core/durable-agent';
-import type { StoredMessage, StoredThread } from '@balsa/core/memory';
-import type { ScheduleRecord } from '@balsa/core/schedules';
-import type { WorkflowRunSnapshot } from '@balsa/core/workflows';
-import type { SqliteStorage } from '@balsa/sqlite';
+import type { AgentRunSnapshot } from '@balsats/core/durable-agent';
+import type { StoredMessage, StoredThread } from '@balsats/core/memory';
+import type { ScheduleRecord } from '@balsats/core/schedules';
+import type { WorkflowRunSnapshot } from '@balsats/core/workflows';
+import type { SqliteStorage } from '@balsats/sqlite';
 import { caught, fileStorage, messageOf, openStorage, rawConnection } from './helpers.js';
 
 /** Every port method, as a thunk — the matrix for the two guards (pre-init, post-close). */

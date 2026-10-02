@@ -10,8 +10,8 @@
  * memory are not the route's business.
  */
 
-import type { ModelFilePart, ModelToolResultPart } from '@balsa/core/model';
-import type { StoredMessage } from '@balsa/core/memory';
+import type { ModelFilePart, ModelToolResultPart } from '@balsats/core/model';
+import type { StoredMessage } from '@balsats/core/memory';
 import type {
   AISdkAssistantUIMessage,
   AISdkFileUIPart,

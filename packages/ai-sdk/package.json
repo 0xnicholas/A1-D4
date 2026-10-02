@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/ai-sdk",
+  "name": "@balsats/ai-sdk",
   "version": "0.0.0",
   "description": "Balsa AI SDK interop — the agent's chunk stream as an AI SDK UI message stream (useChat-compatible routes), zero runtime dependencies.",
   "license": "Apache-2.0",
@@ -36,10 +36,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@balsa/core": "workspace:^"
+    "@balsats/core": "workspace:^"
   },
   "devDependencies": {
-    "@balsa/core": "workspace:*",
+    "@balsats/core": "workspace:*",
     "ai": "7.0.123"
   }
 }

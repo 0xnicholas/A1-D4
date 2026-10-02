@@ -10,7 +10,7 @@
  * response).
  */
 
-import type { Chunk } from '@balsa/core/model';
+import type { Chunk } from '@balsats/core/model';
 import type { AISdkStreamChunk } from './chunks.js';
 
 /** The default sanitized error text, matching the official server-side default. */

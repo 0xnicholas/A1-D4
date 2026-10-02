@@ -21,19 +21,19 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-memory-chat start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-memory-chat start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsa/example-memory-chat start
+ *     pnpm --filter @balsats/example-memory-chat start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsa/core';
-import type { AgentGenerateResult } from '@balsa/core/agent';
-import { Memory, createInMemoryStore } from '@balsa/core/memory';
-import type { MemoryThreadRef, StoredMessage } from '@balsa/core/memory';
-import { consoleExporter, createTracer } from '@balsa/core/observability';
+import { createApp } from '@balsats/core';
+import type { AgentGenerateResult } from '@balsats/core/agent';
+import { Memory, createInMemoryStore } from '@balsats/core/memory';
+import type { MemoryThreadRef, StoredMessage } from '@balsats/core/memory';
+import { consoleExporter, createTracer } from '@balsats/core/observability';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

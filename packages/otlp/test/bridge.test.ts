@@ -4,8 +4,8 @@
  * 「三事件 → OTLP 桥法」). Wire-level against a local capture endpoint, JSON protocol.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createOtlpExporter } from '@balsa/otlp';
-import type { ExportedSpan } from '@balsa/core/observability';
+import { createOtlpExporter } from '@balsats/otlp';
+import type { ExportedSpan } from '@balsats/core/observability';
 import {
   decodeSpans,
   exportAndFlush,
@@ -93,7 +93,7 @@ describe('createOtlpExporter: span_ended bridge', () => {
       const span = decodeSpans((await capture.waitForRequests(1))[0]!.body)[0]!;
       expect(span.resource['service.name']).toBe('balsa');
       expect(Object.keys(span.resource).some((key) => key.startsWith('telemetry.sdk.'))).toBe(false);
-      expect(span.scope.name).toBe('@balsa/otlp');
+      expect(span.scope.name).toBe('@balsats/otlp');
       expect(span.scope.version).toBeUndefined();
     } finally {
       await capture.close();

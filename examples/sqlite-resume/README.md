@@ -1,7 +1,7 @@
 # sqlite-resume
 
 A durable run that outlives the process that made it: the refund desk suspends in a worker process, its
-loop snapshot lands in SQLite through [`@balsa/sqlite`](../../packages/sqlite/), the worker exits — and a
+loop snapshot lands in SQLite through [`@balsats/sqlite`](../../packages/sqlite/), the worker exits — and a
 brand-new process opens its own connection to the same file and resumes the run. Balsa is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
@@ -26,14 +26,14 @@ From the repo root:
 ```bash
 pnpm install
 pnpm build
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-sqlite-resume start
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-sqlite-resume start
 ```
 
 Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsa/example-sqlite-resume start
+  pnpm --filter @balsats/example-sqlite-resume start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. The SQLite file defaults to a fresh
@@ -46,6 +46,6 @@ does not execute the held call — each exits non-zero instead of printing a hap
 - **This is the SQLite adapter's whole point**: `storage.memory`, `storage.agentRunSnapshots` and
   `storage.schedules` are handed to the composition root, so the snapshot, the message history and the
   schedule all land in one file that outlives the process.
-- The example consumes `@balsa/core` and `@balsa/sqlite` through their built package exports — run
+- The example consumes `@balsats/core` and `@balsats/sqlite` through their built package exports — run
   `pnpm build` before `start`. Package docs: [`packages/sqlite`](../../packages/sqlite/); spec:
   [`docs/architecture/storage.md`](../../docs/architecture/storage.md) 「SQLite 参考 adapter」.

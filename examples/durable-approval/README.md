@@ -52,8 +52,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsa/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-durable-approval start
+pnpm build                 # examples consume @balsats/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-durable-approval start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -61,7 +61,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsa/example-durable-approval start
+  pnpm --filter @balsats/example-durable-approval start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. Expected output: the two runs'
@@ -88,5 +88,5 @@ two replies — the approved refund confirmed, the rejected one answered with an
 - **A second suspension overwrites the same `runId`** — a run that suspends again (another gated
   call) is resumable under the id it always had. This narrative does not stage that; the core's test
   suite does.
-- Like the other examples, the script consumes `@balsa/core` through its built package exports — run
+- Like the other examples, the script consumes `@balsats/core` through its built package exports — run
   `pnpm build` before `start`.

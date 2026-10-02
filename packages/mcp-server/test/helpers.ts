@@ -5,7 +5,7 @@
  * 2026-07-28 client sends (protocol revision is mandatory in both the header and the envelope).
  */
 import type { JSONRPCMessage, Transport } from '@modelcontextprotocol/server';
-import type { McpServer } from '@balsa/mcp-server';
+import type { McpServer } from '@balsats/mcp-server';
 
 export interface JsonRpcRequest {
   readonly jsonrpc: '2.0';

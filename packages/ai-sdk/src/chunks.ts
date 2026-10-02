@@ -14,7 +14,7 @@
  * `ai` package (`test/cross-check.test.ts`); the published artifact never imports `ai` types.
  */
 
-import type { Usage } from '@balsa/core/model';
+import type { Usage } from '@balsats/core/model';
 
 /**
  * The finish reason of a UI message stream, as this package emits it on the message-level `finish`

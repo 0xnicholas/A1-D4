@@ -6,9 +6,9 @@
  * `messages` foreign key that the reference does not have.
  */
 import { describe, expect, it } from 'vitest';
-import { supportsWorkingMemory } from '@balsa/core/memory';
-import type { StoredMessage, StoredThread } from '@balsa/core/memory';
-import type { SqliteStorage } from '@balsa/sqlite';
+import { supportsWorkingMemory } from '@balsats/core/memory';
+import type { StoredMessage, StoredThread } from '@balsats/core/memory';
+import type { SqliteStorage } from '@balsats/sqlite';
 import { caught, memoryStorage, messageOf } from './helpers.js';
 
 function thread(

@@ -10,7 +10,7 @@ import type {
   StandardSchema,
   StandardSchemaV1,
   StandardTypedV1,
-} from '@balsa/core/tools';
+} from '@balsats/core/tools';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsa/core/agent';
-import { createTool } from '@balsa/core/tools';
+import { Agent } from '@balsats/core/agent';
+import { createTool } from '@balsats/core/tools';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**

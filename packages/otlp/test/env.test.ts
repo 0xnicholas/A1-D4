@@ -7,7 +7,7 @@
  */
 import { gunzipSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createOtlpExporter } from '@balsa/otlp';
+import { createOtlpExporter } from '@balsats/otlp';
 import { decodeSpans, exportAndFlush, saveOtelEnv, startCapture, testSpan, type CapturedRequest, type NonEmpty } from './helpers.js';
 
 let restoreEnv: () => void;

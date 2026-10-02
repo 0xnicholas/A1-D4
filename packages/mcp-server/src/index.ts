@@ -1,5 +1,5 @@
 /**
- * `@balsa/mcp-server` — the MCP server capability package: expose a `Record<string, Tool>` to MCP
+ * `@balsats/mcp-server` — the MCP server capability package: expose a `Record<string, Tool>` to MCP
  * clients over HTTP and stdio.
  *
  * One creation-time object with three members: `fetch` (the web-standard HTTP handler),
@@ -28,8 +28,8 @@ import type {
 } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import type { ServeStdioOptions, StdioServerHandle } from '@modelcontextprotocol/server/stdio';
-import type { RequestContext } from '@balsa/core/agent';
-import type { Tool, ToolContext } from '@balsa/core/tools';
+import type { RequestContext } from '@balsats/core/agent';
+import type { Tool, ToolContext } from '@balsats/core/tools';
 
 /** What the server exposes: the identity it advertises, and the tool container to serve. */
 export interface McpServerOptions {

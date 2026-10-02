@@ -1,12 +1,12 @@
-# `@balsa/croner`
+# `@balsats/croner`
 
 Cron expressions for [Balsa](https://github.com/0xnicholas/balsa-framework) schedules: one `cron()`
 call returns exactly the `next` + `timezone` fragment `schedules.save()` takes, so a schedule is
 registered by spreading it in — and the expression never enters the record.
 
 ```ts
-import { createSchedules } from '@balsa/core/schedules';
-import { cron } from '@balsa/croner';
+import { createSchedules } from '@balsats/core/schedules';
+import { cron } from '@balsats/croner';
 
 const schedules = createSchedules({ agents: { reporter } });
 
@@ -19,7 +19,7 @@ await schedules.save({
 await schedules.tick(); // the platform cron's endpoint calls this
 ```
 
-- Spec: [`docs/architecture/harness.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/harness.md) —「croner 封装能力包(`@balsa/croner`)」
+- Spec: [`docs/architecture/harness.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/architecture/harness.md) —「croner 封装能力包(`@balsats/croner`)」
 - Facts this package builds on: [`docs/research/croner.md`](https://github.com/0xnicholas/balsa-framework/blob/main/docs/research/croner.md)
 - Decisions: [ADR-0002](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0002-package-structure.md) (packaging); harness spec ([ADR-0011](https://github.com/0xnicholas/balsa-framework/blob/main/docs/adr/0011-harness-semantics.md))
 - Example: [`examples/cron-schedule`](https://github.com/0xnicholas/balsa-framework/blob/main/examples/cron-schedule) — save → occurrences advance → `tick` fires
@@ -27,12 +27,12 @@ await schedules.tick(); // the platform cron's endpoint calls this
 ## Install
 
 ```bash
-npm install @balsa/croner
+npm install @balsats/croner
 ```
 
 The wrapper is one exact-pinned dependency (`croner@10.0.1`, MIT, zero transitive packages, engines
-`>=18`). There is **no `@balsa/core` peer**: the fragment is structurally just the `next` +
-`timezone` slice of `ScheduleSaveInput`, so this package stands alone — install `@balsa/core`
+`>=18`). There is **no `@balsats/core` peer**: the fragment is structurally just the `next` +
+`timezone` slice of `ScheduleSaveInput`, so this package stands alone — install `@balsats/core`
 separately when you actually call `schedules.save()`.
 
 ## The fragment

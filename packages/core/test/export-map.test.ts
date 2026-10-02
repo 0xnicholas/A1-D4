@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * `@balsa/core` 的导出表契约:根入口 + 每个子系统一个子路径。
+ * `@balsats/core` 的导出表契约:根入口 + 每个子系统一个子路径。
  * 子系统清单与 `docs/architecture/README.md` 手工同步;子路径 ↔ 目录的映射形状来自 ADR-0002 / ADR-0014。
  */
 const SUBSYSTEMS = ['model', 'agent', 'tools', 'observability', 'workflows', 'memory', 'signals', 'durable-agent', 'schedules'] as const;
@@ -21,7 +21,7 @@ function readExportMap(): Record<string, ExportEntry> {
 
 const exportMap = readExportMap();
 
-describe('@balsa/core 导出表', () => {
+describe('@balsats/core 导出表', () => {
   it.each(SUBSYSTEMS)('子路径 ./%s 指向该子系统的 dist 入口', (subsystem) => {
     expect(exportMap[`./${subsystem}`]).toEqual({
       types: `./dist/${subsystem}/index.d.ts`,

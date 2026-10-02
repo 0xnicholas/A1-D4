@@ -2,7 +2,7 @@
 
 A traced agent run lands in a local OTLP collector as GenAI semantic-convention spans: a `node:http`
 collector plays the backend (Langfuse, LangSmith and any OTel collector speak the same wire), a scripted
-model drives a real agent run, and [`@balsa/otlp`](../../packages/otlp/) ships the run's spans over OTLP.
+model drives a real agent run, and [`@balsats/otlp`](../../packages/otlp/) ships the run's spans over OTLP.
 Balsa is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no runtime
 baggage.
 
@@ -23,7 +23,7 @@ From the repo root:
 ```bash
 pnpm install
 pnpm build
-pnpm --filter @balsa/example-otlp-collector start
+pnpm --filter @balsats/example-otlp-collector start
 ```
 
 The exporter target defaults to this script's local collector. The official env surface passes straight
@@ -31,7 +31,7 @@ through to point it at a real backend instead:
 
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318 \
-  pnpm --filter @balsa/example-otlp-collector start
+  pnpm --filter @balsats/example-otlp-collector start
 ```
 
 OTLP/JSON is the default here so the local collector can decode what it receives; set
@@ -42,6 +42,6 @@ or misparented, a `gen_ai.*` attribute that drifts — each exits non-zero inste
 ## Notes
 
 - The **scripted model is defined in the file** — the example runs with no key and no network.
-- The example consumes `@balsa/core` and `@balsa/otlp` through their built package exports — run
+- The example consumes `@balsats/core` and `@balsats/otlp` through their built package exports — run
   `pnpm build` before `start`. Package docs: [`packages/otlp`](../../packages/otlp/); spec:
   [`docs/architecture/observability.md`](../../docs/architecture/observability.md) 「OTLP 能力包」.

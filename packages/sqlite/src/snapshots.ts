@@ -14,12 +14,12 @@
  * `json_extract` (「记录能告诉你的不落列」), ordering is newest-suspended-first and the cursor is a
  * run id.
  */
-import type { AgentRunSnapshot, AgentRunSnapshotStore } from '@balsa/core/durable-agent';
+import type { AgentRunSnapshot, AgentRunSnapshotStore } from '@balsats/core/durable-agent';
 import type {
   WorkflowRunSnapshot,
   WorkflowRunStatus,
   WorkflowSnapshotStore,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 import type { SqliteLifecycle } from './connection.js';
 
 /** `WorkflowSnapshotStore` with every declared extension implemented (all of them are frozen). */

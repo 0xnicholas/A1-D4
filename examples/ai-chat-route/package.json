@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/example-ai-chat-route",
+  "name": "@balsats/example-ai-chat-route",
   "version": "0.0.0",
   "private": true,
   "description": "Balsa AI SDK example: a useChat-compatible chat route over node:http, with durable suspension in the stream and the app-side resume orchestration.",
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsa/core": "workspace:*",
-    "@balsa/ai-sdk": "workspace:*",
+    "@balsats/core": "workspace:*",
+    "@balsats/ai-sdk": "workspace:*",
     "zod": "^4.6.5"
   }
 }

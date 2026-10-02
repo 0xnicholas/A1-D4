@@ -1,5 +1,5 @@
 /**
- * `@balsa/otlp` — the OTLP exporter capability package.
+ * `@balsats/otlp` — the OTLP exporter capability package.
  *
  * Maps the kernel's tracing events to GenAI semconv-shaped OTLP spans over HTTP (protobuf or
  * JSON) using the official OpenTelemetry exporter stack. Spec:

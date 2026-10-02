@@ -2,9 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@balsa/core": ["../../packages/core/src/index.ts"],
-      "@balsa/core/*": ["../../packages/core/src/*/index.ts"],
-      "@balsa/ai-sdk": ["./src/index.ts"]
+      "@balsats/core": ["../../packages/core/src/index.ts"],
+      "@balsats/core/*": ["../../packages/core/src/*/index.ts"],
+      "@balsats/ai-sdk": ["./src/index.ts"]
     }
   },
   "include": ["src", "test"]

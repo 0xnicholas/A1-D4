@@ -32,27 +32,27 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-durable-approval start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-durable-approval start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsa/example-durable-approval start
+ *     pnpm --filter @balsats/example-durable-approval start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsa/core';
-import { createInMemoryAgentRunSnapshotStore } from '@balsa/core/durable-agent';
-import type { DurableStreamResult } from '@balsa/core/durable-agent';
-import type { AgentRunSnapshotStore } from '@balsa/core/durable-agent';
-import type { Chunk, FinishReason, ModelMessage } from '@balsa/core/model';
+import { createApp } from '@balsats/core';
+import { createInMemoryAgentRunSnapshotStore } from '@balsats/core/durable-agent';
+import type { DurableStreamResult } from '@balsats/core/durable-agent';
+import type { AgentRunSnapshotStore } from '@balsats/core/durable-agent';
+import type { Chunk, FinishReason, ModelMessage } from '@balsats/core/model';
 import {
   AGENT_RUN_SPAN,
   consoleExporter,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import type { ExportedSpan } from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
+} from '@balsats/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

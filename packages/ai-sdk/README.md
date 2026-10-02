@@ -1,13 +1,13 @@
-# `@balsa/ai-sdk`
+# `@balsats/ai-sdk`
 
 Serve a [Balsa](https://github.com/0xnicholas/balsa-framework) agent to AI SDK clients: one
 `createChatRoute()` handler that speaks the UI message stream `useChat()` consumes, plus the
-stream converter and history read-back behind it. Zero runtime dependencies; `@balsa/core` is a
+stream converter and history read-back behind it. Zero runtime dependencies; `@balsats/core` is a
 peer.
 
 ```ts
-import { createApp } from '@balsa/core';
-import { createChatRoute } from '@balsa/ai-sdk';
+import { createApp } from '@balsats/core';
+import { createChatRoute } from '@balsats/ai-sdk';
 
 const app = createApp({});
 const agent = app.agent({ name: 'desk', instructions: '…', model });
@@ -24,7 +24,7 @@ export default {
 ## Install
 
 ```bash
-npm install @balsa/ai-sdk @balsa/core
+npm install @balsats/ai-sdk @balsats/core
 ```
 
 ## The route
@@ -81,7 +81,7 @@ Same axis as the rest of Balsa — install only what you use, and the numbers ar
 
 - runtime dependencies: **0** (the declared-dependency gate is enforced in CI)
 - first-party code: **8,253 B** minified, recorded in `byte-budget.json`
-- `@balsa/core` stays a peer, so there is exactly one core instance
+- `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License
 

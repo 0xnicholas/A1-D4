@@ -12,8 +12,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach } from 'vitest';
-import { createSqliteStorage } from '@balsa/sqlite';
-import type { SqliteStorage, SqliteStorageOptions } from '@balsa/sqlite';
+import { createSqliteStorage } from '@balsats/sqlite';
+import type { SqliteStorage, SqliteStorageOptions } from '@balsats/sqlite';
 
 const cleanups: Array<() => void> = [];
 

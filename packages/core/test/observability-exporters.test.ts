@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AGENT_RUN_SPAN, consoleExporter, createTracer, memoryExporter } from '@balsa/core/observability';
-import type { TracingEvent } from '@balsa/core/observability';
+import { AGENT_RUN_SPAN, consoleExporter, createTracer, memoryExporter } from '@balsats/core/observability';
+import type { TracingEvent } from '@balsats/core/observability';
 
 /**
  * 导出前整形与 console exporter(M1-08 #29,observability.md):

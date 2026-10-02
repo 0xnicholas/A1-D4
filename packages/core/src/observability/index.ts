@@ -1,5 +1,5 @@
 /**
- * `@balsa/core/observability` — observability kernel.
+ * `@balsats/core/observability` — observability kernel.
  *
  * The kernel's own minimal span model (input/output first-class, seven framework type constants,
  * open `type` string), the tracer with its three-event bus (`span_started` / `span_updated` /

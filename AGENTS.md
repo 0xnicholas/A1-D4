@@ -1,7 +1,7 @@
 # Balsa
 
 This repository is **balsa-framework**, the framework subproject of the Balsa umbrella (packages
-publish under the `@balsa/*` scope). Other Balsa subprojects live alongside it.
+publish under the `@balsats/*` scope). Other Balsa subprojects live alongside it.
 
 ## Agent skills
 

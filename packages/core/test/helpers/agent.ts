@@ -1,6 +1,6 @@
-import { Agent } from '@balsa/core/agent';
-import type { ModelInput } from '@balsa/core/agent';
-import type { Tool } from '@balsa/core/tools';
+import { Agent } from '@balsats/core/agent';
+import type { ModelInput } from '@balsats/core/agent';
+import type { Tool } from '@balsats/core/tools';
 
 /** 测试 fixture:一行 system 指令。多个测试文件从同一份实现取用,不各自复制。 */
 export const INSTRUCTIONS = 'You are concise.';

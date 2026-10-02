@@ -17,9 +17,9 @@
 >
 > | 包 | 定义表面(所在节) |
 > | --- | --- |
-> | `@balsa/mcp-server` / `@balsa/mcp-client` | [tools.md](tools.md)「MCP server 能力包」/「MCP client 能力包」 |
-> | `@balsa/otlp` | [observability.md](observability.md)「OTLP 能力包(M5 设计冻结)」 |
-> | `@balsa/sqlite` | [storage.md](storage.md)「SQLite 参考 adapter(M5 设计冻结)」 |
-> | `@balsa/ai-sdk` | [model.md](model.md)「AI SDK 互操作能力包(M5 设计冻结)」 |
-> | `@balsa/croner` | [harness.md](harness.md)「croner 封装能力包」 |
+> | `@balsats/mcp-server` / `@balsats/mcp-client` | [tools.md](tools.md)「MCP server 能力包」/「MCP client 能力包」 |
+> | `@balsats/otlp` | [observability.md](observability.md)「OTLP 能力包(M5 设计冻结)」 |
+> | `@balsats/sqlite` | [storage.md](storage.md)「SQLite 参考 adapter(M5 设计冻结)」 |
+> | `@balsats/ai-sdk` | [model.md](model.md)「AI SDK 互操作能力包(M5 设计冻结)」 |
+> | `@balsats/croner` | [harness.md](harness.md)「croner 封装能力包」 |
 > | bunfold 桥(**已裁**,不建包;[#79](https://github.com/0xnicholas/balsa-framework/issues/79)) | [memory.md](memory.md)「外部记忆引擎(M5 裁定:不产桥接包)」 |

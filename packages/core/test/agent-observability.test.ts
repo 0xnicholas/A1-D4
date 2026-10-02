@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsa/core/agent';
-import { Memory, createInMemoryStore } from '@balsa/core/memory';
+import { Agent } from '@balsats/core/agent';
+import { Memory, createInMemoryStore } from '@balsats/core/memory';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
@@ -10,9 +10,9 @@ import {
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
-import type { ToolContext } from '@balsa/core/tools';
+} from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
+import type { ToolContext } from '@balsats/core/tools';
 import { fakeModel } from './helpers/fake-model.js';
 import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType, withSpanIdProbe } from './helpers/spans.js';
 
@@ -24,7 +24,7 @@ import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType, withSpanIdProbe } f
  * agent-run 下、memory-save 挂 agent-step 下;run option traceId / parentSpanId 续接外部 trace;
  * ToolContext 的 traceId / spanId 为真值;不挂 tracer 时整个子系统零开销。
  *
- * 断言只走公开面(@balsa/core 子路径导出)与规范钦定的 memory exporter 抓手(issue #21 测试
+ * 断言只走公开面(@balsats/core 子路径导出)与规范钦定的 memory exporter 抓手(issue #21 测试
  * 决策):span 树结构、事件序列与 span 快照都在这里读。
  */
 

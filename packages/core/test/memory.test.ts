@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Memory, createInMemoryStore } from '@balsa/core/memory';
-import type { SaveMessage } from '@balsa/core/memory';
+import { Memory, createInMemoryStore } from '@balsats/core/memory';
+import type { SaveMessage } from '@balsats/core/memory';
 import { captureError, captureRejection } from './helpers/assertions.js';
 
 /**

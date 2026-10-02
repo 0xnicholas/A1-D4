@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Agent } from '@balsa/core/agent';
-import type { AgentMemoryOptions } from '@balsa/core/agent';
-import { Memory } from '@balsa/core/memory';
-import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsa/core/observability';
-import { createSignals } from '@balsa/core/signals';
-import { createTool } from '@balsa/core/tools';
+import { Agent } from '@balsats/core/agent';
+import type { AgentMemoryOptions } from '@balsats/core/agent';
+import { Memory } from '@balsats/core/memory';
+import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsats/core/observability';
+import { createSignals } from '@balsats/core/signals';
+import { createTool } from '@balsats/core/tools';
 import { INSTRUCTIONS } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
 import { eventsOfType, kinds, spanOfType } from './helpers/spans.js';
@@ -14,7 +14,7 @@ import { eventsOfType, kinds, spanOfType } from './helpers/spans.js';
  * memory?, tracer? })` 四方法,语义固定三句——活跃 = 注入当前 run(下一 step 生效);空闲 = 唤醒
  * 新 run;queueMessage = 排队保序。单进程语义(内存 pubsub + thread → 活跃 run 注册表);注入/唤醒
  * 内容落消息历史(复用 MemoryStore);memory 缺席时唤醒 = 无历史新 run。断言只走公开面
- * (@balsa/core/signals 子路径)与脚本化假模型接缝;历史断言走真实 Memory 实例的 recall。
+ * (@balsats/core/signals 子路径)与脚本化假模型接缝;历史断言走真实 Memory 实例的 recall。
  */
 
 /** 目标 thread/resource(与 per-call memory 身份同形)。 */

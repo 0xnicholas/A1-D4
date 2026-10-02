@@ -48,8 +48,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsa/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-minimal-agent start
+pnpm build                 # examples consume @balsats/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-minimal-agent start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -57,7 +57,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsa/example-minimal-agent start
+  pnpm --filter @balsats/example-minimal-agent start
 ```
 
 ## Notes

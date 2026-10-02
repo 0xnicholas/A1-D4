@@ -16,8 +16,8 @@ import {
   TOOL_CALL_SPAN,
   WORKFLOW_RUN_SPAN,
   WORKFLOW_STEP_SPAN,
-} from '@balsa/core/observability';
-import type { ExportedSpan } from '@balsa/core/observability';
+} from '@balsats/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
 import { messagesToPromptPayload, outputToMessages } from './messages.js';
 import {
   collectAttribute,

@@ -1,7 +1,7 @@
 /**
  * Balsa sqlite-resume example — a durable run that outlives the process that made it.
  *
- * One script, two processes, one SQLite file (`@balsa/sqlite`). The parent re-execs itself as a
+ * One script, two processes, one SQLite file (`@balsats/sqlite`). The parent re-execs itself as a
  * **worker**: the worker builds the refund desk, the model asks for the gated `issueRefund`, the
  * run suspends and its loop snapshot lands in SQLite — then the worker exits, and with it every
  * in-process trace of the run. The parent opens its **own connection** to the same file and shows
@@ -21,12 +21,12 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-sqlite-resume start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-sqlite-resume start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsa/example-sqlite-resume start
+ *     pnpm --filter @balsats/example-sqlite-resume start
  *
  * The database file defaults to a fresh temp directory; set `BALSA_SQLITE_EXAMPLE_DB` to keep it.
  * The script self-asserts (`node:assert/strict`): any violated payoff exits 1.
@@ -38,12 +38,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsa/core';
-import { createTool } from '@balsa/core/tools';
-import { createSqliteStorage } from '@balsa/sqlite';
-import type { SqliteStorage } from '@balsa/sqlite';
-import type { DurableAgent } from '@balsa/core/durable-agent';
-import type { AgentMemoryOptions } from '@balsa/core/agent';
+import { createApp } from '@balsats/core';
+import { createTool } from '@balsats/core/tools';
+import { createSqliteStorage } from '@balsats/sqlite';
+import type { SqliteStorage } from '@balsats/sqlite';
+import type { DurableAgent } from '@balsats/core/durable-agent';
+import type { AgentMemoryOptions } from '@balsats/core/agent';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {
@@ -253,7 +253,7 @@ async function parent(): Promise<void> {
     console.log(`  schedules.listDue() → [${due.map((record) => record.id).join(', ')}]`);
 
     console.log(
-      '\n✓ Cross-process suspend/resume on @balsa/sqlite: the snapshot, the history and the ' +
+      '\n✓ Cross-process suspend/resume on @balsats/sqlite: the snapshot, the history and the ' +
         'schedule all outlived the process that wrote them.',
     );
   } finally {

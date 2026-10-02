@@ -3,13 +3,13 @@
 Ultralight TypeScript agent framework. Compose only what you use — run anywhere, no runtime baggage.
 
 > **Balsa** is the umbrella brand; this repository — **balsa-framework** — is its framework
-> subproject. Packages publish under the `@balsa/*` scope (starting with `@balsa/core`), and future
+> subproject. Packages publish under the `@balsats/*` scope (starting with `@balsats/core`), and future
 > subprojects live alongside it.
 
 > **Status:** pre-1.0. Agents, memory, workflows, the harness trio — durable agents, signals,
 > schedules — and the six M5 capability packages are implemented and verified
 > ([roadmap](docs/ROADMAP.md)). **No npm release exists yet**: the package version is still
-> `0.0.0` and the registry has nothing under `@balsa`. The planned versions are 0.1.0 = M1+M2,
+> `0.0.0` and the registry has nothing under `@balsats`. The planned versions are 0.1.0 = M1+M2,
 > 0.2 = M1–M3, 0.3 = M1–M4 and 0.5 = M1–M5 (everything this README describes), all pending a
 > manual owner publish — until then, use Balsa from this repo (see [Development](#development))
 > and see [Capability packages](#capability-packages-m5) for the core-external packages.
@@ -19,7 +19,7 @@ Ultralight TypeScript agent framework. Compose only what you use — run anywher
 Balsa's differentiating axis is **lightweight**, in two precise senses:
 
 - **Compose only what you use.** Every subsystem ships behind its own subpath export
-  (`@balsa/core/agent`, `/tools`, `/memory`, `/workflows`, …). What you don't import costs you
+  (`@balsats/core/agent`, `/tools`, `/memory`, `/workflows`, …). What you don't import costs you
   nothing — not in the dependency tree (the core has zero runtime dependencies), not in concept
   space.
 - **No runtime burden.** No database, queue, or long-running process is required. Storage ports
@@ -39,7 +39,7 @@ from the AI SDK provider ecosystem — no adapters, no registries.
 ## Install
 
 ```bash
-npm install @balsa/core zod @ai-sdk/openai
+npm install @balsats/core zod @ai-sdk/openai
 ```
 
 Not on npm yet — see [Status](#status). Until then, clone this repo and follow
@@ -49,8 +49,8 @@ Not on npm yet — see [Status](#status). Until then, clone this repo and follow
 
 ```ts
 import { openai } from '@ai-sdk/openai';
-import { Agent } from '@balsa/core/agent';
-import { createTool } from '@balsa/core/tools';
+import { Agent } from '@balsats/core/agent';
+import { createTool } from '@balsats/core/tools';
 import { z } from 'zod';
 
 // A tool is a four-field plain object — description, optional inputSchema / outputSchema,
@@ -97,7 +97,7 @@ Every configuration field is a **dynamic argument**: it accepts either a value `
 Each subsystem lives behind its own subpath export — pull in only the ones you use. The
 [package surface](#package-surface) table below is the full import map.
 
-### Agents — `@balsa/core/agent`
+### Agents — `@balsats/core/agent`
 
 `Agent` wraps a model, instructions, and tools into something you can `generate()` / `stream()`.
 Cross-cutting concerns — guardrails, redaction, rate limiting, evals — live in exactly one place:
@@ -106,10 +106,10 @@ declaration order. Multi-agent collaboration is **as-tool composition**: wrap on
 tool and hang it on another; delegation is an ordinary tool call, and there is no supervisor
 protocol or sub-agent concept in the core.
 
-### Memory — `@balsa/core/memory`
+### Memory — `@balsats/core/memory`
 
 ```ts
-import { Memory, createInMemoryStore } from '@balsa/core/memory';
+import { Memory, createInMemoryStore } from '@balsats/core/memory';
 
 const memory = new Memory({ storage: createInMemoryStore() });
 const agent = new Agent({ name, instructions, model, memory });
@@ -129,10 +129,10 @@ next conversation of that user, in any thread, starts already knowing their prof
 through a port with an in-memory default; swapping in a persistent adapter changes nothing above
 the port.
 
-### Workflows — `@balsa/core/workflows`
+### Workflows — `@balsats/core/workflows`
 
 ```ts
-import { createStep, createWorkflow } from '@balsa/core/workflows';
+import { createStep, createWorkflow } from '@balsats/core/workflows';
 
 const workflow = createWorkflow({ id: 'expense-approval', inputSchema, outputSchema })
   .foreach(checkItem, { concurrency: 2 })
@@ -162,11 +162,11 @@ boundary (start input, step input, resume data) is validated against its Standar
 `suspend` / `resume` rest on JSON snapshots at step boundaries, persisted through a storage port
 (in-memory by default).
 
-### Observability — `@balsa/core/observability`
+### Observability — `@balsats/core/observability`
 
 ```ts
-import { createApp } from '@balsa/core';
-import { consoleExporter, createTracer } from '@balsa/core/observability';
+import { createApp } from '@balsats/core';
+import { consoleExporter, createTracer } from '@balsats/core/observability';
 
 // The composition root is an optional thin assembly point: one tracer assembled here is
 // handed to every agent built through the app — no per-agent wiring.
@@ -180,16 +180,16 @@ run/step, and memory recall/save is traced, with console and memory exporters bu
 `new Agent({ … })` with no app and no tracer stays fully first-class — zero overhead, no span
 objects.
 
-### Signals — `@balsa/core/signals`
+### Signals — `@balsats/core/signals`
 
 `createSignals()` is the thread-directed interaction primitive: inject user input into an active
 run, wake an idle thread into a new run, or queue in order — injected content lands in the message
 history. Single-process semantics; cross-instance distribution belongs to capability packages.
 
-### Durable agents — `@balsa/core/durable-agent`
+### Durable agents — `@balsats/core/durable-agent`
 
 ```ts
-import { createDurableAgent } from '@balsa/core/durable-agent';
+import { createDurableAgent } from '@balsats/core/durable-agent';
 
 // The agent wrapped so a run can stop and wait for a human: a tool call whose name is on the
 // approval list does not execute — the run suspends with its loop snapshot written to a port.
@@ -205,10 +205,10 @@ core stays permission-free. Snapshots are JSON-only and go through `AgentRunSnap
 one human interaction stays one trace. Crash recovery, multi-replica leases and a resumable stream
 are deliberately not core.
 
-### Schedules — `@balsa/core/schedules`
+### Schedules — `@balsats/core/schedules`
 
 ```ts
-import { createSchedules } from '@balsa/core/schedules';
+import { createSchedules } from '@balsats/core/schedules';
 
 const schedules = createSchedules({ agents: { desk: agent }, signals });
 await schedules.save({ id: 'morning-sweep', next: (from) => nextDailyAt(9, from), target: { … } });
@@ -225,35 +225,35 @@ parsing never enters the core. A trigger is either threadless (`agent.generate`)
 
 | Import path | What it gives you |
 | --- | --- |
-| `@balsa/core` | `createApp` — the optional composition root |
-| `@balsa/core/agent` | `Agent`, dynamic arguments, structured output, processors |
-| `@balsa/core/model` | the model contract and chunk protocol types |
-| `@balsa/core/tools` | `createTool` and the tool types |
-| `@balsa/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
-| `@balsa/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
-| `@balsa/core/observability` | `createTracer`, console / memory exporters, span types |
-| `@balsa/core/signals` | `createSignals` — inject / wake / queue on a thread |
-| `@balsa/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
-| `@balsa/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
+| `@balsats/core` | `createApp` — the optional composition root |
+| `@balsats/core/agent` | `Agent`, dynamic arguments, structured output, processors |
+| `@balsats/core/model` | the model contract and chunk protocol types |
+| `@balsats/core/tools` | `createTool` and the tool types |
+| `@balsats/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
+| `@balsats/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
+| `@balsats/core/observability` | `createTracer`, console / memory exporters, span types |
+| `@balsats/core/signals` | `createSignals` — inject / wake / queue on a thread |
+| `@balsats/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
+| `@balsats/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
 
 ### Capability packages (M5)
 
-Capability packages that carry external dependencies ship as separate `@balsa/<capability>`
+Capability packages that carry external dependencies ship as separate `@balsats/<capability>`
 packages — install only what you use. All six are implemented and verified: unit tests in
 `pnpm verify`, five end-to-end examples covering all six (see [Examples](#examples)), and
 minified byte budgets plus dependency-closure baselines where there is a dependency to measure
 ([roadmap](docs/ROADMAP.md), M5). They are **not on npm yet** — the
-version is still `0.0.0` and the registry has nothing under `@balsa` (a manual owner publish, see
+version is still `0.0.0` and the registry has nothing under `@balsats` (a manual owner publish, see
 [Status](#status)):
 
 | Package | What it gives you | Spec |
 | --- | --- | --- |
-| `@balsa/otlp` | an OTLP exporter: Balsa spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
-| `@balsa/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
-| `@balsa/mcp-client` | another MCP server's tools, as Balsa tools | [tools.md](docs/architecture/tools.md) |
-| `@balsa/sqlite` | a SQLite adapter for all four storage ports | [storage.md](docs/architecture/storage.md) |
-| `@balsa/ai-sdk` | AI SDK UI message stream interop and a `useChat` route | [model.md](docs/architecture/model.md) |
-| `@balsa/croner` | cron expressions as the injected `next` function | [harness.md](docs/architecture/harness.md) |
+| `@balsats/otlp` | an OTLP exporter: Balsa spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
+| `@balsats/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
+| `@balsats/mcp-client` | another MCP server's tools, as Balsa tools | [tools.md](docs/architecture/tools.md) |
+| `@balsats/sqlite` | a SQLite adapter for all four storage ports | [storage.md](docs/architecture/storage.md) |
+| `@balsats/ai-sdk` | AI SDK UI message stream interop and a `useChat` route | [model.md](docs/architecture/model.md) |
+| `@balsats/croner` | cron expressions as the injected `next` function | [harness.md](docs/architecture/harness.md) |
 
 The bunfold memory bridge was evaluated and ruled out for now; its reopen conditions live in the
 roadmap's deferred list. Packaging and dependency-redline rules are in
@@ -265,8 +265,8 @@ Runnable, self-asserting examples live in [`examples/`](examples/). From the rep
 
 ```bash
 pnpm install
-pnpm build                  # examples consume @balsa/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-minimal-agent start
+pnpm build                  # examples consume @balsats/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-minimal-agent start
 ```
 
 Any OpenAI-compatible endpoint works too, e.g. a local Ollama:

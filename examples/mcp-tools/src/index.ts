@@ -1,14 +1,14 @@
 /**
  * Balsa MCP paired example — one script, both capability packages.
  *
- * The server side (`@balsa/mcp-server`) serves a small tool container over MCP; the client side
- * (`@balsa/mcp-client`) connects and bridges the remote tools back into a `Record<string, Tool>`
+ * The server side (`@balsats/mcp-server`) serves a small tool container over MCP; the client side
+ * (`@balsats/mcp-client`) connects and bridges the remote tools back into a `Record<string, Tool>`
  * — the same shape an agent's tool container takes. The whole round-trip self-asserts with
  * `node:assert` (exit 0 on success; any failure exits 1).
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   pnpm --filter @balsa/example-mcp-tools start
+ *   pnpm --filter @balsats/example-mcp-tools start
  *
  * Both transports are exercised:
  *
@@ -20,11 +20,11 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { createTool } from '@balsa/core/tools';
-import { createMcpClient, prefixTools } from '@balsa/mcp-client';
-import type { McpClient } from '@balsa/mcp-client';
-import { createMcpServer } from '@balsa/mcp-server';
-import type { Tool } from '@balsa/core/tools';
+import { createTool } from '@balsats/core/tools';
+import { createMcpClient, prefixTools } from '@balsats/mcp-client';
+import type { McpClient } from '@balsats/mcp-client';
+import { createMcpServer } from '@balsats/mcp-server';
+import type { Tool } from '@balsats/core/tools';
 import { z } from 'zod';
 
 // --- the shared tool container -------------------------------------------------------------

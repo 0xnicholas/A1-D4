@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/example-memory-chat",
+  "name": "@balsats/example-memory-chat",
   "version": "0.0.0",
   "private": true,
   "description": "Balsa memory example: two threads across one resource, recall, and working memory.",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsa/core": "workspace:*",
+    "@balsats/core": "workspace:*",
     "zod": "^4.6.5"
   }
 }

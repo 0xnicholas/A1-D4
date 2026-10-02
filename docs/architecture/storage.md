@@ -37,7 +37,7 @@ adapter 自拥连接生命周期:可选暴露 `init?()` / `close?()`;**核心永
 ## 第一方 adapter 清单
 
 - **内存实现**:核心自带,四个 port 各一;不接 storage 即纯内存(已钉于各子系统规范)。SQLite 侧也有一个完整实现的参照件(下节)。
-- **SQLite 系参考 adapter** = `@balsa/sqlite`(能力包,恰好一个 durable 第一方):嵌入式文件库、零服务,覆盖最常见自托管形态,同时充当四个 port 的真实后端验证。驱动已冻 = `node:sqlite`,engines 基线 `>=22.13.0`(M5 设计冻结,见下节);build 时机归路线图(#16)。
+- **SQLite 系参考 adapter** = `@balsats/sqlite`(能力包,恰好一个 durable 第一方):嵌入式文件库、零服务,覆盖最常见自托管形态,同时充当四个 port 的真实后端验证。驱动已冻 = `node:sqlite`,engines 基线 `>=22.13.0`(M5 设计冻结,见下节);build 时机归路线图(#16)。
 - **其余后端(Postgres / Redis / Upstash / Mongo 等)不做第一方**,留社区。
 
 ### Adapter 作者指南(要点)
@@ -48,7 +48,7 @@ adapter 自拥连接生命周期:可选暴露 `init?()` / `close?()`;**核心永
 
 ## SQLite 参考 adapter(M5 设计冻结)
 
-第一方 durable adapter = `@balsa/sqlite` 一包(目录与清单字段沿 ADR-0002 M5 修订记;对核心走 peer,零外部依赖)。本节是冻结态:实施图按此直落,表结构、编码、并发与迁移口径都不留实现期判断。
+第一方 durable adapter = `@balsats/sqlite` 一包(目录与清单字段沿 ADR-0002 M5 修订记;对核心走 peer,零外部依赖)。本节是冻结态:实施图按此直落,表结构、编码、并发与迁移口径都不留实现期判断。
 
 ### 驱动与版本基线
 

@@ -46,7 +46,7 @@ type ModelInput =
 
 ## AI SDK 互操作能力包(M5 设计冻结)
 
-> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@balsa/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@balsa/core` 走 peer、与核心锁步发布;事实底座 = `docs/research/ai-sdk-ui-stream-protocol.md`(2026-09-30 实测,版本钉 `ai@7.0.123`)。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
+> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@balsats/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@balsats/core` 走 peer、与核心锁步发布;事实底座 = `docs/research/ai-sdk-ui-stream-protocol.md`(2026-09-30 实测,版本钉 `ai@7.0.123`)。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
 
 ### 包面
 
@@ -58,7 +58,7 @@ type ModelInput =
 ### 目标协议与漂移纪律
 
 - 目标 = `ai@7` 代 UI message stream **词汇表** + 线级响应头 `x-vercel-ai-ui-message-stream: v1`(官方要求;客户端不校验,网关可能看)。
-- **单一代、无 `version` 选项、不做多代适配器**(本 ADR「锁定单一 spec 版本」原则推广到 UI stream 协议):AI SDK 词汇表换代 = 本包 breaking,锁步发布下随全 `@balsa/*` major 走,旧代不承诺。
+- **单一代、无 `version` 选项、不做多代适配器**(本 ADR「锁定单一 spec 版本」原则推广到 UI stream 协议):AI SDK 词汇表换代 = 本包 breaking,锁步发布下随全 `@balsats/*` major 走,旧代不承诺。
 - 客户端白名单逐帧解析:已发帧子集**可小于**目标词汇,**不得超出**(未知 `type` 整流抛错)。
 - 对校:`ai` 精确钉 `devDependencies`(`7.0.123`),升级为有意 PR;三条对校——帧联合对 `UIMessageChunk` 类型可赋值 / 产物 SSE 字节 → `parseJsonEventStream(uiMessageChunkSchema)` → `readUIMessageStream` 往返断言 / 响应头常量与 `UI_MESSAGE_STREAM_HEADERS` 全等。
 

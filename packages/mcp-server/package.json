@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/mcp-server",
+  "name": "@balsats/mcp-server",
   "version": "0.0.0",
   "description": "Balsa MCP server — expose the Tool container over MCP (HTTP fetch handler + stdio).",
   "license": "Apache-2.0",
@@ -36,10 +36,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@balsa/core": "workspace:^"
+    "@balsats/core": "workspace:^"
   },
   "devDependencies": {
-    "@balsa/core": "workspace:*"
+    "@balsats/core": "workspace:*"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.2.0"

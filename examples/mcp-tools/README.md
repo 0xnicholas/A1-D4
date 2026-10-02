@@ -1,7 +1,7 @@
 # mcp-tools
 
-One tool container, served over MCP and bridged back: [`@balsa/mcp-server`](../../packages/mcp-server/)
-serves three tools over the protocol, [`@balsa/mcp-client`](../../packages/mcp-client/) connects and turns
+One tool container, served over MCP and bridged back: [`@balsats/mcp-server`](../../packages/mcp-server/)
+serves three tools over the protocol, [`@balsats/mcp-client`](../../packages/mcp-client/) connects and turns
 the remote list back into the framework's `Record<string, Tool>` — the same shape an agent's `tools:`
 takes. Balsa is an ultralight TypeScript agent framework — compose only what you use, run anywhere, no
 runtime baggage.
@@ -26,16 +26,16 @@ From the repo root:
 ```bash
 pnpm install
 pnpm build                 # examples consume the packages through their built exports (dist)
-pnpm --filter @balsa/example-mcp-tools start                       # HTTP, ephemeral 127.0.0.1 port
-MCP_PORT=8787 pnpm --filter @balsa/example-mcp-tools start         # pin the HTTP port
-MCP_TRANSPORT=stdio pnpm --filter @balsa/example-mcp-tools start   # stdio child owned by the client
+pnpm --filter @balsats/example-mcp-tools start                       # HTTP, ephemeral 127.0.0.1 port
+MCP_PORT=8787 pnpm --filter @balsats/example-mcp-tools start         # pin the HTTP port
+MCP_TRANSPORT=stdio pnpm --filter @balsats/example-mcp-tools start   # stdio child owned by the client
 ```
 
 No API key and no network beyond loopback.
 
 ## Notes
 
-- The example consumes `@balsa/core`, `@balsa/mcp-server` and `@balsa/mcp-client` through their built
+- The example consumes `@balsats/core`, `@balsats/mcp-server` and `@balsats/mcp-client` through their built
   package exports — run `pnpm build` before `start`.
 - Server-side docs: [`packages/mcp-server`](../../packages/mcp-server/) (HTTP / Next.js / Hono /
   `node:http` wiring, Host and Origin protection); client-side docs:

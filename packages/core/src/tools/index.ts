@@ -1,5 +1,5 @@
 /**
- * `@balsa/core/tools` — tools.
+ * `@balsats/core/tools` — tools.
  *
  * The four-field `createTool` plain object (schema-derived input/output types, frozen), the
  * `Record<string, Tool>` container whose keys are the tool names, the six-piece `ToolContext`

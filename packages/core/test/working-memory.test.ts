@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsa/core/agent';
-import type { ProcessInputArgs } from '@balsa/core/agent';
-import { Memory, createInMemoryStore } from '@balsa/core/memory';
-import type { MemoryStore, SaveMessage } from '@balsa/core/memory';
-import type { ModelMessage } from '@balsa/core/model';
-import { createTool } from '@balsa/core/tools';
+import { Agent } from '@balsats/core/agent';
+import type { ProcessInputArgs } from '@balsats/core/agent';
+import { Memory, createInMemoryStore } from '@balsats/core/memory';
+import type { MemoryStore, SaveMessage } from '@balsats/core/memory';
+import type { ModelMessage } from '@balsats/core/model';
+import { createTool } from '@balsats/core/tools';
 import { captureRejection } from './helpers/assertions.js';
 import { INSTRUCTIONS } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';

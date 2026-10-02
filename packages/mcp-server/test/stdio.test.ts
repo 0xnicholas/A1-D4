@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
-import { createMcpServer } from '@balsa/mcp-server';
-import type { McpServer } from '@balsa/mcp-server';
-import { createTool } from '@balsa/core/tools';
+import { createMcpServer } from '@balsats/mcp-server';
+import type { McpServer } from '@balsats/mcp-server';
+import { createTool } from '@balsats/core/tools';
 import type { JsonRpcMessage } from './helpers.js';
 import { initializeRequest, rpc, sendWire, toolsOf } from './helpers.js';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/example-minimal-agent",
+  "name": "@balsats/example-minimal-agent",
   "version": "0.0.0",
   "private": true,
   "description": "Minimal Balsa example: a five-field agent streams one tool-calling generation.",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsa/core": "workspace:*",
+    "@balsats/core": "workspace:*",
     "zod": "^4.6.5"
   }
 }

@@ -1,5 +1,5 @@
 /**
- * `@balsa/sqlite` — the first-party SQLite reference adapter (`docs/architecture/storage.md`
+ * `@balsats/sqlite` — the first-party SQLite reference adapter (`docs/architecture/storage.md`
  * 「SQLite 参考 adapter(M5 设计冻结)」). One factory, one embedded file, all four storage ports:
  * `memory` / `workflowSnapshots` / `agentRunSnapshots` / `schedules`, each a port the core defines
  * and this package implements — the core's types are untouched and every declared port extension is
@@ -17,8 +17,8 @@
  * de-duplication across processes rests on the caller using `compareAndSave`; the adapter keeps no
  * lease / claim / retry layer and lets `SQLITE_BUSY` out unchanged.
  */
-import type { WorkingMemoryStore } from '@balsa/core/memory';
-import type { ScheduleStore } from '@balsa/core/schedules';
+import type { WorkingMemoryStore } from '@balsats/core/memory';
+import type { ScheduleStore } from '@balsats/core/schedules';
 import { createLifecycle, DEFAULT_BUSY_TIMEOUT_MS } from './connection.js';
 import { createMemoryStore } from './memory.js';
 import { createScheduleStore } from './schedules.js';

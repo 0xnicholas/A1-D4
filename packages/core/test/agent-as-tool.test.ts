@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent, resolveDynamicArgument } from '@balsa/core/agent';
-import type { RequestContext } from '@balsa/core/agent';
+import { Agent, resolveDynamicArgument } from '@balsats/core/agent';
+import type { RequestContext } from '@balsats/core/agent';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import type { ExportedSpan } from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
-import type { Tool } from '@balsa/core/tools';
+} from '@balsats/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
+import type { Tool } from '@balsats/core/tools';
 import { captureRejection } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 import { SPAN_ID, TRACE_ID } from './helpers/spans.js';

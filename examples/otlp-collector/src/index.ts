@@ -4,13 +4,13 @@
  *
  * One script, no external services: a **local collector** (`node:http`) plays the OTLP backend —
  * Langfuse / LangSmith / any OTel collector speak the same wire — a **scripted model** (defined in
- * this file: no API key, no network) drives a real agent run, and `@balsa/otlp` ships the run's
+ * this file: no API key, no network) drives a real agent run, and `@balsats/otlp` ships the run's
  * spans over OTLP/JSON.
  *
  * 1. **The run is traced** — `createApp({ tracer })` distributes the tracer to the desk agent;
  *    the run produces the framework's automatic spans: `agent-run` → `agent-step` → `tool-call`.
  * 2. **The collector receives semconv, not Balsa shapes** — the kernel's own span model never
- *    leaves the process: the `@balsa/otlp` exporter rebuilds every span for backends —
+ *    leaves the process: the `@balsats/otlp` exporter rebuilds every span for backends —
  *    `invoke_agent refund-desk`, `chat scripted-mini` (CLIENT kind; `gen_ai.*` request / usage /
  *    response attributes; messages as parts), `execute_tool checkOrder` (arguments / result) —
  *    plus `balsa.span.type` / `balsa.run_id` for Balsa-side correlation.
@@ -20,7 +20,7 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   pnpm --filter @balsa/example-otlp-collector start
+ *   pnpm --filter @balsats/example-otlp-collector start
  *
  * The collector endpoint defaults to this script's local collector; export
  * `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) to point the exporter at
@@ -34,11 +34,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createApp } from '@balsa/core';
-import { createTracer } from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
-import type { Model, ModelStreamPart } from '@balsa/core/model';
-import { createOtlpExporter } from '@balsa/otlp';
+import { createApp } from '@balsats/core';
+import { createTracer } from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
+import type { Model, ModelStreamPart } from '@balsats/core/model';
+import { createOtlpExporter } from '@balsats/otlp';
 import { z } from 'zod';
 
 // ── The scripted model: two turns — ask for the tool, then answer ────────────────────────────────

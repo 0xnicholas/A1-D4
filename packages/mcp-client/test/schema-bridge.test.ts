@@ -4,8 +4,8 @@
  * `inputSchema`, exactly as an agent's tool-container path consumes it.
  */
 import { describe, expect, it } from 'vitest';
-import { prefixTools, createMcpClient } from '@balsa/mcp-client';
-import type { Tool } from '@balsa/core/tools';
+import { prefixTools, createMcpClient } from '@balsats/mcp-client';
+import type { Tool } from '@balsats/core/tools';
 import { serveLegacy } from './helpers.js';
 
 const REMOTE_SCHEMA = { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } as const;

@@ -1,5 +1,5 @@
 /**
- * `@balsa/core/durable-agent` — durable agents (Harness 三件套之一).
+ * `@balsats/core/durable-agent` — durable agents (Harness 三件套之一).
  *
  * `createDurableAgent({ agent, storage?, approval? })`: the agent wrapped so a run may suspend at a
  * tool-calling boundary — the model's calls are known, none has executed yet, and one of them hits

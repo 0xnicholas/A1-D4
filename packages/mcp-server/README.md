@@ -1,12 +1,12 @@
-# `@balsa/mcp-server`
+# `@balsats/mcp-server`
 
 Serve a [Balsa](https://github.com/0xnicholas/balsa-framework) tool container over MCP: one
 `createMcpServer()` object with a web-standard HTTP `fetch` handler and a stdio entry, both fed
 by the same tools.
 
 ```ts
-import { createTool } from '@balsa/core/tools';
-import { createMcpServer } from '@balsa/mcp-server';
+import { createTool } from '@balsats/core/tools';
+import { createMcpServer } from '@balsats/mcp-server';
 import { z } from 'zod';
 
 const weather = createTool({
@@ -37,10 +37,10 @@ with the official `McpServer.connect(transport)` when you need it.
 ## Install
 
 ```bash
-npm install @balsa/mcp-server @balsa/core zod
+npm install @balsats/mcp-server @balsats/core zod
 ```
 
-`@balsa/core` is a peer dependency (one core instance by design); `zod` is only needed when
+`@balsats/core` is a peer dependency (one core instance by design); `zod` is only needed when
 your tools declare schemas. The only direct runtime dependency is
 `@modelcontextprotocol/server`.
 
@@ -160,7 +160,7 @@ Same axis as the rest of Balsa — install only what you use, and the numbers ar
 - dependency closure: **3 packages / ~13.9 MB unpacked** (`@modelcontextprotocol/server` plus
   its core/zod closure), recorded in `deps-budget.json`
 - first-party code: **1,671 B** minified, recorded in `byte-budget.json`
-- `@balsa/core` stays a peer, so there is exactly one core instance
+- `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License
 

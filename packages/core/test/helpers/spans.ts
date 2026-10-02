@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { ExportedSpan, MemoryExporter, TracingEvent } from '@balsa/core/observability';
+import type { ExportedSpan, MemoryExporter, TracingEvent } from '@balsats/core/observability';
 
 /**
  * 测试共享的 span 读取工具与零开销探针:事件序列、span 快照与「未创建 span 对象」的断言在多个

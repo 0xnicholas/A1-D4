@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsa/core/agent';
-import { createDurableAgent, createInMemoryAgentRunSnapshotStore } from '@balsa/core/durable-agent';
-import type { AgentRunSnapshot } from '@balsa/core/durable-agent';
-import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
-import type { Tool, ToolContext } from '@balsa/core/tools';
-import { Memory } from '@balsa/core/memory';
-import type { RequestContext } from '@balsa/core/agent';
+import { Agent } from '@balsats/core/agent';
+import { createDurableAgent, createInMemoryAgentRunSnapshotStore } from '@balsats/core/durable-agent';
+import type { AgentRunSnapshot } from '@balsats/core/durable-agent';
+import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
+import type { Tool, ToolContext } from '@balsats/core/tools';
+import { Memory } from '@balsats/core/memory';
+import type { RequestContext } from '@balsats/core/agent';
 import { INSTRUCTIONS, assistantWithTools } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
 import { captureRejection } from './helpers/assertions.js';
@@ -17,8 +17,8 @@ import { TRACE_ID, eventsOfType, kinds } from './helpers/spans.js';
  * durable agent(M4 #57,`docs/architecture/harness.md`「Durable agents」/「AgentRunSnapshotStore」):
  * 审批闸挂起(命中清单的调用不执行、run 以 `'suspended'` 正常落定、loop 快照写 port)+ resume 两路
  * (true 执行该调用续跑 / false 以「用户拒绝」结果回喂模型续跑,不终止 run)+ span 锚点(挂起 =
- * status 属性 + 正常 end;resume = 同 traceId 新 span)。断言只走公开面(`@balsa/core/durable-agent`
- * / `@balsa/core/agent`)与脚本化假模型接缝;挂起语义只存在于包装内(裸 agent 永不产生
+ * status 属性 + 正常 end;resume = 同 traceId 新 span)。断言只走公开面(`@balsats/core/durable-agent`
+ * / `@balsats/core/agent`)与脚本化假模型接缝;挂起语义只存在于包装内(裸 agent 永不产生
  * `'suspended'`)。
  */
 

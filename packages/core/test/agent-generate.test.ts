@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsa/core/agent';
-import type { ModelSettings } from '@balsa/core/agent';
-import { ModelContractError } from '@balsa/core/model';
-import type { ModelMessage } from '@balsa/core/model';
+import { Agent } from '@balsats/core/agent';
+import type { ModelSettings } from '@balsats/core/agent';
+import { ModelContractError } from '@balsats/core/model';
+import type { ModelMessage } from '@balsats/core/model';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**
  * generate() 终值与执行选项透传(M1-04 #25 / M1-05 #26):generate() = stream() + await 终值,单一
  * 代码路径。本文件钉住终值形状、prompt 形状与执行选项透传;输出对象的双消费、错误路径与
- * generate()/stream() 单一路径回归见 `agent-stream.test.ts`。断言只走公开面(`@balsa/core/agent`)
+ * generate()/stream() 单一路径回归见 `agent-stream.test.ts`。断言只走公开面(`@balsats/core/agent`)
  * 与脚本化假模型接缝(@see helpers/fake-model.ts),不触内部实现。
  */
 describe('Agent.generate:纯文本闭环', () => {

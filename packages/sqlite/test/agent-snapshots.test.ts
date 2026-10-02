@@ -5,7 +5,7 @@
  * 「AgentRunSnapshotStore」) — there is nothing to race here, so nothing is tested for it.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentRunSnapshot } from '@balsa/core/durable-agent';
+import type { AgentRunSnapshot } from '@balsats/core/durable-agent';
 import { caught, memoryStorage, messageOf } from './helpers.js';
 
 /** A suspended run's snapshot: message list, step count, held calls, trace. */

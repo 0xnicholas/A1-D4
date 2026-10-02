@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/example-workflow-approval",
+  "name": "@balsats/example-workflow-approval",
   "version": "0.0.0",
   "private": true,
   "description": "Balsa workflow example: an expense report walks an approval gate (suspend → snapshot → resume).",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsa/core": "workspace:*",
+    "@balsats/core": "workspace:*",
     "zod": "^4.6.5"
   }
 }

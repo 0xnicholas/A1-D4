@@ -7,17 +7,17 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-minimal-agent start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-minimal-agent start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsa/example-minimal-agent start
+ *     pnpm --filter @balsats/example-minimal-agent start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsa/core';
-import { consoleExporter, createTracer } from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
+import { createApp } from '@balsats/core';
+import { consoleExporter, createTracer } from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

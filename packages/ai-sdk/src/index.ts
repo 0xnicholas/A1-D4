@@ -1,10 +1,10 @@
 /**
- * `@balsa/ai-sdk` — AI SDK interop capability package.
+ * `@balsats/ai-sdk` — AI SDK interop capability package.
  *
  * The agent's chunk stream as an AI SDK UI message stream: `toAISdkStream` converts body frames,
  * `createChatRoute` is the web-standard `useChat()` route, `toAISdkMessages` reads thread history
  * back as UI messages. One target generation (`ai@7` vocabulary + the `v1` wire header), zero
- * runtime dependencies, `@balsa/core` as a peer. Spec: `docs/architecture/model.md`
+ * runtime dependencies, `@balsats/core` as a peer. Spec: `docs/architecture/model.md`
  * 「AI SDK 互操作能力包(M5 设计冻结)」.
  */
 export type {

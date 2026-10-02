@@ -14,14 +14,14 @@ afterEach(cleanupFixtures);
 describe('check-deps-budget:依赖数字比对', () => {
   it('零声明运行时依赖且无基线时直接通过(如 core、运行时 0 依赖的能力包)', () => {
     const dir = fixturePackage({
-      'package.json': packageManifest({ peerDependencies: { '@balsa/core': 'workspace:^' } }),
+      'package.json': packageManifest({ peerDependencies: { '@balsats/core': 'workspace:^' } }),
     });
 
     const result = runScript('check-deps-budget', [dir]);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('0 个声明运行时依赖');
-    expect(result.stdout).toContain('@balsa/core');
+    expect(result.stdout).toContain('@balsats/core');
   });
 
   it('零声明但有基线且口径不符时仍拒绝比对(退出 2)', () => {
@@ -40,7 +40,7 @@ describe('check-deps-budget:依赖数字比对', () => {
   it('非 core peer 的 workspace: 范围即硬错误(能力包之间默认不建依赖边,ADR-0002 M5)', () => {
     const dir = fixturePackage({
       'package.json': packageManifest({
-        dependencies: { '@balsa/mcp-server': 'workspace:^' },
+        dependencies: { '@balsats/mcp-server': 'workspace:^' },
       }),
     });
 
@@ -48,7 +48,7 @@ describe('check-deps-budget:依赖数字比对', () => {
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('workspace');
-    expect(result.stderr).toContain('@balsa/mcp-server');
+    expect(result.stderr).toContain('@balsats/mcp-server');
   });
 
   it('基线口径与脚本口径不符时拒绝比对(硬错误,退出 2)', () => {

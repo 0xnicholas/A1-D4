@@ -5,9 +5,9 @@ import {
   WORKFLOW_STEP_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import { createStep, createInMemorySnapshotStore, createWorkflow } from '@balsa/core/workflows';
-import type { StepContext } from '@balsa/core/workflows';
+} from '@balsats/core/observability';
+import { createStep, createInMemorySnapshotStore, createWorkflow } from '@balsats/core/workflows';
+import type { StepContext } from '@balsats/core/workflows';
 import { expectSuccess } from './helpers/assertions.js';
 import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType, withSpanIdProbe } from './helpers/spans.js';
 
@@ -18,7 +18,7 @@ import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType, withSpanIdProbe } f
  * 传播(无 AsyncLocalStorage);run span 的 input / output = 校验后的触发输入 / 终态信封,step span 的
  * input / output = 边界校验值 / step 输出,失败落 error;不挂 tracer 时整个子系统零开销。
  *
- * 接缝 = 公开 `@balsa/core/workflows` 与 `@balsa/core/observability` 子路径,用规范钦定的 memory
+ * 接缝 = 公开 `@balsats/core/workflows` 与 `@balsats/core/observability` 子路径,用规范钦定的 memory
  * exporter 读 span 树、事件序列与快照。
  */
 

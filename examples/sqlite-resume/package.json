@@ -1,8 +1,8 @@
 {
-  "name": "@balsa/example-sqlite-resume",
+  "name": "@balsats/example-sqlite-resume",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsa SQLite example: a durable refund desk suspends in one process, its snapshot lands in @balsa/sqlite, and a new process resumes the run.",
+  "description": "Balsa SQLite example: a durable refund desk suspends in one process, its snapshot lands in @balsats/sqlite, and a new process resumes the run.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsa/core": "workspace:*",
-    "@balsa/sqlite": "workspace:*",
+    "@balsats/core": "workspace:*",
+    "@balsats/sqlite": "workspace:*",
     "zod": "^4.6.5"
   }
 }

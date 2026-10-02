@@ -6,14 +6,14 @@ import {
   uiMessageChunkSchema,
 } from 'ai';
 import type { UIMessage, UIMessageChunk } from 'ai';
-import type { Chunk } from '@balsa/core/model';
-import type { StoredMessage } from '@balsa/core/memory';
+import type { Chunk } from '@balsats/core/model';
+import type { StoredMessage } from '@balsats/core/memory';
 import {
   UI_MESSAGE_STREAM_HEADERS,
   toAISdkMessages,
   toAISdkStream,
   type AISdkStreamChunk,
-} from '@balsa/ai-sdk';
+} from '@balsats/ai-sdk';
 
 /**
  * The three drift guards of the frozen spec (spec: `docs/architecture/model.md`

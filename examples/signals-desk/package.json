@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/example-signals-desk",
+  "name": "@balsats/example-signals-desk",
   "version": "0.0.0",
   "private": true,
   "description": "Balsa signals example: one support thread that messages, typed signals and a scheduled trigger all land in.",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsa/core": "workspace:*",
+    "@balsats/core": "workspace:*",
     "zod": "^4.6.5"
   }
 }

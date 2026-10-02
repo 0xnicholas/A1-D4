@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import type { RequestContext } from '@balsa/core/agent';
-import { createTool } from '@balsa/core/tools';
-import type { Tool, ToolConfig, ToolContext } from '@balsa/core/tools';
+import type { RequestContext } from '@balsats/core/agent';
+import { createTool } from '@balsats/core/tools';
+import type { Tool, ToolConfig, ToolContext } from '@balsats/core/tools';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

@@ -2,7 +2,7 @@ import type {
   WorkflowRunOutcome,
   WorkflowRunSuccessOutcome,
   WorkflowRunSuspendedOutcome,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 
 /**
  * 测试共享断言工具:编译期断言与错误捕获。各测试文件从同一份实现取用,不各自复制。

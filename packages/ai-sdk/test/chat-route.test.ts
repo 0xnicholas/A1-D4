@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsa/core/agent';
-import { Memory } from '@balsa/core/memory';
-import { createTool } from '@balsa/core/tools';
-import { createDurableAgent } from '@balsa/core/durable-agent';
-import type { ModelPrompt } from '@balsa/core/model';
-import { createChatRoute } from '@balsa/ai-sdk';
+import { Agent } from '@balsats/core/agent';
+import { Memory } from '@balsats/core/memory';
+import { createTool } from '@balsats/core/tools';
+import { createDurableAgent } from '@balsats/core/durable-agent';
+import type { ModelPrompt } from '@balsats/core/model';
+import { createChatRoute } from '@balsats/ai-sdk';
 import { scriptedModel } from './helpers/model.js';
 import type { ScriptedStep } from './helpers/model.js';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/croner",
+  "name": "@balsats/croner",
   "version": "0.0.0",
   "description": "Balsa croner wrapper — cron expressions as a schedules.save() fragment (next + timezone), one exact-pinned dependency, no core peer.",
   "license": "Apache-2.0",
@@ -36,7 +36,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@balsa/core": "workspace:*"
+    "@balsats/core": "workspace:*"
   },
   "dependencies": {
     "croner": "10.0.1"

@@ -7,7 +7,7 @@ import {
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
+} from '@balsats/core/observability';
 import type {
   AgentRunAttributes,
   AgentStepAttributes,
@@ -24,7 +24,7 @@ import type {
   TracingEvent,
   ToolCallAttributes,
   WorkflowRunAttributes,
-} from '@balsa/core/observability';
+} from '@balsats/core/observability';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

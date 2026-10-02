@@ -82,7 +82,7 @@ createStep({
 
 ## MCP server 能力包
 
-独立 npm 包 `@balsa/mcp-server`(ADR-0002 M5 修订;`@balsa/core` 走 peer,清单三件套沿能力包先例)。直连依赖仅 `@modelcontextprotocol/server@^2.2.0`——传递闭包 server / core / zod 3 包;Node `node:http` 绑定与 Host/Origin 防护归用户侧(官方 `@modelcontextprotocol/node`,文档钉接线),不直连。v1 单包 `@modelcontextprotocol/sdk`(92 安装包、硬拉 express+hono)为过时路径,明确排除。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
+独立 npm 包 `@balsats/mcp-server`(ADR-0002 M5 修订;`@balsats/core` 走 peer,清单三件套沿能力包先例)。直连依赖仅 `@modelcontextprotocol/server@^2.2.0`——传递闭包 server / core / zod 3 包;Node `node:http` 绑定与 Host/Origin 防护归用户侧(官方 `@modelcontextprotocol/node`,文档钉接线),不直连。v1 单包 `@modelcontextprotocol/sdk`(92 安装包、硬拉 express+hono)为过时路径,明确排除。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
 
 ```ts
 const server = createMcpServer(
@@ -106,7 +106,7 @@ await server.close()                        // 闭合已开入口、中止在途
 
 ## MCP client 能力包
 
-独立 npm 包 `@balsa/mcp-client`(#72 首批六包之一;ADR-0002 M5 修订)。直连依赖仅 `@modelcontextprotocol/client@^2.2.0`(`.` 与 `./stdio` 两个子路径面;13 包 / 14.1 MiB,#6 实测;大头是 OAuth/SSE/stdio,属功能必需),`@balsa/core` 走 peer(清单三件套沿能力包先例)。**与 server 包分开是按需组合的硬要求**:依赖是包级粒度,合包则 server 用户连坐 client 的 13 包。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
+独立 npm 包 `@balsats/mcp-client`(#72 首批六包之一;ADR-0002 M5 修订)。直连依赖仅 `@modelcontextprotocol/client@^2.2.0`(`.` 与 `./stdio` 两个子路径面;13 包 / 14.1 MiB,#6 实测;大头是 OAuth/SSE/stdio,属功能必需),`@balsats/core` 走 peer(清单三件套沿能力包先例)。**与 server 包分开是按需组合的硬要求**:依赖是包级粒度,合包则 server 用户连坐 client 的 13 包。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
 
 ```ts
 const client = await createMcpClient({
@@ -124,7 +124,7 @@ await client.close()    // HTTP 先 terminateSession(失败静默)→ client.clo
 
 - **接入形态唯一**:外部 MCP 工具转译为本框架 Tool 直接进 agent 容器;不做 mastra 式 MCPConfiguration 平行容器。
 - **传输**:stdio(`command + args + env`,SDK 自拥子进程)+ Streamable HTTP(`url + headers` → transport `requestInit.headers`)。`env` 语义照 SDK:给了就是**整份**环境,不给 = SDK 白名单(不继承整份 `process.env`);`stderr` 缺省 inherit——子进程日志进父 stderr,正是 MCP 要的。旋钮面收口:stdio 的 `stderr` / `cwd` / `maxBufferSize`、HTTP 的 `fetch` / `authProvider` / `sessionId`、`listMaxPages`、响应缓存三件(`responseCacheStore` / `cachePartition` / `defaultCacheTtlMs`)与客户端中间件 v1 一律不暴露;逃逸口是官方 SDK 自布线(与 server 票同一条纪律)。**不接受 SDK transport 实例注入**。
-- **身份**:SDK 的 `Client({ name, version })` 由包内定(`@balsa/mcp-client` + 包版本),v1 不暴露覆写。
+- **身份**:SDK 的 `Client({ name, version })` 由包内定(`@balsats/mcp-client` + 包版本),v1 不暴露覆写。
 - **era 姿态**:缺省 `'auto'`(先 `server/discover` 探测,定不了就回退 legacy `initialize`);可切 `'legacy'`(零探测,即 SDK 自身缺省)或 `{ pin: '2026-07-28' }`(不回退,失败即抛)——**我们显式把缺省抬到 auto**,SDK 缺省是 legacy。代价是 connect 期成本:stdio 上多一次短命兄弟探测进程;HTTP 探测静默超时按 outage 拒绝、不回落。
 - **超时**:SDK 逐请求缺省 60s(`DEFAULT_REQUEST_TIMEOUT_MSEC`),且**没有 client 级默认值设置**——`timeoutMs` 必须由本包在 connect 与**每次** `callTool` 上透传(长工具调用的唯一入口);不提供 per-call 覆盖。
 - **认证**:headers 透传(bearer 等)覆盖多数远程 server;OAuth 授权流助手裁出 v1(SDK 的 `authProvider` 不接线;裁它不缩小安装树,裁的是产品面)。

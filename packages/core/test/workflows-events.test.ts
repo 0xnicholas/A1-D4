@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createStep, createWorkflow, WorkflowValidationError } from '@balsa/core/workflows';
-import type { StepContext, WorkflowEvent, WorkflowRunOutput } from '@balsa/core/workflows';
+import { createStep, createWorkflow, WorkflowValidationError } from '@balsats/core/workflows';
+import type { StepContext, WorkflowEvent, WorkflowRunOutput } from '@balsats/core/workflows';
 import { captureRejection, expectAssignable, expectSuccess } from './helpers/assertions.js';
 
 /**
@@ -10,7 +10,7 @@ import { captureRejection, expectAssignable, expectSuccess } from './helpers/ass
  * `await out.result` 共享同一次执行(单路径)。事件带边界值(step 输入 / 输出、run 输入 / 终值),
  * 包络复用 chunk 协议(`{ type, … }` 判别联合、kebab-case 词汇)。
  *
- * 接缝 = 公开 `@balsa/core/workflows` 子路径:`run.start` 返回的输出对象,以及 step execute 收到的
+ * 接缝 = 公开 `@balsats/core/workflows` 子路径:`run.start` 返回的输出对象,以及 step execute 收到的
  * ctx;不触内部模块。
  */
 

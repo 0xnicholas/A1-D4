@@ -55,8 +55,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsa/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-signals-desk start
+pnpm build                 # examples consume @balsats/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-signals-desk start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -64,7 +64,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsa/example-signals-desk start
+  pnpm --filter @balsats/example-signals-desk start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. Expected output: the acts, one
@@ -96,5 +96,5 @@ and at the end, and the schedule record advancing from one 09:00 UTC to the next
   for `agent-run` spans to end and for the thread to be released before starting the next run. The
   waits are guarded — a model that never calls `pageSupervisor` fails the act loudly instead of
   hanging.
-- Like the other examples, the script consumes `@balsa/core` through its built package exports — run
+- Like the other examples, the script consumes `@balsats/core` through its built package exports — run
   `pnpm build` before `start`.

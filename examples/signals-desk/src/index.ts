@@ -32,27 +32,27 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-signals-desk start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-signals-desk start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsa/example-signals-desk start
+ *     pnpm --filter @balsats/example-signals-desk start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsa/core';
-import { Memory, createInMemoryStore } from '@balsa/core/memory';
-import type { StoredMessage } from '@balsa/core/memory';
+import { createApp } from '@balsats/core';
+import { Memory, createInMemoryStore } from '@balsats/core/memory';
+import type { StoredMessage } from '@balsats/core/memory';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   consoleExporter,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import type { ExportedSpan } from '@balsa/core/observability';
-import { createInMemoryScheduleStore } from '@balsa/core/schedules';
-import { createTool } from '@balsa/core/tools';
+} from '@balsats/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
+import { createInMemoryScheduleStore } from '@balsats/core/schedules';
+import { createTool } from '@balsats/core/tools';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

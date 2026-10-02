@@ -16,7 +16,7 @@ import { OTLPTraceExporter as OTLPTraceExporterProto } from '@opentelemetry/expo
 import { detectResources, envDetector, resourceFromAttributes } from '@opentelemetry/resources';
 import type { Resource } from '@opentelemetry/resources';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace';
-import type { ObservabilityExporter } from '@balsa/core/observability';
+import type { ObservabilityExporter } from '@balsats/core/observability';
 import { toReadableSpan } from './to-readable.js';
 
 /** Batch tuning, passed straight to the official `BatchSpanProcessor`. */
@@ -59,7 +59,7 @@ function resolveProtocol(explicit: OtlpExporterOptions['protocol']): 'protobuf' 
   if (fromEnv === 'json') return 'json';
   if (fromEnv !== undefined && fromEnv !== '' && fromEnv !== 'protobuf') {
     diag.warn(
-      `@balsa/otlp: OTEL_EXPORTER_OTLP_PROTOCOL="${fromEnv}" is not supported (protobuf | json); falling back to protobuf`,
+      `@balsats/otlp: OTEL_EXPORTER_OTLP_PROTOCOL="${fromEnv}" is not supported (protobuf | json); falling back to protobuf`,
     );
   }
   return 'protobuf';
@@ -125,7 +125,7 @@ export function createOtlpExporter(options: OtlpExporterOptions = {}): Observabi
         processor.onEnd(toReadableSpan(event.span, resource));
       } catch (error) {
         // A span that cannot be synthesized is dropped silently — telemetry never breaks the traced code.
-        diag.warn(`@balsa/otlp: dropping unsynthesizable span: ${error instanceof Error ? error.message : String(error)}`);
+        diag.warn(`@balsats/otlp: dropping unsynthesizable span: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
     flush(): Promise<void> {

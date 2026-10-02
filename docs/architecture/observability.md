@@ -105,13 +105,13 @@ tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 ## Exporter 清单
 
 - **核心包自带两个**:`console`(开发调试美化打印)与 `memory`(环形缓冲,测试/集成断言的抓手)。
-- **OTLP 能力包一个**(独立 npm 包 `@balsa/otlp`,沿 ADR-0002 M5 修订记):把 span 映射为 GenAI semconv 形状——`{operation} {model}` 命名、`gen_ai.operation.name / provider.name / request.model / usage.*` 属性、parts 格式消息;usage 只挂 `chat` span 防后端重复计数。transport 仅 HTTP/protobuf + HTTP/JSON,**不做 gRPC**(Langfuse 不收 gRPC,`@grpc/grpc-js` 依赖重);协议层依赖 OTel 官方 exporter 包,隔离在包边界。带 env-var 零配置 preset。设计冻结见下节「OTLP 能力包(M5 设计冻结)」。
+- **OTLP 能力包一个**(独立 npm 包 `@balsats/otlp`,沿 ADR-0002 M5 修订记):把 span 映射为 GenAI semconv 形状——`{operation} {model}` 命名、`gen_ai.operation.name / provider.name / request.model / usage.*` 属性、parts 格式消息;usage 只挂 `chat` span 防后端重复计数。transport 仅 HTTP/protobuf + HTTP/JSON,**不做 gRPC**(Langfuse 不收 gRPC,`@grpc/grpc-js` 依赖重);协议层依赖 OTel 官方 exporter 包,隔离在包边界。带 env-var 零配置 preset。设计冻结见下节「OTLP 能力包(M5 设计冻结)」。
 - **不做厂商专用 exporter**:Langfuse / LangSmith 均把裸 OTLP + `gen_ai.*` 当一等摄入路径,发标准形状即同时覆盖多家后端。
 - **OTel bridge**(复用进程内 OTel SDK 上下文):延后。mastra 同类包至今 experimental;记为地图 fog,路线图阶段判断。
 
 ## OTLP 能力包(M5 设计冻结)
 
-> 决策:wayfinder ticket #73(决策:OTLP exporter 能力包)。包名 `@balsa/otlp`(沿 ADR-0002 M5 修订记),对 `@balsa/core` 走 peer(`workspace:^`)、与全 `@balsa/*` 锁步发布;事实底座 = `docs/research/otlp-js-packages.md`(2026-09-30 实测,版本钉 `exporter-trace-otlp-{proto,http}@0.222.0` / `sdk-trace@2.11.0` / `resources@2.11.0` / `api@1.9.1`)。本节是冻结态:包面、依赖路线、三事件桥法与映射契约都不留实现期判断。
+> 决策:wayfinder ticket #73(决策:OTLP exporter 能力包)。包名 `@balsats/otlp`(沿 ADR-0002 M5 修订记),对 `@balsats/core` 走 peer(`workspace:^`)、与全 `@balsats/*` 锁步发布;事实底座 = `docs/research/otlp-js-packages.md`(2026-09-30 实测,版本钉 `exporter-trace-otlp-{proto,http}@0.222.0` / `sdk-trace@2.11.0` / `resources@2.11.0` / `api@1.9.1`)。本节是冻结态:包面、依赖路线、三事件桥法与映射契约都不留实现期判断。
 
 ### 包面
 
@@ -131,7 +131,7 @@ createOtlpExporter(options?: {
 - **配置优先级 = 显式选项 > env > 官方默认**。未给的项由官方 exporter 基座解析 env:`OTEL_EXPORTER_OTLP_{ENDPOINT,HEADERS,TIMEOUT,COMPRESSION,CERTIFICATE,CLIENT_CERTIFICATE,CLIENT_KEY}` + `..._TRACES_*` 特化(headers 合并、特化优先;通用 endpoint 自动拼 `v1/traces`);url 缺省 `http://localhost:4318/v1/traces`。
 - **`protocol` 是本包自己的 env 面**:官方两个 exporter 包都不读 `OTEL_EXPORTER_OTLP_PROTOCOL`(协议 = 选包),本包读它做选包,显式选项优先。
 - **resource(必填,官方 transformer 缺它直接抛)**:`service.name` 合并序 `'balsa'` < `OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES` < `serviceName` 选项 < `resourceAttributes` 选项(后者整体覆盖);**不发 `telemetry.sdk.*`**——本包没走 OTel SDK,不冒领。
-- `instrumentationScope = { name: '@balsa/otlp' }`(不带 version,免锁步版本漂移)。
+- `instrumentationScope = { name: '@balsats/otlp' }`(不带 version,免锁步版本漂移)。
 - **`flush()` → 批处理器 `forceFlush()`;`shutdown()` → `shutdown()`**,原样透传(框架 tracer 的同名方法转发到这里)。
 - **失败面**:`export()` 只入队、永不抛;队列满静默丢、导出失败静默(官方批处理器语义),诊断走 OTel diag(`diag.setLogger`)。不自研重试 / 日志 / `onError` 回调——可重试状态(429/502/503/504 + `Retry-After`)、超时、并发是官方 exporter 基座职责。
 - **不重复的核心面**:`hideInput` / `hideOutput`(上游 trace 级已擦,exporter 永远看不到)、`spanProcessors`(核心已跑完)、采样(合成 span 的 `traceFlags` 恒 `SAMPLED`——到包里的必然已通过 root 采样)。
@@ -139,7 +139,7 @@ createOtlpExporter(options?: {
 ### 依赖路线
 
 - **路线 = 官方 exporter 包 + 官方批处理器**(调研 §7 路线①):直接依赖 `@opentelemetry/exporter-trace-otlp-proto` / `-http`(双协议)、`@opentelemetry/sdk-trace`(`BatchSpanProcessor`)、`@opentelemetry/resources`(`resourceFromAttributes` + env 检测器)、`@opentelemetry/api`(`SpanKind` / `SpanStatusCode` / `TraceFlags`);五件全部**精确钉版本**并以 `dependencies` 声明(exporter 系列走 0.x 且对 SDK 用精确版本;`api` 作直接依赖,免 peer 解析面)。
-- **安装树实测 12 包 / 19,312,287 B(≈18.42 MiB unpacked)**:`semantic-conventions` 单包 12.0 MB(62%,`core` / `resources` / `sdk-trace` 的传递依赖,无法从树里移除)、`sdk-metrics` + `sdk-logs` + `api-logs` ≈2.67 MB(transformer 同时编码三信号)。数字口径归 `deps-budget.json` 黄灯(实施图落基线,#72);`@balsa/core` peer 豁免。
+- **安装树实测 12 包 / 19,312,287 B(≈18.42 MiB unpacked)**:`semantic-conventions` 单包 12.0 MB(62%,`core` / `resources` / `sdk-trace` 的传递依赖,无法从树里移除)、`sdk-metrics` + `sdk-logs` + `api-logs` ≈2.67 MB(transformer 同时编码三信号)。数字口径归 `deps-budget.json` 黄灯(实施图落基线,#72);`@balsats/core` peer 豁免。
 - 不选的路线:仅 `otlp-transformer` + 自写 HTTP(只省 0.67 MiB,却把传输 / 重试 / 并发簿记搬进本包);自实现序列化(把 semconv 演进从「跟版本」升级成「自己维护」)。
 - **不 import `semantic-conventions`**:`gen_ai.*` 键名按字符串直写(常量包只在 incubating 入口携带且全 Development;它在意不在树不是本包引入的);键名漂移只改本包、核心不随动(ADR-0009 的可逆性不对称)。
 

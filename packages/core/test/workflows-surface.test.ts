@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import type { RequestContext } from '@balsa/core/agent';
-import { createTracer } from '@balsa/core/observability';
-import { createStep, createWorkflow } from '@balsa/core/workflows';
-import type { Step, StepContext, WorkflowSnapshotStore } from '@balsa/core/workflows';
+import type { RequestContext } from '@balsats/core/agent';
+import { createTracer } from '@balsats/core/observability';
+import { createStep, createWorkflow } from '@balsats/core/workflows';
+import type { Step, StepContext, WorkflowSnapshotStore } from '@balsats/core/workflows';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

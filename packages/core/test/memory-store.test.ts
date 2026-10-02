@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createInMemoryStore } from '@balsa/core/memory';
-import type { StoredMessage, StoredThread, WorkingMemoryStore } from '@balsa/core/memory';
-import type { ModelTextPart } from '@balsa/core/model';
+import { createInMemoryStore } from '@balsats/core/memory';
+import type { StoredMessage, StoredThread, WorkingMemoryStore } from '@balsats/core/memory';
+import type { ModelTextPart } from '@balsats/core/model';
 import { captureRejection } from './helpers/assertions.js';
 
 /**

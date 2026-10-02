@@ -2,7 +2,7 @@
 // 依赖一条实测——传递包数 `packages` + 解包体积 `bytes`(registry `dist.unpackedSize`)合计。
 // 口径沿事实底座研究方法(docs/research/otlp-js-packages.md §方法):空目录
 // `npm install --package-lock-only`(npm 7+ 自动装 peer)解析闭包,再对每个 name@version
-// 取 registry `dist.unpackedSize` 求和。peer `@balsa/core` 豁免——核心重量由核心自身
+// 取 registry `dist.unpackedSize` 求和。peer `@balsats/core` 豁免——核心重量由核心自身
 // 字节预算承载(ADR-0002 M5 单份 core 实例,peer 是身份语义前提)。
 // `--update` 用实测值重写基线(基线调整与代码同 PR);缺基线/超基线 = 黄灯,
 // 「声明但产物零引用」追加黄灯记录——都不卡合并(CI 用 `|| test $? -eq 1` 容忍)。
@@ -18,7 +18,7 @@ const METRIC = 'npm-install-closure-packages-and-unpacked-bytes';
 const BUDGET_FILE = 'deps-budget.json';
 const UPDATE_HINT = 'pnpm deps-budget:update';
 const REGISTRY = 'https://registry.npmjs.org';
-const CORE_PEER_EXEMPT = '@balsa/core';
+const CORE_PEER_EXEMPT = '@balsats/core';
 const EXIT_YELLOW = 1;
 const EXIT_HARD_ERROR = 2;
 
@@ -42,7 +42,7 @@ const packageDir = resolve(argv.find((arg) => !arg.startsWith('--')) ?? process.
 const manifest = readManifest(packageDir);
 
 /**
- * 声明运行时依赖 → 测量条目。peer `@balsa/core`(workspace: 范围)豁免;
+ * 声明运行时依赖 → 测量条目。peer `@balsats/core`(workspace: 范围)豁免;
  * 其余 workspace: 范围即硬错误——能力包之间默认不建依赖边(ADR-0002 M5),
  * 例外若出现须先改 ADR 再改这里。
  */

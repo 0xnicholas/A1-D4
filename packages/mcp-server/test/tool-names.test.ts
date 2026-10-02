@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createMcpServer } from '@balsa/mcp-server';
-import type { Tool } from '@balsa/core/tools';
+import { createMcpServer } from '@balsats/mcp-server';
+import type { Tool } from '@balsats/core/tools';
 
 const ping: Tool = { description: 'ping', execute: () => 'pong' };
 

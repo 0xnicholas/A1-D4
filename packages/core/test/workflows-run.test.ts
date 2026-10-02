@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createStep, createWorkflow, createWorkflowRun } from '@balsa/core/workflows';
-import { WorkflowValidationError } from '@balsa/core/workflows';
+import { createStep, createWorkflow, createWorkflowRun } from '@balsats/core/workflows';
+import { WorkflowValidationError } from '@balsats/core/workflows';
 import type {
   StepContext,
   WorkflowEntry,
   WorkflowRun,
   WorkflowRunOutcome,
   WorkflowStepResultSnapshot,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 import { captureError, captureRejection, expectAssignable, expectSuccess } from './helpers/assertions.js';
 
 /**
@@ -18,7 +18,7 @@ import { captureError, captureRejection, expectAssignable, expectSuccess } from 
  * workflows-suspend-resume;输出对象的事件流消费归 workflows-events)、`getStepResult`、
  * AbortSignal 沿 execute 传播。
  *
- * 接缝 = 公开 `@balsa/core/workflows` 子路径:定义 → `createRun` → `run.start` → `out.result`,
+ * 接缝 = 公开 `@balsats/core/workflows` 子路径:定义 → `createRun` → `run.start` → `out.result`,
  * 以及 step `execute` / 动态函数收到的 ctx;不触内部模块(事件流的 for-await 面归
  * workflows-events,span / trace 面归 workflows-observability)。
  */

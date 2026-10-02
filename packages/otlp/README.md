@@ -1,4 +1,4 @@
-# `@balsa/otlp`
+# `@balsats/otlp`
 
 The OTLP exporter for [Balsa](https://github.com/0xnicholas/balsa-framework): one
 `createOtlpExporter()` that maps the kernel's own spans to **GenAI semconv-shaped OTLP** over HTTP
@@ -6,9 +6,9 @@ The OTLP exporter for [Balsa](https://github.com/0xnicholas/balsa-framework): on
 `gen_ai.*` receive the standard shape directly — there is no vendor-specific exporter.
 
 ```ts
-import { createApp } from '@balsa/core';
-import { createTracer } from '@balsa/core/observability';
-import { createOtlpExporter } from '@balsa/otlp';
+import { createApp } from '@balsats/core';
+import { createTracer } from '@balsats/core/observability';
+import { createOtlpExporter } from '@balsats/otlp';
 
 const tracer = createTracer({ exporters: [createOtlpExporter()] });
 const app = createApp({ tracer });
@@ -26,10 +26,10 @@ await tracer.shutdown();
 ## Install
 
 ```bash
-npm install @balsa/otlp @balsa/core
+npm install @balsats/otlp @balsats/core
 ```
 
-`@balsa/core` is a peer dependency (one core instance by design). The package brings the official
+`@balsats/core` is a peer dependency (one core instance by design). The package brings the official
 OpenTelemetry exporter stack (`exporter-trace-otlp-proto` / `-http`, `sdk-trace`, `resources`,
 `api` — five pinned dependencies; `semantic-conventions` rides the tree transitively but is never
 imported — `gen_ai.*` keys are written as string literals, so semconv drift changes this package,

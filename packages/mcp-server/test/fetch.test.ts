@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createMcpServer } from '@balsa/mcp-server';
-import { createTool } from '@balsa/core/tools';
-import type { Tool, ToolContext } from '@balsa/core/tools';
+import { createMcpServer } from '@balsats/mcp-server';
+import { createTool } from '@balsats/core/tools';
+import type { Tool, ToolContext } from '@balsats/core/tools';
 import { contentOf, initializeRequest, legacyHeaders, modernHeaders, post, postParsedBody, rpc, toolsOf, withEnvelope } from './helpers.js';
 
 const SERVER_INFO = { name: 'tools-server', version: '1.2.3' };

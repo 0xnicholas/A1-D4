@@ -2,9 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@balsa/core": ["../../packages/core/src/index.ts"],
-      "@balsa/core/*": ["../../packages/core/src/*/index.ts"],
-      "@balsa/croner": ["./src/index.ts"]
+      "@balsats/core": ["../../packages/core/src/index.ts"],
+      "@balsats/core/*": ["../../packages/core/src/*/index.ts"],
+      "@balsats/croner": ["./src/index.ts"]
     }
   },
   "include": ["src", "test"]

@@ -1,5 +1,5 @@
 {
-  "name": "@balsa/core",
+  "name": "@balsats/core",
   "version": "0.0.0",
   "description": "Balsa core — ultralight TypeScript agent framework: model contract, agents, tools, and observability.",
   "license": "Apache-2.0",

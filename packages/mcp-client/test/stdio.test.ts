@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createMcpClient } from '@balsa/mcp-client';
+import { createMcpClient } from '@balsats/mcp-client';
 import { sleep, toolContext, toolOf } from './helpers.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/stdio-server.ts', import.meta.url));

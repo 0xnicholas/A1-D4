@@ -10,7 +10,7 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4StreamPart,
 } from '@ai-sdk/provider';
-import type { Model, ModelCallOptions } from '@balsa/core/model';
+import type { Model, ModelCallOptions } from '@balsats/core/model';
 
 /** One scripted model step: what one `doStream` call emits. */
 export interface ScriptedStep {

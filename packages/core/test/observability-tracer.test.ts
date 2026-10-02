@@ -10,8 +10,8 @@ import {
   WORKFLOW_STEP_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsa/core/observability';
-import type { ExportedSpan, Span } from '@balsa/core/observability';
+} from '@balsats/core/observability';
+import type { ExportedSpan, Span } from '@balsats/core/observability';
 import { SPAN_ID, TRACE_ID, kinds } from './helpers/spans.js';
 
 /**
@@ -20,7 +20,7 @@ import { SPAN_ID, TRACE_ID, kinds } from './helpers/spans.js';
  * 上可断言;采样四档只在 root 判定一次、不通过全树 NoOpSpan;spanProcessors 同步逐事件改写或丢弃;
  * hideInput / hideOutput 导出时擦字段;isEvent span 创建即完成、只派发一次 span_ended。
  *
- * 断言只走公开面(`@balsa/core/observability` 子路径导出)与规范钦定的 memory exporter 断言抓手
+ * 断言只走公开面(`@balsats/core/observability` 子路径导出)与规范钦定的 memory exporter 断言抓手
  * (issue #21 测试决策),不触碰内部状态。
  */
 

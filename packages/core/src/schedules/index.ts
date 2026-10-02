@@ -1,5 +1,5 @@
 /**
- * `@balsa/core/schedules` — schedules subsystem (Harness 三件套之一).
+ * `@balsats/core/schedules` — schedules subsystem (Harness 三件套之一).
  *
  * `createSchedules({ storage?, agents, signals? })`: the record CRUD + `tick` primitive — records
  * carry a `next` occurrence function (cron parsing injected, so the core stays zero-dependency) and

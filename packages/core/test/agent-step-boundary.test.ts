@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsa/core/agent';
+import { Agent } from '@balsats/core/agent';
 import type {
   AgentStepBoundary,
   AgentStepBoundaryEvent,
   AgentToolCallsBoundaryEvent,
-} from '@balsa/core/agent';
-import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsa/core/observability';
-import { createTool } from '@balsa/core/tools';
-import type { Tool } from '@balsa/core/tools';
+} from '@balsats/core/agent';
+import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsats/core/observability';
+import { createTool } from '@balsats/core/tools';
+import type { Tool } from '@balsats/core/tools';
 import { INSTRUCTIONS, assistantWithTools } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
 import { collect } from './helpers/collect.js';
@@ -21,7 +21,7 @@ import { SPAN_ID, TRACE_ID, eventsOfType, kinds, spanOfType } from './helpers/sp
  * suspend 决策把 run 正常终止为 finishReason 'suspended')与 `beforeNextStep`(每次模型调用前;
  * signals 注入挂点,返回的消息进入 prompt 参与该次调用)。缺席 = 裸 agent 行为完全不变
  * (既有 579 例零改动即证;此处再钉「缺席不拦截、不挂起」)。断言只走公开面
- * (@balsa/core 子路径导出)与脚本化假模型接缝(@see helpers/fake-model.ts):假模型录制的
+ * (@balsats/core 子路径导出)与脚本化假模型接缝(@see helpers/fake-model.ts):假模型录制的
  * prompt 就是"模型看到的历史",挂 tracer 时 memory exporter 是钦定断言抓手(issue #21)。
  */
 

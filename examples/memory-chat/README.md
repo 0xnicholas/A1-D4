@@ -45,8 +45,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsa/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-memory-chat start
+pnpm build                 # examples consume @balsats/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-memory-chat start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -54,7 +54,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsa/example-memory-chat start
+  pnpm --filter @balsats/example-memory-chat start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one.
@@ -82,5 +82,5 @@ Expected output: the console exporter's `[balsa] span_started / …` lines, the 
   non-conforming update comes back to the model as an error tool result.
 - The example uses `openai.chat(...)` (Chat Completions), the lowest common denominator across
   OpenAI and OpenAI-compatible endpoints. Use `openai('gpt-4o-mini')` for OpenAI's Responses API.
-- Like `examples/minimal-agent`, the script consumes `@balsa/core` through its built package
+- Like `examples/minimal-agent`, the script consumes `@balsats/core` through its built package
   exports — run `pnpm build` before `start`.

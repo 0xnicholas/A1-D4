@@ -1,12 +1,12 @@
-# `@balsa/mcp-client`
+# `@balsats/mcp-client`
 
 Bridge a remote [MCP](https://modelcontextprotocol.io) server's tools into a
 [Balsa](https://github.com/0xnicholas/balsa-framework) tool container: one `createMcpClient()`
 object with a `tools` snapshot you spread straight into an agent, a `refresh()`, and a `close()`.
 
 ```ts
-import { createAgent } from '@balsa/core/agent';
-import { createMcpClient } from '@balsa/mcp-client';
+import { createAgent } from '@balsats/core/agent';
+import { createMcpClient } from '@balsats/mcp-client';
 
 const client = await createMcpClient({
   transport: { type: 'http', url: 'https://example.com/mcp' },
@@ -32,10 +32,10 @@ await client.close();                        // tear down (idempotent)
 ## Install
 
 ```bash
-npm install @balsa/mcp-client @balsa/core
+npm install @balsats/mcp-client @balsats/core
 ```
 
-`@balsa/core` is a peer dependency (one core instance by design). The only direct runtime
+`@balsats/core` is a peer dependency (one core instance by design). The only direct runtime
 dependency is `@modelcontextprotocol/client`.
 
 ## Transports and options
@@ -120,7 +120,7 @@ Same axis as the rest of Balsa — install only what you use, and the numbers ar
   OAuth/SSE/stdio closure; one 2014-era package lacks registry size metadata, so the byte count
   is a lower bound in that spirit), recorded in `deps-budget.json`
 - first-party code: **2,286 B** minified, recorded in `byte-budget.json`
-- `@balsa/core` stays a peer, so there is exactly one core instance
+- `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License
 

@@ -6,10 +6,10 @@
  * Spans are hand-built `ExportedSpan` fixtures: the seam under test is the exporter's
  * `export(event)` face, not the core tracer (that dispatch is core's own, already covered there).
  */
-import { createOtlpExporter } from '@balsa/otlp';
+import { createOtlpExporter } from '@balsats/otlp';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { ExportedSpan } from '@balsa/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
 
 /** One request the capture endpoint received. */
 export interface CapturedRequest {

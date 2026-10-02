@@ -1,4 +1,4 @@
-# `@balsa/sqlite`
+# `@balsats/sqlite`
 
 The first-party SQLite storage adapter for [Balsa](https://github.com/0xnicholas/balsa-framework):
 one factory over one embedded file, implementing all four storage ports — memory history, workflow
@@ -7,7 +7,7 @@ dependencies: the driver is Node's built-in [`node:sqlite`](https://nodejs.org/a
 so it installs nothing and runs no service.
 
 ```ts
-import { createSqliteStorage } from '@balsa/sqlite';
+import { createSqliteStorage } from '@balsats/sqlite';
 
 const storage = createSqliteStorage({ path: 'balsa.db', busyTimeoutMs: 5_000 });
 
@@ -29,10 +29,10 @@ await storage.close();      // idempotent; after it every port method throws
 ## Install
 
 ```bash
-npm install @balsa/sqlite @balsa/core
+npm install @balsats/sqlite @balsats/core
 ```
 
-`@balsa/core` is a peer dependency (one core instance by design). `@balsa/sqlite` has no other
+`@balsats/core` is a peer dependency (one core instance by design). `@balsats/sqlite` has no other
 runtime dependency. Requires Node **`>=22.13.0`** — the flag-free floor of `node:sqlite`
 (experimental, release candidate since Node 25.7; Bun / Deno / Workers stubs are not a promise).
 
@@ -105,7 +105,7 @@ is only correct when the caller uses `compareAndSave`; `':memory:'` databases ar
 
 - dependencies: **0** — the driver is built into Node, so there is no `deps-budget.json` to watch
 - first-party code: **11,965 B** minified (3,120 B gzip), recorded in `byte-budget.json`
-- `@balsa/core` stays a peer, so there is exactly one core instance
+- `@balsats/core` stays a peer, so there is exactly one core instance
 
 ## License
 

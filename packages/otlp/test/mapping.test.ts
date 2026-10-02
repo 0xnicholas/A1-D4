@@ -4,7 +4,7 @@
  * `balsa.*` vocabulary, error mapping, metadata, and the value-domain rules.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ExportedSpan } from '@balsa/core/observability';
+import type { ExportedSpan } from '@balsats/core/observability';
 import { saveOtelEnv, shipSpans, testSpan } from './helpers.js';
 
 let restoreEnv: () => void;

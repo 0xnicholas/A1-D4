@@ -50,8 +50,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsa/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-workflow-approval start
+pnpm build                 # examples consume @balsats/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-workflow-approval start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -59,7 +59,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsa/example-workflow-approval start
+  pnpm --filter @balsats/example-workflow-approval start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one.
@@ -96,5 +96,5 @@ receipt:
   `foreach` / `parallel` / `branch`, and the loop and wait operators are exercised by the core's
   test suite. The definition surface's kill-list and load-bearing seams are in
   `docs/architecture/workflows.md`「砍单与承载缝」.
-- Like the other examples, the script consumes `@balsa/core` through its built package exports — run
+- Like the other examples, the script consumes `@balsats/core` through its built package exports — run
   `pnpm build` before `start`.

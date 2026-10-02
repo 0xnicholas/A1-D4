@@ -27,27 +27,27 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsa/example-workflow-approval start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-workflow-approval start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsa/example-workflow-approval start
+ *     pnpm --filter @balsats/example-workflow-approval start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsa/core';
-import { consoleExporter, createTracer } from '@balsa/core/observability';
+import { createApp } from '@balsats/core';
+import { consoleExporter, createTracer } from '@balsats/core/observability';
 import {
   createInMemorySnapshotStore,
   createStep,
   createWorkflow,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 import type {
   StepContext,
   WorkflowEntry,
   WorkflowEvent,
   WorkflowSnapshotStore,
-} from '@balsa/core/workflows';
+} from '@balsats/core/workflows';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {
