@@ -38,5 +38,10 @@ CI 单 job,两段:硬闸门 `pnpm verify`(typecheck / build / test / check:dist 
   - **判定走产物声明扫描**(`dist/*.d.ts` 的公共声明文本里,类型位置的标识符必须解析到某个入口导出的名字),**不在框架侧跑 TypeDoc**——文档侧零警告红线不充分(api-reference §3:同一入口在不同解析环境下 0 警告 vs 10 警告,警告出现与否依赖解析环境);同一条扫描对能力包同样成立(能力包入口单一,今天零命中)。
   - **唯一排除通道 = 源码 JSDoc 的 `@internal`**(与生成侧 `excludeInternal` 同源),不另设白名单。
   - **落位与退出码**:实现 `scripts/check-export-surface.mjs`,七包同名薄脚本指回,挂法沿本 ADR(0 = 干净 / 1 = 有缺口 / 2 = 配置·产物硬错误);与 `check:runtime-deps` 同属**硬闸门**(不是黄灯)。
+- **修订(2026-10-02,离线 example 冒烟闸门 [balsats-framework#110](https://github.com/0xnicholas/balsats-framework/issues/110))**:CI 单 job 内、`pnpm verify` **之后**加一步硬闸门 `pnpm check:examples`,逐条跑四个离线 example 入口(`cron-schedule` · `otlp-collector` · `mcp-tools` HTTP + stdio)。
+  - **不进 `verify`、不新增 job、不改 job 超时**:闸门是跨进程编排且消费当次构建产物,实现落根 `scripts/check-examples.mjs`(零第三方依赖);本地口径 = **先构建再跑**(`pnpm build && pnpm check:examples`),运行器不内建 dist 前置探测——CI 的构建顺序由 `verify` 保证,本地忘 build 以例子自身的模块解析错误呈现并计为该案失败。
+  - **退出码沿本 ADR 形状,且是硬闸门(红)**:0 = 全绿 / 1 = 至少一案失败(含超时)/ 2 = 案表不可读·JSON 非法·空案表;CI 不做黄灯容忍(黄灯只给数字类预算)。
+  - **案表条目 = 一条命令 + 可选逐案 env + 可选逐案超时**:后续接入 mock 例与需真 key 例只需案表加行、不改运行器(两者本票均不入闸门)。
+  - **运行器自带负例自证**:注入案表(`--cases <文件>`)是唯一缝,覆盖一例失败 → 1、案表不可用 → 2、超时 → 1 三条路径。
 
 (来源:M1-02 ticket #23;度量口径由 ADR-0014 留给本票决定)

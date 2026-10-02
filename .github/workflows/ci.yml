@@ -1,5 +1,6 @@
 # CI(M1-02 #23;M5 修订见 ADR-0015):
-# 硬闸门(红)= `pnpm verify`(typecheck / build / test / check:dist / 仅声明依赖红线);
+# 硬闸门(红)= `pnpm verify`(typecheck / build / test / check:dist / 仅声明依赖红线 / 导出面红线)
+#   + 离线 example 冒烟一步(verify 之后调同一入口命令;需要真实跨进程的验证落 examples、不进 verify);
 # 黄灯(@ADR-0001:不卡合并)= 字节预算 + 依赖数字两步,以 GitHub 警告注释 + job summary 呈现。
 name: CI
 
@@ -38,6 +39,11 @@ jobs:
 
       - name: 硬闸门(typecheck / build / test / check:dist / 仅声明依赖红线 / 导出面红线)
         run: pnpm verify
+
+      - name: 离线 example 冒烟闸门(四案逐条跑通:构建产物就绪后验证 examples 仍可用)
+        # 硬闸门(红),不做黄灯容忍;不进 `pnpm verify`(ADR-0015 M5 修订:需要真实服务/跨进程的
+        # 验证落 examples),靠上一步 verify 的顺序保证构建在前。本地同命令:`pnpm build && pnpm check:examples`。
+        run: pnpm check:examples
 
       - name: 字节预算黄灯(ADR-0001:超预算不卡合并;口径/测量硬错误照常变红)
         # 退出码契约(ADR-0015):0 在预算内 / 1 超预算(黄灯,本步容忍)/ 2 硬错误(失败)

@@ -300,6 +300,15 @@ pnpm install
 pnpm verify    # typecheck + build + tests + dist / runtime-deps checks
 ```
 
+The offline examples are gated too — the same gate CI runs, one step after `verify`:
+
+```bash
+pnpm build && pnpm check:examples   # cron-schedule / otlp-collector / mcp-tools (HTTP + stdio)
+```
+
+It runs the four offline entries serially, streams each one's output and exits non-zero if any fails
+(`pnpm build` first: examples consume the packages through their built exports).
+
 The byte budget (minified size per export path) is checked in CI on every PR — "lightweight" is a
 checked property, not a slogan — and it is a warning, not a merge blocker
 ([ADR-0001](docs/adr/0001-lightweight-definition.md)).
