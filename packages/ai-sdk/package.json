@@ -17,7 +17,8 @@
     "check:byte-budget": "node ../../scripts/check-byte-budget.mjs",
     "byte-budget:update": "node ../../scripts/check-byte-budget.mjs --update",
     "check:deps-budget": "node ../../scripts/check-deps-budget.mjs",
-    "deps-budget:update": "node ../../scripts/check-deps-budget.mjs --update"
+    "deps-budget:update": "node ../../scripts/check-deps-budget.mjs --update",
+    "prepublishOnly": "pnpm -w verify"
   },
   "exports": {
     ".": {
