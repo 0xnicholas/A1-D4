@@ -30,7 +30,8 @@
  * envelope reads `suspended`. `resume` loads the snapshot, validates `resumeData` against the
  * step's `resumeSchema` and re-enters the walk from the snapshot's position (inside its block,
  * from the site), replaying the completed executions from the records instead of re-running
- * them; concurrent resumes of one run are deduplicated in process. Snapshots are written at fixed
+ * them; concurrent resumes of one snapshot — the same store and run id — are deduplicated in
+ * process. Snapshots are written at fixed
  * points — every completed entry with attached storage, plus suspend and the terminal state —
  * never through hooks; a run with a tracer writes the trace it was exported under into the
  * snapshot, so a resumed segment continues the same trace. A tracer attached to the definition

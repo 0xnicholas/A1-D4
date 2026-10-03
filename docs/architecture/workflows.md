@@ -7,6 +7,7 @@
 > 修订(#51):suspend/resume 落地时补钉实施期裁决——v1 的 suspend 只成立在**顶层 then 条目**的 step 内,块内(parallel / branch 臂 / foreach / 循环)调用 suspend 显式报错(块内迭代现场不在快照形状内,升级为新 ticket);`position` = 重进下标(suspend 时 = 挂起条目,running 时 = 下一条目,终态 success = 条目数);resume 把前序条目**按记录回放**重建 tip(不重执行、不重估条件),`input` 用快照里已校验的值;持久化粒度 = **条目完成**(块的子 step 随块一起记录,见 #49/#50;sleep 不是 step 但条目完成也写),step 边界写只随真实 storage,无 storage 时只写 suspend 与终态。
 > 修订(#52):事件流与 span 埋点落地时补钉实施期裁决——事件词汇表与载荷(下表「流式事件」)、块内 step 的**每次执行**一对事件 / 一个 `workflow-step` span(stepResults 仍按块聚合)、run span 的 input = 校验后的触发输入(start 的 input / resume 的 resumeData)、output = 终态信封;`createRun` 收 `{ traceId?, parentSpanId? }`(外部 trace 续接,空串语义沿 agent 的 run option),`traceId` 作为**可选字段**进快照(additive),resume 以快照 traceId 开同一 trace 下的新 run span。
 > 修订(#54):块内挂起落地——四类块体内 `suspend()` 真挂起,迭代现场以可选 `iterationSite?` 字段进快照(additive,旧快照无此字段 = 顶层挂起的旧形状);resume 按 site 重进块内:parallel / branch 按**记录回放**完成臂(无 success 记录的臂重跑,挂起臂各落 suspended 记录,resume 命名谁谁收 resumeData)、foreach 记已收集前缀与挂起索引(洞重跑)、循环记已完成迭代数与挂起迭代的输入(dowhile 重进跳过首次前置检查);块是**满同步点**——挂起或失败前等在飞执行落定,挂起优先于同窗兄弟失败;事件/记录/快照同读「块内挂起 = suspended」。实施期补钉:foreach/parallel 的失败也等在飞落定(旧 Promise.all 的“失败即离场、在飞脱缰”废止)。
+> 修订(#119):resume 并发去重的键域钉为快照的持久化身份 **(store, runId)**——机制收进内部 resume-lock 模块(`WeakMap<store, Map<runId, Promise>>`,join-in-flight、settle 即删),workflows 与 durable-agent 各持一个模块级注册表实例(结构性跨子系统隔离);两个 store 上的同 runId 各自独立,durable 侧跨 wrapper 实例也去重。
 
 ## 定位
 
@@ -84,14 +85,14 @@ await run.resume({ step, resumeData? })   // 见「suspend/resume 与快照」
 - 快照 = JSON 可序列化的 `{ runId, status, input, stepResults, position }`(stepResults 记录每步 status / output / 起止时间 / suspendPayload;position 即 mastra 的 startIdx 等价物)。**JSON-only 约束**:大数据只存引用。
 - 恢复 = `run.resume({ step, resumeData? })`:load 快照 → resumeData 过 resumeSchema → 从 position 重进同一个 for 循环。time-travel / restart / restartAllActiveWorkflowRuns 是同一机制的变种,**全部裁出 v1**;引擎只暴露「load → 重进」原语,durable 重启归 Harness(#18)。
 - 持久化时机:有 storage 时**每个条目完成后** + suspend + 终态,固定写;无 shouldPersistSnapshot / prune 钩子。"每个条目"而非字面的"每个 step":块的子 step 随块一起记录(#49/#50 已钉块只按 step id 记一条),条目完成才是记录表变化的时刻;sleep 不产生记录但条目完成照写。
-- resume 并发去重:进程内锁;跨进程 CAS = adapter 可选扩展(`compareAndSave`,见 `docs/architecture/storage.md`)。
+- resume 并发去重:进程内锁,键域 = 快照的持久化身份 (store, runId)(#119);跨进程 CAS = adapter 可选扩展(`compareAndSave`,见 `docs/architecture/storage.md`)。
 
 ### 实施钉死(#51,块内部分由 #54 修订)
 
 - **suspend 在任何条目类型内都成立(#54 修订)**:顶层 `then` 的 step、parallel / branch 臂、foreach / 循环体内调用 `suspend(payload)` 都真挂起 run;条件里调用 suspend 仍显式报错(条件是只读的)。#51 的「v1 只在顶层 then」由 #54 补上承载缝。
 - **position = 重进下标**:suspend 快照 = 挂起条目;`running` 快照 = 已完成条目的下一条;终态 `success` = 条目数。只写 `running` 快照当 `createWorkflow` 附了真实 storage;无 storage 时只写 suspend 与终态——快照只落在 run 对象的内存默认实现里(同一 run 对象可恢复;新 run 对象要接真实 storage,进程内默认 store 不跨对象)。
 - **resume 的回放**:从快照 `input`(start 边界已校验过的值)起,按记录重建前序条目的输出得到 tip——前序 step 不重执行、条件不重估;`getStepResult` 由快照记录种子恢复。`resumeData` 过挂起 step 的 `resumeSchema` 是第三处固定 IO 校验,校验值替换原数据;声眀无 `resumeSchema` 的 step 不接受 resumeData(显式报错)。`step`(step 对象或 id)必须与快照里挂起的 step 一致,否则显式报错。resume 选项可再传 `signal` / `requestContext`(跨进程恢复时;缺省用 start 的)。
-- **信封与去重**:挂起终态 = `{ status: 'suspended', stepId, stepResults }`(payload 在 `stepResults[stepId].suspendPayload`);resume 与 start 返回同一终态信封。进程内锁按 runId 去重:同一 run 的并发 resume 合并为一次调用(后到者拿到同一 promise),锁在 settle 后释放(再次挂起可再次 resume)。
+- **信封与去重**:挂起终态 = `{ status: 'suspended', stepId, stepResults }`(payload 在 `stepResults[stepId].suspendPayload`);resume 与 start 返回同一终态信封。进程内锁按 (store, runId) 去重(#119 钉键域 = 快照的持久化身份):同一 store 上同一 run 的并发 resume 合并为一次调用(后到者拿到同一 promise),两个 store 上的同 runId 各自独立、互不 join;锁在 settle 后释放(再次挂起可再次 resume)。
 - **写失败语义**:快照写失败随 run 失败(除 failed 终态那一写为 best-effort——run 自身的错误永远原样上抛)。挂起的 step 落 `suspended` 记录(记录与挂起信封同源):顶层 then 与 parallel / branch 臂按各自 step id 落记录(多个同时挂起的臂各落各的,谁都可以是下一个 resume 目标);foreach / 循环按块的聚合 step id 落一条(mid-block 挂起,块完成时替换为 success)。
 
 ### 块内挂起与迭代现场(#54)

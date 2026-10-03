@@ -658,6 +658,30 @@ describe('run.resume:load 快照 → resumeData 校验 → 从 position 重进',
     expect(approvalExecute).toHaveBeenCalledTimes(2);
   });
 
+  it('resume 锁的键域是 (store, runId):两个 store 上的同 runId 各自独立 resume,互不 join(#119)', async () => {
+    // 快照的持久化身份是 (store, runId):两个 store 各自挂起同一 runId,是两场互不相干的 resume
+    const a = recordingStore();
+    const b = recordingStore();
+    const workflowA = approvalWorkflow({ storage: a.store });
+    const workflowB = approvalWorkflow({ storage: b.store });
+    const runId = 'cross-store';
+    const runA = workflowA.workflow.createRun({ runId });
+    const runB = workflowB.workflow.createRun({ runId });
+    await runA.start({ inputData: { topic: 'a' } }).result;
+    await runB.start({ inputData: { topic: 'b' } }).result;
+
+    const [outcomeA, outcomeB] = await Promise.all([
+      runA.resume({ step: 'approval', resumeData: { approved: true } }),
+      runB.resume({ step: 'approval', resumeData: { approved: false } }),
+    ]);
+
+    // 各自的快照各自的结局:join 会让 B 拿到 A 的错型 outcome,且 B 自己的快照从未被消费
+    expect(expectSuccess(outcomeA).output).toEqual({ polished: '«A:true»' });
+    expect(expectSuccess(outcomeB).output).toEqual({ polished: '«B:false»' });
+    expect(workflowA.approvalExecute).toHaveBeenCalledTimes(2);
+    expect(workflowB.approvalExecute).toHaveBeenCalledTimes(2);
+  });
+
   it('resume 进程内锁在失败后释放:中止的 resume 不消费快照,下一次仍可恢复', async () => {
     const { workflow, approvalExecute } = approvalWorkflow();
     const run = workflow.createRun();

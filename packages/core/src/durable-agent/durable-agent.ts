@@ -13,6 +13,7 @@ import type {
 } from '../agent/types.js';
 import type { ToolCallChunk, ToolResultChunk } from '../model/chunks.js';
 import type { ModelMessage } from '../model/contract.js';
+import { createResumeLock } from '../resume-lock.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import { createInMemoryAgentRunSnapshotStore } from './in-memory-snapshot-store.js';
 import type { AgentRunSnapshot, AgentRunSnapshotStore, AgentRunSuspendPayload } from './snapshot.js';
@@ -30,7 +31,8 @@ import type { AgentRunSnapshot, AgentRunSnapshotStore, AgentRunSuspendPayload } 
  * produces `'suspended'` (`agent/loop.ts` keeps no snapshot and holds no approval state).
  *
  * Single-process semantics where it matters: the store's in-memory default keeps snapshots for this
- * process, and concurrent resumes of one run are deduplicated in process. The port is the
+ * process, and concurrent resumes of one snapshot — the same store and run id — are deduplicated
+ * in process, across wrapper instances. The port is the
  * deployment surface — attaching a durable store and clearing a consumed snapshot are the
  * application's side (no CAS, no cross-process recovery).
  */
@@ -110,7 +112,8 @@ export interface DurableAgent {
    * Continues a suspended run: loads its snapshot, replays the held calls under the approval
    * decision and drives the run to its next stop. Resolves with the segment's outcome (a run that
    * suspended again resolves `'suspended'` and is resumable under the same id). Concurrent resumes
-   * of one run are joined into the one in flight.
+   * of one snapshot — the same store and run id — are joined into the one in flight, even across
+   * wrapper instances.
    */
   resume(runId: string, options: DurableResumeOptions): Promise<DurableRunOutcome>;
 }
@@ -136,19 +139,22 @@ interface RunState {
 }
 
 /**
+ * The durable-agent subsystem's resume-lock registry (the same mechanism as the workflow
+ * engine's, one registry per subsystem): one resume per snapshot identity — (store, runId) — at
+ * a time. The registry lives at module level, so two wrappers over one store cannot consume the
+ * same suspended snapshot twice: a concurrent resume joins the one in flight instead of loading
+ * it again; the lock clears when that resume settles. Cross-process safety is the store's concern
+ * — there is no CAS (the snapshot-store port).
+ */
+const resumeLock = createResumeLock();
+
+/**
  * Creates the durable agent. See `DurableAgent` for the run surface.
  */
 export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
   const { agent } = config;
   const storage = config.storage ?? createInMemoryAgentRunSnapshotStore();
   const gate = new Set(config.approval?.tools ?? []);
-  /**
-   * The in-process resume lock (the same technique as the workflow engine): one resume per
-   * run at a time. A concurrent resume of the same run joins the one in flight instead of loading
-   * the same suspended snapshot twice; the lock clears when that resume settles. Cross-process
-   * safety is the store's concern — there is no CAS (the snapshot-store port).
-   */
-  const resumes = new Map<string, Promise<DurableRunOutcome>>();
 
   /**
    * The run's boundary wiring: the durable gate's `beforeToolCalls` around whatever the caller
@@ -240,7 +246,7 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
     return Object.assign(stream, { runId, suspendPayload });
   }
 
-  /** `resume`: load, decide, continue — deduplicated per run id (see the lock above). */
+  /** `resume`: load, decide, continue — deduplicated by snapshot identity (see the lock above). */
   function resume(runId: string, options: DurableResumeOptions): Promise<DurableRunOutcome> {
     if (typeof options.approved !== 'boolean') {
       throw new Error(
@@ -248,13 +254,7 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
           'to execute the held calls, or { approved: false } to answer them with a rejection.',
       );
     }
-    const inFlight = resumes.get(runId);
-    if (inFlight !== undefined) return inFlight;
-    const locked = continueRun(runId, options).finally(() => {
-      if (resumes.get(runId) === locked) resumes.delete(runId);
-    });
-    resumes.set(runId, locked);
-    return locked;
+    return resumeLock.run(storage, runId, () => continueRun(runId, options));
   }
 
   /** One run's resume: the load → decide → re-enter path. */

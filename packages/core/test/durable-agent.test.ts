@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Agent } from '@balsats/core/agent';
 import { createDurableAgent, createInMemoryAgentRunSnapshotStore } from '@balsats/core/durable-agent';
-import type { AgentRunSnapshot } from '@balsats/core/durable-agent';
+import type { AgentRunSnapshot, AgentRunSnapshotStore } from '@balsats/core/durable-agent';
+import { createStep, createWorkflow } from '@balsats/core/workflows';
+import type {
+  StepContext,
+  WorkflowRunSnapshot,
+  WorkflowSnapshotStore,
+} from '@balsats/core/workflows';
 import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsats/core/observability';
 import { createTool } from '@balsats/core/tools';
 import type { Tool, ToolContext } from '@balsats/core/tools';
@@ -10,7 +16,7 @@ import { Memory } from '@balsats/core/memory';
 import type { RequestContext } from '@balsats/core/agent';
 import { INSTRUCTIONS, assistantWithTools } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
-import { captureRejection } from './helpers/assertions.js';
+import { captureRejection, expectSuccess } from './helpers/assertions.js';
 import { TRACE_ID, eventsOfType, kinds } from './helpers/spans.js';
 
 /**
@@ -471,6 +477,113 @@ describe('createDurableAgent:resume 两路', () => {
 
     expect(transfer.execute).toHaveBeenCalledTimes(1);
     expect(first).toEqual(second);
+  });
+});
+
+describe('createDurableAgent:resume 去重的键域 = (store, runId)(#119)', () => {
+  it('跨 wrapper:两个 createDurableAgent 实例同一 store+runId 也合并为一次执行', async () => {
+    // 去重不依赖工厂闭包的偶然:快照的持久化身份是 (store, runId),与哪个 wrapper 发起无关
+    const model = fakeModel([TRANSFER_CALL, { text: 'Money moved.' }]);
+    const transfer = transferTool(vi.fn(() => 'moved'));
+    const storage = createInMemoryAgentRunSnapshotStore();
+    const approval = { tools: ['transfer'] };
+    const first = createDurableAgent({
+      agent: assistantWithTools(model, { transfer }),
+      storage,
+      approval,
+    });
+    const second = createDurableAgent({
+      agent: assistantWithTools(model, { transfer }),
+      storage,
+      approval,
+    });
+    const out = first.stream('Transfer my funds.');
+    expect(await out.finishReason).toBe('suspended');
+
+    const [a, b] = await Promise.all([
+      first.resume(out.runId, { approved: true }),
+      second.resume(out.runId, { approved: true }),
+    ]);
+
+    // 只续跑一次:工具执行一次,模型只在续跑段多被调一次;两个调用方拿到同一结局
+    expect(transfer.execute).toHaveBeenCalledTimes(1);
+    expect(model.streamCalls).toHaveLength(2);
+    expect(a).toEqual(b);
+  });
+
+  it('跨子系统:同一 store 对象、同一 runId 的 workflow 与 durable resume 互不误并', async () => {
+    // 统一 adapter 的最坏情形:两个快照 port 面是同一对象。store 按形状分槽(workflow 快照带
+    // stepResults,durable 快照带 messages),load 合并两槽返回——任一子系统读回自己写的那部分。
+    const slots = new Map<string, { workflow?: WorkflowRunSnapshot; durable?: AgentRunSnapshot }>();
+    const store: WorkflowSnapshotStore & AgentRunSnapshotStore = {
+      load: async (runId: string) => {
+        const slot = slots.get(runId);
+        return slot === undefined
+          ? null
+          : ({ ...slot.workflow, ...slot.durable } as unknown as WorkflowRunSnapshot &
+              AgentRunSnapshot);
+      },
+      save: async (runId: string, snapshot: WorkflowRunSnapshot | AgentRunSnapshot) => {
+        const slot = slots.get(runId) ?? {};
+        if ('stepResults' in snapshot) slot.workflow = structuredClone(snapshot);
+        else slot.durable = structuredClone(snapshot);
+        slots.set(runId, slot);
+      },
+    };
+
+    const runId = 'unified-run';
+    const gateExecute = vi.fn((ctx: StepContext<string, string>) => {
+      if (ctx.resumeData === undefined) ctx.suspend({ question: 'ok?' });
+      return `gate:${ctx.resumeData}`;
+    });
+    const gate = createStep({
+      id: 'gate',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      resumeSchema: z.string(),
+      execute: gateExecute,
+    });
+    const workflow = createWorkflow({
+      id: 'unified-workflow',
+      inputSchema: z.string(),
+      outputSchema: z.string(),
+      storage: store,
+    })
+      .then(gate)
+      .commit();
+    const run = workflow.createRun({ runId });
+    await run.start({ inputData: 'x' }).result;
+
+    // durable 侧的挂起快照直接写 port(stream 的 runId 由包装铸造,同 runId 由 save 摆出)
+    const model = fakeModel([{ text: 'Money moved.' }]);
+    const transfer = transferTool(vi.fn(() => 'moved'));
+    const durable = createDurableAgent({
+      agent: assistantWithTools(model, { transfer }),
+      storage: store,
+      approval: { tools: ['transfer'] },
+    });
+    await store.save(runId, {
+      runId,
+      status: 'suspended',
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'Transfer my funds.' }] },
+        { role: 'assistant', content: [TRANSFER_CALL_CHUNK] },
+      ],
+      stepCount: 0,
+      suspendPayload: { toolCalls: [TRANSFER_CALL_CHUNK], awaitingApproval: ['call-1'] },
+    });
+
+    const [workflowOutcome, durableOutcome] = await Promise.all([
+      run.resume({ step: 'gate', resumeData: 'yes' }),
+      durable.resume(runId, { approved: true }),
+    ]);
+
+    // 锁的隔离是结构性的:误并会让 durable 拿到 workflow 的信封,transfer 永不执行
+    expect(expectSuccess(workflowOutcome).output).toBe('gate:yes');
+    expect(gateExecute).toHaveBeenCalledTimes(2);
+    expect(durableOutcome.finishReason).toBe('stop');
+    expect(durableOutcome.text).toBe('Money moved.');
+    expect(transfer.execute).toHaveBeenCalledTimes(1);
   });
 });
 

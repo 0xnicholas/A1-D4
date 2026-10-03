@@ -1,4 +1,5 @@
 import type { RequestContext } from '../agent/types.js';
+import { createResumeLock } from '../resume-lock.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { WorkflowEvent } from './events.js';
 import { createInMemorySnapshotStore } from './in-memory-snapshot-store.js';
@@ -124,7 +125,8 @@ export interface WorkflowRun<TInputData = unknown, TOutput = unknown> {
   /**
    * Resumes a suspended run: loads its snapshot, validates `resumeData` against the suspended step's
    * `resumeSchema`, and re-enters the walk from the snapshot's position. Concurrent resumes of one
-   * run are deduplicated: the later call joins the one in flight.
+   * snapshot — the same store and run id — are deduplicated: the later call joins the one in
+   * flight.
    */
   resume(options: WorkflowResumeOptions): Promise<WorkflowRunOutcome<TOutput>>;
 }
@@ -133,13 +135,14 @@ export interface WorkflowRun<TInputData = unknown, TOutput = unknown> {
 const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
- * The in-process resume lock (suspend/resume and snapshots): one resume
- * per run at a time. A concurrent resume of the same run joins the one in flight instead of loading
- * the same suspended snapshot twice; the lock clears when that resume settles, so a run that
- * suspended again can be resumed again. Cross-process safety is the store's concern (CAS is the
- * adapter's optional extension), not the core's.
+ * The workflow subsystem's resume-lock registry (suspend/resume and snapshots): one resume per
+ * snapshot identity — (store, runId) — at a time. A concurrent resume of the same snapshot joins
+ * the one in flight instead of loading it twice; two stores holding the same run id stay
+ * independent. The lock clears when that resume settles, so a run that suspended again can be
+ * resumed again. Cross-process safety is the store's concern (CAS is the adapter's optional
+ * extension), not the core's.
  */
-const resumeLocks = new Map<string, Promise<WorkflowRunOutcome>>();
+const resumeLock = createResumeLock();
 
 /**
  * Creates a run of the given workflow: an identity now, an execution on `start`. `createRun` does
@@ -204,9 +207,9 @@ interface SnapshotPersistence {
 }
 
 /**
- * One resume, deduplicated by run id: everything on the path — loading the snapshot, checking it,
- * validating the resume data, re-entering the walk — runs inside the lock, so two callers asking at
- * once get one resume and one outcome.
+ * One resume, deduplicated by snapshot identity (store, runId): everything on the path — loading
+ * the snapshot, checking it, validating the resume data, re-entering the walk — runs inside the
+ * lock, so two callers asking at once get one resume and one outcome.
  */
 function resumeRun<TOutput>(
   workflow: WorkflowDefinition,
@@ -215,16 +218,9 @@ function resumeRun<TOutput>(
   startOptions: WorkflowStartOptions<unknown> | undefined,
   persistence: SnapshotPersistence,
 ): Promise<WorkflowRunOutcome<TOutput>> {
-  const inFlight = resumeLocks.get(runId);
-  if (inFlight !== undefined) return inFlight as Promise<WorkflowRunOutcome<TOutput>>;
-
-  const running = resumeSnapshot<TOutput>(workflow, runId, options, startOptions, persistence);
-  let locked: Promise<WorkflowRunOutcome<TOutput>> | undefined;
-  locked = running.finally(() => {
-    if (locked !== undefined && resumeLocks.get(runId) === locked) resumeLocks.delete(runId);
-  });
-  resumeLocks.set(runId, locked);
-  return locked;
+  return resumeLock.run(persistence.store, runId, () =>
+    resumeSnapshot<TOutput>(workflow, runId, options, startOptions, persistence),
+  );
 }
 
 /** One run's resume: the load → check → validate → re-enter path of the spec's resume section. */
