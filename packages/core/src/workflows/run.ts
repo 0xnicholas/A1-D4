@@ -1,5 +1,7 @@
 import type { RequestContext } from '../agent/types.js';
+import { createOutputObject } from '../output-object.js';
 import { createResumeLock } from '../resume-lock.js';
+import { NEVER_ABORTED } from '../run-context.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { WorkflowEvent } from './events.js';
 import { createInMemorySnapshotStore } from './in-memory-snapshot-store.js';
@@ -130,9 +132,6 @@ export interface WorkflowRun<TInputData = unknown, TOutput = unknown> {
    */
   resume(options: WorkflowResumeOptions): Promise<WorkflowRunOutcome<TOutput>>;
 }
-
-/** A signal that never aborts — the `signal` of runs that were started without one. */
-const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
  * The workflow subsystem's resume-lock registry (suspend/resume and snapshots): one resume per
@@ -279,10 +278,9 @@ async function resumeSnapshot<TOutput>(
 }
 
 /**
- * The output object of one run. Exactly one execution pass backs it (the single-path principle of
- * the agent's output object): `result` settles from that pass, and the lifecycle events the walker
- * emits are handed to the iterator or buffered for it. A consumer that leaves the loop early stops
- * the buffering but not the run — the terminal outcome still settles from the same pass.
+ * The output object of one run (`output-object.ts` carries the pump; this is its workflow source
+ * and terminal projection). The push source: the walker emits the lifecycle events as it runs
+ * (`emit`) and resolves with the run's outcome — the single pass both consumption styles read.
  */
 function createRunOutput<TOutput>(
   workflow: WorkflowDefinition,
@@ -291,19 +289,6 @@ function createRunOutput<TOutput>(
   persistence: SnapshotPersistence,
   trace: WalkTraceContinuation,
 ): WorkflowRunOutput<TOutput> {
-  let started = false;
-  let settled = false;
-  let abandoned = false;
-  let resultPromise: Promise<WorkflowRunOutcome<TOutput>> | undefined;
-  let outcome: WorkflowRunOutcome<TOutput> | undefined;
-  let failure: { readonly error: unknown } | undefined;
-  let settle: ((value: WorkflowRunOutcome<TOutput>) => void) | undefined;
-  let reject: ((error: unknown) => void) | undefined;
-  /** Lifecycle events produced but not read yet, in boundary order. */
-  const buffered: WorkflowEvent[] = [];
-  /** Iterators parked in `next()`, waiting for the next event. */
-  const waiting: WaitForEvent[] = [];
-
   /** The run's request context: the user's per-call bag plus framework-written `signal`/`runId`. */
   const requestContext: RequestContext = {
     ...options.requestContext,
@@ -311,89 +296,24 @@ function createRunOutput<TOutput>(
     runId,
   };
 
-  function start(): void {
-    if (started) return;
-    started = true;
-    void pump();
-  }
-
-  async function pump(): Promise<void> {
-    try {
-      outcome = (await walk(workflow, {
-        runId,
-        inputData: options.inputData,
-        requestContext,
-        signal: requestContext.signal,
-        storage: persistence.store,
-        persistStepBoundaries: persistence.persistStepBoundaries,
-        emit: deliver,
-        trace,
-      })) as WorkflowRunOutcome<TOutput>;
-      settled = true;
-      for (const waiter of waiting.splice(0)) waiter.resolve(DONE_EVENTS);
-      settle?.(outcome);
-    } catch (error) {
-      failure = { error };
-      settled = true;
-      for (const waiter of waiting.splice(0)) waiter.reject(error);
-      reject?.(error);
-    }
-  }
-
-  /** Hand one lifecycle event to the waiting iterator, or buffer it until one asks. */
-  function deliver(event: WorkflowEvent): void {
-    if (abandoned) return; // The consumer left; nothing will read this buffer again.
-    const waiter = waiting.shift();
-    if (waiter === undefined) {
-      buffered.push(event);
-      return;
-    }
-    waiter.resolve({ value: event, done: false });
-  }
-
-  const iterator: AsyncIterator<WorkflowEvent> = {
-    next(): Promise<IteratorResult<WorkflowEvent>> {
-      start();
-      if (abandoned) return Promise.resolve(DONE_EVENTS);
-      // Buffered events first: a failed run still delivers everything it produced before failing.
-      const event = buffered.shift();
-      if (event !== undefined) return Promise.resolve({ value: event, done: false });
-      if (failure !== undefined) return Promise.reject(failure.error);
-      if (settled) return Promise.resolve(DONE_EVENTS);
-      return new Promise<IteratorResult<WorkflowEvent>>((resolve, rejectEvent) => {
-        waiting.push({ resolve, reject: rejectEvent });
-      });
+  return createOutputObject<
+    WorkflowEvent,
+    WorkflowRunOutcome<TOutput>,
+    { readonly result: WorkflowRunOutcome<TOutput> }
+  >(
+    {
+      start: (deliver) =>
+        walk(workflow, {
+          runId,
+          inputData: options.inputData,
+          requestContext,
+          signal: requestContext.signal,
+          storage: persistence.store,
+          persistStepBoundaries: persistence.persistStepBoundaries,
+          emit: deliver,
+          trace,
+        }) as Promise<WorkflowRunOutcome<TOutput>>,
     },
-    return(): Promise<IteratorResult<WorkflowEvent>> {
-      abandoned = true;
-      buffered.length = 0;
-      return Promise.resolve(DONE_EVENTS);
-    },
-  };
-
-  return {
-    [Symbol.asyncIterator]: () => iterator,
-    get result(): Promise<WorkflowRunOutcome<TOutput>> {
-      start();
-      if (resultPromise !== undefined) return resultPromise;
-      // Settling before the first read stores the outcome instead of creating a promise, so a run
-      // whose `result` is never read cannot reject unhandled.
-      resultPromise = new Promise<WorkflowRunOutcome<TOutput>>((onValue, onError) => {
-        if (outcome !== undefined) onValue(outcome);
-        else if (failure !== undefined) onError(failure.error);
-        else {
-          settle = onValue;
-          reject = onError;
-        }
-      });
-      return resultPromise;
-    },
-  };
+    { result: (outcome) => outcome },
+  );
 }
-
-interface WaitForEvent {
-  resolve(result: IteratorResult<WorkflowEvent>): void;
-  reject(error: unknown): void;
-}
-
-const DONE_EVENTS: IteratorResult<WorkflowEvent> = { value: undefined, done: true };

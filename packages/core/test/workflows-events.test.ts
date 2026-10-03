@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createStep, createWorkflow, WorkflowValidationError } from '@balsats/core/workflows';
 import type { StepContext, WorkflowEvent, WorkflowRunOutput } from '@balsats/core/workflows';
 import { captureRejection, expectAssignable, expectSuccess } from './helpers/assertions.js';
+import { describeOutputObjectContract } from './helpers/output-object-contract.js';
 
 /**
  * lifecycle 事件流(M3 #52,`docs/architecture/workflows.md`「流式事件」):run 输出对象的第二种消费
@@ -12,7 +13,87 @@ import { captureRejection, expectAssignable, expectSuccess } from './helpers/ass
  *
  * 接缝 = 公开 `@balsats/core/workflows` 子路径:`run.start` 返回的输出对象,以及 step execute 收到的
  * ctx;不触内部模块。
+ *
+ * 共享泵的行为矩阵由 helpers/output-object-contract.ts 钉住,本文件以推源(promise+emit)一侧
+ * 喂它;拉源(generator)一侧在 agent-stream.test.ts。
  */
+describeOutputObjectContract<WorkflowEvent>({
+  success: () => {
+    let ran = 0;
+    const step = createStep({
+      id: 'work',
+      inputSchema: topicInput,
+      outputSchema: topicInput,
+      execute: ({ inputData }) => {
+        ran += 1;
+        return inputData;
+      },
+    });
+    const workflow = createWorkflow({
+      id: 'article',
+      inputSchema: topicInput,
+      outputSchema: topicInput,
+    })
+      .then(step)
+      .commit();
+    const run = workflow.createRun();
+    const out = run.start({ inputData: { topic: 'ts' } });
+    return {
+      output: out,
+      readTerminal: () => out.result,
+      started: () => ran > 0,
+      chunks: [
+        { type: 'run-start', runId: run.runId, workflowId: 'article', input: { topic: 'ts' } },
+        { type: 'step-start', stepId: 'work', input: { topic: 'ts' } },
+        { type: 'step-end', stepId: 'work', status: 'success', output: { topic: 'ts' } },
+        { type: 'run-end', status: 'success', output: { topic: 'ts' } },
+      ],
+      terminal: {
+        status: 'success',
+        output: { topic: 'ts' },
+        stepResults: {
+          work: {
+            status: 'success',
+            output: { topic: 'ts' },
+            startedAt: expect.any(Number),
+            endedAt: expect.any(Number),
+          },
+        },
+      },
+    };
+  },
+  failure: () => {
+    const boom = new Error('boom');
+    const failing = createStep({
+      id: 'failing',
+      inputSchema: topicInput,
+      outputSchema: topicInput,
+      execute: () => {
+        throw boom;
+      },
+    });
+    const workflow = createWorkflow({
+      id: 'article',
+      inputSchema: topicInput,
+      outputSchema: topicInput,
+    })
+      .then(failing)
+      .commit();
+    const run = workflow.createRun();
+    const out = run.start({ inputData: { topic: 'ts' } });
+    return {
+      output: out,
+      readTerminal: () => out.result,
+      started: () => true,
+      chunks: [
+        { type: 'run-start', runId: run.runId, workflowId: 'article', input: { topic: 'ts' } },
+        { type: 'step-start', stepId: 'failing', input: { topic: 'ts' } },
+        { type: 'step-end', stepId: 'failing', status: 'failed' },
+      ],
+      error: boom,
+    };
+  },
+});
 
 const topicInput = z.object({ topic: z.string() });
 const articleOutput = z.object({ polished: z.string() });

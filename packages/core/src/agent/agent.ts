@@ -6,6 +6,7 @@ import { loadRunWorkingMemory } from '../memory/working-memory.js';
 import type { RunWorkingMemory } from '../memory/working-memory.js';
 import { AGENT_RUN_SPAN, MEMORY_RECALL_SPAN } from '../observability/index.js';
 import type { Tracer } from '../observability/index.js';
+import { NEVER_ABORTED } from '../run-context.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
 import { toModelTools } from '../tools/to-model-tools.js';
@@ -377,9 +378,6 @@ function toTracing(
     }),
   };
 }
-
-/** A signal that never aborts — the `signal` of runs that were started without one. */
-const NEVER_ABORTED: AbortSignal = new AbortController().signal;
 
 /**
  * The run's tool container, with what the memory subsystem attaches to it: when the run has a
