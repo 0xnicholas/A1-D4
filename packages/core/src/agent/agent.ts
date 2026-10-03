@@ -6,6 +6,7 @@ import { loadRunWorkingMemory } from '../memory/working-memory.js';
 import type { RunWorkingMemory } from '../memory/working-memory.js';
 import { AGENT_RUN_SPAN, MEMORY_RECALL_SPAN } from '../observability/index.js';
 import type { Tracer } from '../observability/index.js';
+import { materialize } from '../output-object.js';
 import { NEVER_ABORTED } from '../run-context.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import type { Tool } from '../tools/index.js';
@@ -231,18 +232,7 @@ export class Agent {
     input: string | ModelMessage[],
     options: AgentRunOptions = {},
   ): Promise<AgentGenerateResult> {
-    const result = this.stream(input, options);
-    const [text, object, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
-      result.text,
-      result.object,
-      result.toolCalls,
-      result.toolResults,
-      result.usage,
-      result.finishReason,
-      result.steps,
-    ]);
-
-    return { text, object, toolCalls, toolResults, usage, finishReason, steps };
+    return materialize<AgentGenerateResult>(this.stream(input, options));
   }
 }
 

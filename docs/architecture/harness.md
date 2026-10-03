@@ -9,6 +9,8 @@ Harness 是**文档分类**,不是统一模块:一组把 agent 从「请求-响�
 
 运行时立场(ADR-0001 的具体化):核心永远不要求长驻进程。进程内便利件(内存 pubsub、ticker)显式标注「单进程语义」;serverless/edge 路径(平台 cron 打 endpoint)是**一等形态**而非降级;跨实例能力(共享 PubSub、执行租约、leader election)整体归能力包,不进核心。
 
+wrapper 不可组合(编译期):`createDurableAgent` / `createSignals` 的配置字段 `agent` 类型为 `Agent` 类,wrapper 产物(`DurableAgent` / `Signals`)结构上不满足它——互相嵌套在编译期即被拒绝,不存在「durable 包 signals」或反向的写法。组合器属假想缝,本规范不为它留扩展点;若未来要支持嵌套,须先改配置字段类型并另立决策。
+
 ## Durable agents(审批挂起/恢复)
 
 ```ts

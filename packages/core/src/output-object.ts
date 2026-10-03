@@ -4,7 +4,8 @@
  * lazy pass over the run. The agent stream (`agent/stream.ts`) and the workflow run output
  * (`workflows/run.ts`) build theirs through `createOutputObject` — their sources differ only in
  * shape (the agent pulls an async generator, the workflow pushes events from a promise), which
- * the `start` callback parameterizes away; `materialize` awaits the terminal record.
+ * the `start` callback parameterizes away; the harness wrappers observe one through
+ * `teeOutputObject`, and `materialize` awaits the terminal record.
  *
  * Internal seam — not exported from any entry (the `standard-schema-runtime.ts` pattern). The
  * interface is shaped so it could be promoted to a public subpath as-is; that promotion needs its
@@ -172,6 +173,73 @@ export async function materialize<TTerminals>(output: {
     ),
   );
   return Object.fromEntries(entries) as TTerminals;
+}
+
+/**
+ * The observation taps of a tee (`teeOutputObject`). All optional; a tee with none is the inner
+ * run re-exposed.
+ */
+export interface TeeHooks<TChunk, TTerminals> {
+  /**
+   * Called with each chunk as it flows through to the consumer — the fan-out tap (the signals
+   * wrapper's subscriber broadcast). Runs from the tee's own pass over the inner run, so it
+   * keeps firing even after the tee's consumer leaves the loop (abandon stays local).
+   */
+  readonly onChunk?: ((chunk: TChunk) => void) | undefined;
+  /**
+   * Runs once, when the inner run completes — before the tee's terminal values settle, in the
+   * promise sense of "settle": on success it precedes the terminal resolutions, on failure the
+   * rejections. The wrapper's completion-ordering semantics live here (the durable wrapper: the
+   * snapshot is in the store before `finishReason: 'suspended'` can be observed, so a resume
+   * fired on sight finds it). A hook that throws replaces the run's outcome with its own error —
+   * the durable wrapper leans on that: a snapshot the store refused fails the run.
+   */
+  readonly beforeSettle?: (() => void | Promise<void>) | undefined;
+  /**
+   * How the tee harvests the inner run's terminal record once it completed; defaults to
+   * `materialize` — the one collection site.
+   */
+  readonly collect?: ((inner: OutputObject<TChunk, TTerminals>) => Promise<TTerminals>) | undefined;
+}
+
+/**
+ * A tee over an output object: the same run re-exposed (same chunk stream, same terminal keys),
+ * with `onChunk` / `beforeSettle` observing the pass — the harness wrappers' seam, so they never
+ * re-pump the inner stream by hand. The tee's own pump pulls the inner run to completion
+ * regardless of the tee's consumer (the pinned abandon rule applies to the tee as to any output
+ * object), so the hooks' timing does not depend on how the caller consumes.
+ */
+export function teeOutputObject<TChunk, TTerminals>(
+  inner: OutputObject<TChunk, TTerminals>,
+  hooks: TeeHooks<TChunk, TTerminals> = {},
+): OutputObject<TChunk, TTerminals> {
+  const collect = hooks.collect ?? materialize<TTerminals>;
+  // The tee re-exposes the inner object's own terminal keys, each selecting its field of the
+  // collected record — a terminal field added on the inside flows through untouched.
+  const projections = Object.fromEntries(
+    Object.keys(inner).map((key) => [key, (record: TTerminals) => record[key as keyof TTerminals]]),
+  ) as OutputProjections<TTerminals, TTerminals>;
+  return createOutputObject(
+    {
+      async start(deliver) {
+        const iterator = inner[Symbol.asyncIterator]();
+        try {
+          for (;;) {
+            const next = await iterator.next();
+            if (next.done) break;
+            hooks.onChunk?.(next.value);
+            deliver(next.value);
+          }
+        } catch (error) {
+          await hooks.beforeSettle?.();
+          throw error;
+        }
+        await hooks.beforeSettle?.();
+        return collect(inner);
+      },
+    },
+    projections,
+  );
 }
 
 interface WaitForNext<TChunk> {

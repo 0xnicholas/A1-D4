@@ -1,5 +1,5 @@
 import type { Agent } from '../agent/agent.js';
-import { createAgentStream } from '../agent/stream.js';
+import { passThrough } from '../agent/boundary.js';
 import type {
   AgentGenerateResult,
   AgentMemoryOptions,
@@ -13,6 +13,7 @@ import type { Chunk } from '../model/chunks.js';
 import type { ModelMessage } from '../model/contract.js';
 import type { Memory, MemoryThreadRef } from '../memory/index.js';
 import type { Tracer } from '../observability/index.js';
+import { materialize, teeOutputObject } from '../output-object.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 
 /**
@@ -215,40 +216,19 @@ export function createSignals(config: SignalsConfig): Signals {
         const theirs = await userBoundary?.beforeNextStep?.(event);
         return [...injected, ...(theirs ?? [])];
       },
-      ...(userBoundary?.beforeToolCalls === undefined
-        ? {}
-        : {
-            beforeToolCalls: (event: Parameters<NonNullable<AgentStepBoundary['beforeToolCalls']>>[0]) =>
-              userBoundary.beforeToolCalls!(event),
-          }),
+      ...passThrough('beforeToolCalls', userBoundary?.beforeToolCalls),
     };
     const inner = agent.stream(input, { ...options, stepBoundary: boundary });
-    return createAgentStream(async function* () {
-      const iterator = inner[Symbol.asyncIterator]();
-      try {
-        // The chunk pass: every chunk fans out to the thread's subscribers on its way through.
-        for (;;) {
-          const next = await iterator.next();
-          if (next.done) break;
-          for (const subscriber of state.subscribers) subscriber.push(next.value);
-          yield next.value;
-        }
-        // The terminal result is rebuilt from the inner output object's terminal values — the
-        // iterator protocol carries chunks only, and the run's result lives in the promises
-        // (`stream.ts`: same single-pass contract, both consumption styles).
-        const [text, object, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
-          inner.text,
-          inner.object,
-          inner.toolCalls,
-          inner.toolResults,
-          inner.usage,
-          inner.finishReason,
-          inner.steps,
-        ]);
-        return { text, object, toolCalls, toolResults, usage, finishReason, steps };
-      } finally {
+    return teeOutputObject<Chunk, AgentGenerateResult>(inner, {
+      // Every chunk fans out to the thread's subscribers on its way to the caller.
+      onChunk: (chunk) => {
+        for (const subscriber of state.subscribers) subscriber.push(chunk);
+      },
+      // The run's end releases the thread (and fires a queued continuation) before the caller can
+      // observe it settled — on success and on failure alike (the tee's completion chain).
+      beforeSettle: () => {
         settleRun(state);
-      }
+      },
     });
   }
 
@@ -421,17 +401,7 @@ export function createSignals(config: SignalsConfig): Signals {
       input: string | ModelMessage[],
       options?: AgentRunOptions,
     ): Promise<AgentGenerateResult> {
-      const result = streamWrapped(input, options);
-      const [text, object, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
-        result.text,
-        result.object,
-        result.toolCalls,
-        result.toolResults,
-        result.usage,
-        result.finishReason,
-        result.steps,
-      ]);
-      return { text, object, toolCalls, toolResults, usage, finishReason, steps };
+      return materialize<AgentGenerateResult>(streamWrapped(input, options));
     },
     sendMessage: (target, input) => deliver(target, toInputMessages(input)),
     queueMessage: (target, input) => queue(target, toInputMessages(input)),

@@ -17,6 +17,7 @@ import type { RequestContext } from '@balsats/core/agent';
 import { INSTRUCTIONS, assistantWithTools } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
 import { captureRejection, expectSuccess } from './helpers/assertions.js';
+import { collect } from './helpers/collect.js';
 import { TRACE_ID, eventsOfType, kinds } from './helpers/spans.js';
 
 /**
@@ -133,6 +134,29 @@ describe('createDurableAgent:审批闸挂起', () => {
     ]);
     expect(await out.suspendPayload).toBeUndefined();
     expect(await storage.load(out.runId)).toBeNull();
+  });
+
+  it('快照写入被 store 拒绝:suspendPayload 照常收敛(undefined),save 错误成为 run 的错误', async () => {
+    const model = fakeModel([TRANSFER_CALL]);
+    const transfer = transferTool(vi.fn(() => 'moved'));
+    const refused = new Error('store unavailable');
+    const storage: AgentRunSnapshotStore = {
+      load: () => Promise.resolve(null),
+      save: () => Promise.reject(refused),
+    };
+    const durable = createDurableAgent({
+      agent: assistantWithTools(model, { transfer }),
+      storage,
+      approval: { tools: ['transfer'] },
+    });
+
+    const out = durable.stream('Transfer my funds.');
+
+    // 存不下的快照不算挂起:payload 照常收敛(不悬空),save 的失败取代 run 自己的结局——
+    // 终值与 chunk 流(缓冲排空后)都以它 reject。
+    await expect(out.finishReason).rejects.toBe(refused);
+    await expect(out.suspendPayload).resolves.toBeUndefined();
+    expect(await captureRejection(() => collect(out))).toBe(refused);
   });
 
   it('调用方自己的 boundary 与闸共存:beforeNextStep 注入照旧生效', async () => {

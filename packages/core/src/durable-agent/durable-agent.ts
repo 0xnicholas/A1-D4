@@ -1,18 +1,18 @@
 import type { Agent } from '../agent/agent.js';
-import { createAgentStream } from '../agent/stream.js';
+import { passThrough } from '../agent/boundary.js';
 import type {
   AgentGenerateResult,
   AgentRunOptions,
   AgentRunResume,
   AgentStepBoundary,
-  AgentStepBoundaryEvent,
   AgentStepBoundaryDecision,
   AgentStreamResult,
   AgentToolCallsBoundaryEvent,
   StructuredOutputConfig,
 } from '../agent/types.js';
-import type { ToolCallChunk, ToolResultChunk } from '../model/chunks.js';
+import type { Chunk, ToolCallChunk, ToolResultChunk } from '../model/chunks.js';
 import type { ModelMessage } from '../model/contract.js';
+import { materialize, teeOutputObject } from '../output-object.js';
 import { createResumeLock } from '../resume-lock.js';
 import type { StandardSchema, StandardSchemaV1 } from '../standard-schema.js';
 import { createInMemoryAgentRunSnapshotStore } from './in-memory-snapshot-store.js';
@@ -186,12 +186,7 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
         };
         return { suspend: true };
       },
-      ...(user?.beforeNextStep === undefined
-        ? {}
-        : {
-            beforeNextStep: (event: AgentStepBoundaryEvent) =>
-              user.beforeNextStep === undefined ? undefined : user.beforeNextStep(event),
-          }),
+      ...passThrough('beforeNextStep', user?.beforeNextStep),
     };
   }
 
@@ -217,28 +212,25 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
     const suspendPayload = new Promise<AgentRunSuspendPayload | undefined>((resolve) => {
       settlePayload = resolve;
     });
-    const stream = createAgentStream(async function* () {
-      const iterator = inner[Symbol.asyncIterator]();
-      try {
-        for (;;) {
-          const next = await iterator.next();
-          if (next.done) break;
-          yield next.value;
+    const stream = teeOutputObject<Chunk, AgentGenerateResult>(inner, {
+      // The run settled: the snapshot goes to the store first, so a caller that sees
+      // `'suspended'` (its terminal values settle only after this hook) can resume right away —
+      // the store already holds what resume loads. A failed run suspends nothing (the gate's
+      // state is only ever set on a run that ends `'suspended'`), so its payload resolves
+      // `undefined` here.
+      beforeSettle: async () => {
+        try {
+          if (state.suspension !== undefined) {
+            await storage.save(runId, toSnapshot(runId, state.suspension));
+          }
+          settlePayload(state.suspension?.payload);
+        } catch (error) {
+          // A snapshot the store refused suspends nothing: the payload still resolves
+          // (`undefined`), and the save failure fails the run in place of its own outcome.
+          settlePayload(undefined);
+          throw error;
         }
-        // The run settled: the snapshot goes to the store first, so a caller that sees
-        // `'suspended'` (its terminal values settle only when this generator returns) can resume
-        // right away — the store already holds what resume loads.
-        if (state.suspension !== undefined) {
-          await storage.save(runId, toSnapshot(runId, state.suspension));
-        }
-        settlePayload(state.suspension?.payload);
-        return await toOutcome(inner);
-      } catch (error) {
-        // A failed run suspends nothing: the payload resolves `undefined` and the failure reaches
-        // the caller through the run's own terminal values.
-        settlePayload(undefined);
-        throw error;
-      }
+      },
     });
     // The durable fields ride on the agent's output object without touching its terminal getters —
     // assigning reads no property of the target, so the run stays lazy (a spread would read them
@@ -298,7 +290,7 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
     for (;;) {
       if ((await iterator.next()).done) break;
     }
-    const result = await toOutcome(outcome);
+    const result = await materialize<AgentGenerateResult>(outcome);
     return { ...result, runId, suspendPayload: await outcome.suspendPayload };
   }
 
@@ -308,22 +300,6 @@ export function createDurableAgent(config: DurableAgentConfig): DurableAgent {
     },
     resume,
   };
-}
-
-/** The run's terminal values, awaited — `stream()`'s promise surface materialized. */
-async function toOutcome<TObject>(
-  stream: AgentStreamResult<TObject>,
-): Promise<AgentGenerateResult<TObject>> {
-  const [text, object, toolCalls, toolResults, usage, finishReason, steps] = await Promise.all([
-    stream.text,
-    stream.object,
-    stream.toolCalls,
-    stream.toolResults,
-    stream.usage,
-    stream.finishReason,
-    stream.steps,
-  ]);
-  return { text, object, toolCalls, toolResults, usage, finishReason, steps };
 }
 
 /** The snapshot one suspension produces — spec shape, JSON-only (`snapshot.ts`). */
