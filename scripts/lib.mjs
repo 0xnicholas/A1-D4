@@ -12,12 +12,32 @@ export const RUNTIME_DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies'
 /** 零运行时依赖的包(ADR-0001 硬线):合法集恒为空集,三字段非空即红(ADR-0015 M5)。 */
 export const ZERO_RUNTIME_PACKAGES = ['@balsats/core'];
 
+/** 硬闸门退出码契约的硬错误档(ADR-0015):0 = 干净 / 1 = 有缺口 / 2 = 配置·产物硬错误。 */
+export const EXIT_HARD_ERROR = 2;
+
+/** 硬错误(不是「有缺口」):配置或产物问题,检查没能跑成——报 stderr 并以退出码 2 结束。 */
+export function hardError(message) {
+  console.error(message);
+  process.exit(EXIT_HARD_ERROR);
+}
+
 export function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
 export function readManifest(packageDir) {
   return readJson(join(packageDir, 'package.json'));
+}
+
+/** manifest 不可读 / JSON 非法 = 配置硬错误:干净报错(路径 + 原因),不把栈抛给调用方。 */
+export function readManifestOrHardError(packageDir) {
+  try {
+    return readManifest(packageDir);
+  } catch (error) {
+    hardError(
+      `读取 ${join(packageDir, 'package.json')} 失败——${error instanceof Error ? error.message : error}`,
+    );
+  }
 }
 
 /** manifest 运行时字段里声明的包名(去重;`@balsats/core` peer 由调用方决定豁免)。 */

@@ -6,11 +6,13 @@ import { cleanupFixtures, fixturePackage, packageManifest, runScript } from './h
  * 按 `exports` 表逐子路径验真——每个条件声明的产物必须在盘上,子路径要能被 `require.resolve()`
  * 解析、`import()` 加载、`require()` 走通(ESM 与 require(esm) 两条路)。
  *
+ * 退出码契约(沿 ADR-0015,#113 裁决对齐 check-export-surface):0 = 干净;1 = 公开面缺口
+ * (产物在盘上但解析或加载失败);2 = 配置·产物硬错误(`exports` 表为空 / 缺 dist / 子路径声明
+ * 产物缺失 / manifest 不可读)——「闸门没跑成」不混进「公开面真坏」;硬错误优先于缺口,两类都报。
+ *
  * 夹具由测试自身构造(临时包目录 + 自带可加载的 ESM 产物 + 显式 `type: "module"`),不依赖仓库
  * 自身构建;断言只碰外部行为(退出码 / stdout 的 `ok` 进度行 / stderr 的缺口行),脚本内部重构
- * 不造成假红。本套件按现状钉住:缺口报在 stderr(与 check-export-surface 报 stdout 相反);
- * 现有脚本没有「配置/产物硬错误 → 2」通路——缺产物与空 exports 表一律 1
- * (现状钉住而非应然:#113 裁决后若改口径,需同步改本套件)。
+ * 不造成假红。缺口与硬错误都报在 stderr(与 check-export-surface 把缺口报 stdout 相反)。
  */
 afterEach(cleanupFixtures);
 
@@ -62,16 +64,16 @@ describe('check-dist:exports 表逐子路径验真', () => {
     expect(result.stderr).toBe('');
   });
 
-  it('声明产物缺失时变红:报出子路径与缺失目标', () => {
+  it('子路径声明产物缺失时以退出码 2 报错:闸门没跑成,不是公开面缺口', () => {
     const dir = packageFixture(ROOT_ONLY, { 'dist/index.d.ts': ROOT_DTS });
 
     const result = runScript('check-dist', [dir]);
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(result.stderr).toContain('fixture: 缺产物 ./dist/index.js');
   });
 
-  it('产物存在但加载抛错时变红:报「导入失败」与原因', () => {
+  it('产物在盘上但加载抛错时留 1(公开面缺口):报「导入失败」与原因', () => {
     const dir = packageFixture(ROOT_ONLY, {
       'dist/index.js': "throw new Error('夹具产物加载失败');\n",
       'dist/index.d.ts': ROOT_DTS,
@@ -84,28 +86,30 @@ describe('check-dist:exports 表逐子路径验真', () => {
     expect(result.stderr).toContain('夹具产物加载失败');
   });
 
-  it('exports 表为空时变红:明示无可校验的子路径', () => {
+  it('exports 表为空时以退出码 2 报错:没有子路径就没有校验对象', () => {
     const dir = packageFixture({});
 
     const result = runScript('check-dist', [dir]);
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(result.stderr).toContain('exports 表为空');
     expect(result.stderr).toContain('无可校验的子路径');
     expect(result.stdout).toBe('');
   });
 
-  it('多条件里仅 types 缺产物也变红:逐条件校验,不只查 default', () => {
+  it('多条件里仅 types 缺产物也以退出码 2 报错:逐条件校验,不只查 default', () => {
     // default 侧产物齐备且可加载——只查 default 的实现会把这一夹具读成干净。
     const dir = packageFixture(ROOT_ONLY, { 'dist/index.js': ROOT_JS });
 
     const result = runScript('check-dist', [dir]);
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(result.stderr).toContain('fixture: 缺产物 ./dist/index.d.ts');
+    // 缺产物的子路径不试解析(那只会重复报一遍「Cannot find module」),也不报 ok。
+    expect(okSubpaths(result.stdout)).toEqual([]);
   });
 
-  it('一好一坏时变红:坏的报缺口、好的照常报 ok(累积报错,不因一坏中断)', () => {
+  it('一好一坏时以退出码 2 报错:坏的报硬错误、好的照常报 ok(不因一坏中断)', () => {
     const dir = packageFixture(BAD_THEN_GOOD, {
       ...ROOT_ARTIFACTS,
       'dist/tools/index.d.ts': TOOLS_DTS,
@@ -113,8 +117,55 @@ describe('check-dist:exports 表逐子路径验真', () => {
 
     const result = runScript('check-dist', [dir]);
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(okSubpaths(result.stdout)).toEqual(['fixture']);
     expect(result.stderr).toContain('fixture/tools: 缺产物 ./dist/tools/index.js');
+  });
+
+  it('整个 dist 缺失时以退出码 2 报错:提示先构建,不逐子路径报噪音', () => {
+    const dir = packageFixture(TWO_SUBPATHS);
+
+    const result = runScript('check-dist', [dir]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('缺产物目录 dist');
+    expect(result.stderr).toContain('pnpm build');
+    expect(result.stdout).toBe('');
+  });
+
+  it('manifest 不可读 / JSON 非法时以退出码 2 干净报错,不抛栈', () => {
+    const dir = fixturePackage({ 'package.json': '{ 非法 JSON' });
+
+    const result = runScript('check-dist', [dir]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('package.json');
+    expect(result.stderr).not.toContain('\n    at ');
+    expect(result.stdout).toBe('');
+  });
+
+  it('manifest 根本不存在时同样以退出码 2 干净报错(读不通与读不到同档)', () => {
+    const dir = fixturePackage({});
+
+    const result = runScript('check-dist', [dir]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('package.json');
+    expect(result.stderr).not.toContain('\n    at ');
+  });
+
+  it('硬错误盖过缺口:两类都报出来,退出码取 2', () => {
+    const dir = packageFixture(BAD_THEN_GOOD, {
+      'dist/index.js': "throw new Error('夹具产物加载失败');\n",
+      'dist/index.d.ts': ROOT_DTS,
+      'dist/tools/index.d.ts': TOOLS_DTS,
+    });
+
+    const result = runScript('check-dist', [dir]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('fixture/tools: 缺产物 ./dist/tools/index.js');
+    expect(result.stderr).toContain('fixture: 导入失败');
+    expect(okSubpaths(result.stdout)).toEqual([]);
   });
 });

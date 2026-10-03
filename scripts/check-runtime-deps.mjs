@@ -5,21 +5,33 @@
 // devDependencies 不在合法集——源码误引 devDependency(清单却干净)的绕过路径照旧被挡;
 // 传递依赖不入扫描(重量由 deps-budget 数字承载,见 check-deps-budget.mjs)。
 // 落位(ADR-0015 M5 修订):共享实现居根 scripts/,各包以 `node ../../scripts/check-runtime-deps.mjs`
-// 薄脚本指回;退出码契约不变(任一违背即退出 1,挂进 pnpm verify 走红线)。
+// 薄脚本指回;挂进 pnpm verify 走红线。
+// 退出码契约(ADR-0015):0 = 干净;1 = 任一违背;2 = 配置·产物硬错误
+// (manifest 不可读 / 缺 dist——扫描无从谈起)。「闸门没跑成」不混进「公开面真坏」(#113 裁决)。
 import { existsSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import {
   RUNTIME_DEPENDENCY_FIELDS,
   ZERO_RUNTIME_PACKAGES,
   allowedSpecifierPredicate,
-  readManifest,
+  hardError,
+  readManifestOrHardError,
   scanDist,
 } from './lib.mjs';
 
+/** 依赖红线违背(不是硬错误):manifest 三字段或产物导入面任一不对,退出码 1。 */
+const EXIT_VIOLATION = 1;
+
 const packageDir = resolve(process.argv[2] ?? process.cwd());
-const manifest = readManifest(packageDir);
+const manifest = readManifestOrHardError(packageDir);
 
 const violations = [];
+
+// 产物是扫描对象:缺它就谈不上扫描(硬错误 2),不混进「违背」(1)。
+const distDir = join(packageDir, 'dist');
+if (!existsSync(distDir)) {
+  hardError(`${manifest.name}:产物目录 dist/ 不存在,无法做导入扫描——先运行 pnpm build 再跑本检查`);
+}
 
 const isZeroRuntimePackage = ZERO_RUNTIME_PACKAGES.includes(manifest.name);
 if (isZeroRuntimePackage) {
@@ -28,14 +40,6 @@ if (isZeroRuntimePackage) {
       violations.push(`package.json 的 ${field} 声明了运行时依赖 ${name}(零运行时依赖包,ADR-0001)`);
     }
   }
-}
-
-const distDir = join(packageDir, 'dist');
-if (!existsSync(distDir)) {
-  console.error(
-    `${manifest.name}:产物目录 dist/ 不存在,无法做导入扫描——先运行 pnpm build 再跑本检查`,
-  );
-  process.exit(1);
 }
 
 const declaredNames = isZeroRuntimePackage
@@ -61,7 +65,7 @@ if (violations.length > 0) {
   for (const violation of violations) {
     console.error(`  - ${violation}`);
   }
-  process.exitCode = 1;
+  process.exitCode = EXIT_VIOLATION;
 } else {
   console.log(
     isZeroRuntimePackage

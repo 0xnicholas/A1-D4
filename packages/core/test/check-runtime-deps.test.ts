@@ -11,6 +11,9 @@ import {
  * 零运行时依赖包(@balsats/core,ADR-0001)——三字段非空即红、合法集恒为空;
  * 其余包「仅声明依赖」——产物导入只允许 Node 内置 ∪ 相对路径 ∪ manifest 运行字段
  * 声明的包名(含子路径);devDependencies 不在合法集。
+ *
+ * 退出码契约(沿 ADR-0015,#113 裁决对齐兄弟脚本):0 = 干净;1 = 任一违背;
+ * 2 = 配置·产物硬错误(manifest 不可读 / 缺 dist,扫描无从谈起)——「闸门没跑成」不混进「公开面真坏」。
  */
 afterEach(cleanupFixtures);
 
@@ -72,13 +75,24 @@ describe('check-runtime-deps:零运行时依赖包(@balsats/core)', () => {
     expect(result.stderr).toContain('zod');
   });
 
-  it('产物目录缺失时失败并提示先构建', () => {
+  it('产物目录缺失时以退出码 2 报错并提示先构建(硬错误,不是依赖违背)', () => {
     const dir = fixturePackage({ 'package.json': coreManifest() });
 
     const result = runScript('check-runtime-deps', [dir]);
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(result.stderr).toContain('dist');
+    expect(result.stderr).toContain('pnpm build');
+  });
+
+  it('manifest JSON 非法时以退出码 2 干净报错,不抛栈(配置硬错误)', () => {
+    const dir = fixturePackage({ 'package.json': '{ 非法 JSON' });
+
+    const result = runScript('check-runtime-deps', [dir]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('package.json');
+    expect(result.stderr).not.toContain('\n    at ');
   });
 });
 
