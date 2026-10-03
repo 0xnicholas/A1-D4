@@ -12,8 +12,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach } from 'vitest';
-import { createSqliteStorage } from '@balsats/sqlite';
-import type { SqliteStorage, SqliteStorageOptions } from '@balsats/sqlite';
+import { createSqliteStorage } from '@oribos/sqlite';
+import type { SqliteStorage, SqliteStorageOptions } from '@oribos/sqlite';
 
 const cleanups: Array<() => void> = [];
 
@@ -48,9 +48,9 @@ export interface FileStorage {
 
 /** An initialized file-backed storage in a fresh temp directory, removed after the test. */
 export function fileStorage(options: { name?: string; busyTimeoutMs?: number } = {}): FileStorage {
-  const dir = mkdtempSync(join(tmpdir(), 'balsats-sqlite-'));
+  const dir = mkdtempSync(join(tmpdir(), 'oribos-sqlite-'));
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-  const path = join(dir, options.name ?? 'balsats.db');
+  const path = join(dir, options.name ?? 'oribos.db');
   const storage = openStorage(
     options.busyTimeoutMs === undefined ? { path } : { path, busyTimeoutMs: options.busyTimeoutMs },
   );

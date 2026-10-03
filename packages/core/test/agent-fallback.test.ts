@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsats/core/agent';
-import { ModelContractError, ModelFallbackError, ModelSpecificationVersionError } from '@balsats/core/model';
-import type { Chunk, Model } from '@balsats/core/model';
+import { Agent } from '@oribos/core/agent';
+import { ModelContractError, ModelFallbackError, ModelSpecificationVersionError } from '@oribos/core/model';
+import type { Chunk, Model } from '@oribos/core/model';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
-import { createTool } from '@balsats/core/tools';
+} from '@oribos/core/observability';
+import { createTool } from '@oribos/core/tools';
 import { assistant, assistantWithTools } from './helpers/agent.js';
 import { captureError, captureRejection } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
@@ -20,7 +20,7 @@ import { spanOfType } from './helpers/spans.js';
  * 模型 fallback 链(M1-11 #32,ADR-0004 / model.md「model 字段形状」):model 字段接受模型数组,
  * 每次模型调用按数组顺序逐项尝试;仅在"该次尝试尚未产出任何 chunk"的失败时切换下一项,流中途失败
  * 直接报错(部分输出已发给调用方,切换会产生拼接幻觉);链上全部失败时错误含沿链上下文。
- * 断言只走公开面(@balsats/core 子路径导出)与脚本化假模型接缝(@see helpers/fake-model.ts)。
+ * 断言只走公开面(@oribos/core 子路径导出)与脚本化假模型接缝(@see helpers/fake-model.ts)。
  */
 const INSTRUCTIONS = 'You are concise.';
 

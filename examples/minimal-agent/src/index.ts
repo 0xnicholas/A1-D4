@@ -1,5 +1,5 @@
 /**
- * Balsats minimal example — a five-field agent with one tool, streamed to the terminal.
+ * Oribos minimal example — a five-field agent with one tool, streamed to the terminal.
  *
  * The model instance comes straight from an AI SDK provider package; it satisfies the core's
  * model contract structurally, no adapter or registration (ADR-0004). The agent hangs on the
@@ -7,17 +7,17 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-minimal-agent start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-minimal-agent start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-minimal-agent start
+ *     pnpm --filter @oribos/example-minimal-agent start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import { consoleExporter, createTracer } from '@balsats/core/observability';
-import { createTool } from '@balsats/core/tools';
+import { createApp } from '@oribos/core';
+import { consoleExporter, createTracer } from '@oribos/core/observability';
+import { createTool } from '@oribos/core/tools';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

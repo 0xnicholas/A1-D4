@@ -1,5 +1,5 @@
 /**
- * Balsats memory-chat example — two threads, one resource, and working memory.
+ * Oribos memory-chat example — two threads, one resource, and working memory.
  *
  * A scripted, non-interactive run drives one agent over one `Memory` instance and shows the two
  * memory mechanisms of the framework working together:
@@ -21,19 +21,19 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-memory-chat start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-memory-chat start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-memory-chat start
+ *     pnpm --filter @oribos/example-memory-chat start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import type { AgentGenerateResult } from '@balsats/core/agent';
-import { Memory, createInMemoryStore } from '@balsats/core/memory';
-import type { MemoryThreadRef, StoredMessage } from '@balsats/core/memory';
-import { consoleExporter, createTracer } from '@balsats/core/observability';
+import { createApp } from '@oribos/core';
+import type { AgentGenerateResult } from '@oribos/core/agent';
+import { Memory, createInMemoryStore } from '@oribos/core/memory';
+import type { MemoryThreadRef, StoredMessage } from '@oribos/core/memory';
+import { consoleExporter, createTracer } from '@oribos/core/observability';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsats/core/agent';
-import { Memory } from '@balsats/core/memory';
-import { createTool } from '@balsats/core/tools';
-import { createDurableAgent } from '@balsats/core/durable-agent';
-import type { ModelPrompt } from '@balsats/core/model';
-import { createChatRoute } from '@balsats/ai-sdk';
+import { Agent } from '@oribos/core/agent';
+import { Memory } from '@oribos/core/memory';
+import { createTool } from '@oribos/core/tools';
+import { createDurableAgent } from '@oribos/core/durable-agent';
+import type { ModelPrompt } from '@oribos/core/model';
+import { createChatRoute } from '@oribos/ai-sdk';
 import { scriptedModel } from './helpers/model.js';
 import type { ScriptedStep } from './helpers/model.js';
 

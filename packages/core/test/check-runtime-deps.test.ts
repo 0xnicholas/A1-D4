@@ -8,7 +8,7 @@ import {
 
 /**
  * 依赖红线硬检查的 CLI 契约(ADR-0015,M5 修订推广):
- * 零运行时依赖包(@balsats/core,ADR-0001)——三字段非空即红、合法集恒为空;
+ * 零运行时依赖包(@oribos/core,ADR-0001)——三字段非空即红、合法集恒为空;
  * 其余包「仅声明依赖」——产物导入只允许 Node 内置 ∪ 相对路径 ∪ manifest 运行字段
  * 声明的包名(含子路径);devDependencies 不在合法集。
  *
@@ -17,9 +17,9 @@ import {
  */
 afterEach(cleanupFixtures);
 
-describe('check-runtime-deps:零运行时依赖包(@balsats/core)', () => {
+describe('check-runtime-deps:零运行时依赖包(@oribos/core)', () => {
   const coreManifest = (fields: Readonly<Record<string, unknown>> = {}) =>
-    manifest({ name: '@balsats/core', ...fields });
+    manifest({ name: '@oribos/core', ...fields });
 
   it('清单无运行时依赖声明时通过', () => {
     const dir = fixturePackage({
@@ -101,7 +101,7 @@ describe('check-runtime-deps:仅声明依赖(能力包,ADR-0015 M5)', () => {
     const dir = fixturePackage({
       'package.json': manifest({
         dependencies: { zod: '^4.0.0' },
-        peerDependencies: { '@balsats/core': 'workspace:^' },
+        peerDependencies: { '@oribos/core': 'workspace:^' },
       }),
       'dist/index.js': [
         'import { z } from "zod";',

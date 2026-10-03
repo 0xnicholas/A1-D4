@@ -1,9 +1,9 @@
 /**
- * Balsats cron-schedule example — a cron expression becomes the `next` fragment `schedules.save()`
+ * Oribos cron-schedule example — a cron expression becomes the `next` fragment `schedules.save()`
  * takes, and the schedule's whole life is walked one act at a time.
  *
  * One script, no external services: a **scripted model** (defined in this file — no API key, no
- * network) plays the reporting agent that a threadless target runs, and `@balsats/croner` turns one
+ * network) plays the reporting agent that a threadless target runs, and `@oribos/croner` turns one
  * expression into the occurrence function the schedules subsystem asks for.
  *
  * 1. **Save: the fragment slots straight in.** `{ ...cron('0 9 * * *', { timezone:
@@ -25,15 +25,15 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   pnpm --filter @balsats/example-cron-schedule start
+ *   pnpm --filter @oribos/example-cron-schedule start
  */
 import assert from 'node:assert/strict';
-import { createApp } from '@balsats/core';
-import type { Model, ModelStreamPart } from '@balsats/core/model';
-import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@balsats/core/observability';
-import type { ExportedSpan } from '@balsats/core/observability';
-import { createInMemoryScheduleStore } from '@balsats/core/schedules';
-import { cron } from '@balsats/croner';
+import { createApp } from '@oribos/core';
+import type { Model, ModelStreamPart } from '@oribos/core/model';
+import { AGENT_RUN_SPAN, createTracer, memoryExporter } from '@oribos/core/observability';
+import type { ExportedSpan } from '@oribos/core/observability';
+import { createInMemoryScheduleStore } from '@oribos/core/schedules';
+import { cron } from '@oribos/croner';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REPORT = 'Daily report: 3 orders open, nothing needs attention.';

@@ -1,5 +1,5 @@
 /**
- * Balsats durable-approval example — a refund desk where money moves only after a human says so.
+ * Oribos durable-approval example — a refund desk where money moves only after a human says so.
  *
  * A scripted, non-interactive run drives one durable agent over a real OpenAI model and shows the
  * M4 approval gate end to end: the model's tool calls reach the loop's step boundary, a call whose
@@ -32,27 +32,27 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-durable-approval start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-durable-approval start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-durable-approval start
+ *     pnpm --filter @oribos/example-durable-approval start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import { createInMemoryAgentRunSnapshotStore } from '@balsats/core/durable-agent';
-import type { DurableStreamResult } from '@balsats/core/durable-agent';
-import type { AgentRunSnapshotStore } from '@balsats/core/durable-agent';
-import type { Chunk, FinishReason, ModelMessage } from '@balsats/core/model';
+import { createApp } from '@oribos/core';
+import { createInMemoryAgentRunSnapshotStore } from '@oribos/core/durable-agent';
+import type { DurableStreamResult } from '@oribos/core/durable-agent';
+import type { AgentRunSnapshotStore } from '@oribos/core/durable-agent';
+import type { Chunk, FinishReason, ModelMessage } from '@oribos/core/model';
 import {
   AGENT_RUN_SPAN,
   consoleExporter,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
-import type { ExportedSpan } from '@balsats/core/observability';
-import { createTool } from '@balsats/core/tools';
+} from '@oribos/core/observability';
+import type { ExportedSpan } from '@oribos/core/observability';
+import { createTool } from '@oribos/core/tools';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

@@ -1,6 +1,6 @@
 # minimal-agent
 
-The smallest runnable Balsats example. Balsats is an ultralight TypeScript agent framework — compose
+The smallest runnable Oribos example. Oribos is an ultralight TypeScript agent framework — compose
 only what you use, run anywhere, no runtime baggage.
 
 This example defines a five-field agent (`name` / `instructions` / `model` / `tools`) with one
@@ -29,7 +29,7 @@ step requests no tool call or `maxSteps` (default 5) is reached. Failures never 
 invalid input, an `execute` throw and invalid output all come back to the model as an `isError`
 tool result, so it can recover or give up on its own.
 
-Expected output: the console exporter's `[balsats] span_started / …` lines for the agent run, each
+Expected output: the console exporter's `[oribos] span_started / …` lines for the agent run, each
 step and the tool call; a `[tool-call] …` line, the tool's result, then the model's text streamed
 as it arrives, followed by a `steps` / `finishReason` / `usage` summary.
 
@@ -48,8 +48,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsats/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-minimal-agent start
+pnpm build                 # examples consume @oribos/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-minimal-agent start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -57,7 +57,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsats/example-minimal-agent start
+  pnpm --filter @oribos/example-minimal-agent start
 ```
 
 ## Notes

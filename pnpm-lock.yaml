@@ -38,10 +38,10 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/ai-sdk':
+      '@oribos/ai-sdk':
         specifier: workspace:*
         version: link:../../packages/ai-sdk
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -50,10 +50,10 @@ importers:
 
   examples/cron-schedule:
     dependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@balsats/croner':
+      '@oribos/croner':
         specifier: workspace:*
         version: link:../../packages/croner
 
@@ -62,7 +62,7 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -71,13 +71,13 @@ importers:
 
   examples/mcp-tools:
     dependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@balsats/mcp-client':
+      '@oribos/mcp-client':
         specifier: workspace:*
         version: link:../../packages/mcp-client
-      '@balsats/mcp-server':
+      '@oribos/mcp-server':
         specifier: workspace:*
         version: link:../../packages/mcp-server
       zod:
@@ -89,7 +89,7 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -101,7 +101,7 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -110,10 +110,10 @@ importers:
 
   examples/otlp-collector:
     dependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@balsats/otlp':
+      '@oribos/otlp':
         specifier: workspace:*
         version: link:../../packages/otlp
       zod:
@@ -125,7 +125,7 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -137,10 +137,10 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@balsats/sqlite':
+      '@oribos/sqlite':
         specifier: workspace:*
         version: link:../../packages/sqlite
       zod:
@@ -152,7 +152,7 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.78
         version: 4.0.78(zod@4.6.5)
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:
@@ -161,7 +161,7 @@ importers:
 
   packages/ai-sdk:
     devDependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../core
       ai:
@@ -176,7 +176,7 @@ importers:
         specifier: 10.0.1
         version: 10.0.1
     devDependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../core
 
@@ -186,12 +186,12 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0
     devDependencies:
-      '@balsats/core':
-        specifier: workspace:*
-        version: link:../core
       '@modelcontextprotocol/server':
         specifier: ^2.2.0
         version: 2.2.0
+      '@oribos/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/mcp-server:
     dependencies:
@@ -199,7 +199,7 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0
     devDependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../core
 
@@ -221,13 +221,13 @@ importers:
         specifier: 2.11.0
         version: 2.11.0(@opentelemetry/api@1.9.1)
     devDependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../core
 
   packages/sqlite:
     devDependencies:
-      '@balsats/core':
+      '@oribos/core':
         specifier: workspace:*
         version: link:../core
 

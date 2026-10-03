@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createMcpServer } from '@balsats/mcp-server';
-import { createTool } from '@balsats/core/tools';
-import type { Tool, ToolContext } from '@balsats/core/tools';
+import { createMcpServer } from '@oribos/mcp-server';
+import { createTool } from '@oribos/core/tools';
+import type { Tool, ToolContext } from '@oribos/core/tools';
 import { contentOf, initializeRequest, legacyHeaders, modernHeaders, post, postParsedBody, rpc, toolsOf, withEnvelope } from './helpers.js';
 
 const SERVER_INFO = { name: 'tools-server', version: '1.2.3' };

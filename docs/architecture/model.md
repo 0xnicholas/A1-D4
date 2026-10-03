@@ -29,7 +29,7 @@ type ModelInput =
 - **fallback 语义(初版保守)**:每次模型调用按数组顺序逐项尝试;仅在"该次尝试尚未产出任何 chunk"的失败时切换下一项;流中途失败不切换、直接报错(部分输出已发给调用方,切换会产生拼接幻觉)。错误上下文沿链保留(链上全部失败时,错误含每个候选与各自错误;单候选链的失败原样浮出)。
 - **动态函数**:每次执行按请求上下文解析,一个 union 类型换来多租户、按 tier 选模型等表达力。
 
-此形状由 [决策:Agent 核心抽象](https://github.com/0xnicholas/balsats-framework/issues/10) 继承。
+此形状由 [决策:Agent 核心抽象](https://github.com/0xnicholas/oribos-framework/issues/10) 继承。
 
 ## Chunk 协议
 
@@ -46,7 +46,7 @@ type ModelInput =
 
 ## AI SDK 互操作能力包(M5 设计冻结)
 
-> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@balsats/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@balsats/core` 走 peer、与核心锁步发布;事实底座 = `docs/research/ai-sdk-ui-stream-protocol.md`(2026-09-30 实测,版本钉 `ai@7.0.123`)。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
+> 决策:wayfinder ticket #77(决策:AI SDK 互操作包)。包名 `@oribos/ai-sdk`(沿 ADR-0002 M5 修订记),对 `@oribos/core` 走 peer、与核心锁步发布;事实底座 = `docs/research/ai-sdk-ui-stream-protocol.md`(2026-09-30 实测,版本钉 `ai@7.0.123`)。下文的「已发帧子集」是客户端可见的协议承诺,实现只许收窄。
 
 ### 包面
 
@@ -58,7 +58,7 @@ type ModelInput =
 ### 目标协议与漂移纪律
 
 - 目标 = `ai@7` 代 UI message stream **词汇表** + 线级响应头 `x-vercel-ai-ui-message-stream: v1`(官方要求;客户端不校验,网关可能看)。
-- **单一代、无 `version` 选项、不做多代适配器**(本 ADR「锁定单一 spec 版本」原则推广到 UI stream 协议):AI SDK 词汇表换代 = 本包 breaking,锁步发布下随全 `@balsats/*` major 走,旧代不承诺。
+- **单一代、无 `version` 选项、不做多代适配器**(本 ADR「锁定单一 spec 版本」原则推广到 UI stream 协议):AI SDK 词汇表换代 = 本包 breaking,锁步发布下随全 `@oribos/*` major 走,旧代不承诺。
 - 客户端白名单逐帧解析:已发帧子集**可小于**目标词汇,**不得超出**(未知 `type` 整流抛错)。
 - 对校:`ai` 精确钉 `devDependencies`(`7.0.123`),升级为有意 PR;三条对校——帧联合对 `UIMessageChunk` 类型可赋值 / 产物 SSE 字节 → `parseJsonEventStream(uiMessageChunkSchema)` → `readUIMessageStream` 往返断言 / 响应头常量与 `UI_MESSAGE_STREAM_HEADERS` 全等。
 
@@ -68,7 +68,7 @@ type ModelInput =
 - **职责切分:转换器只产体帧**;消息级 `start` / `finish` 由调用方写(`finish` 的 reason 与 metadata 需要终值,转换器看不到)。
 - 帧映射(逐行冻结):
 
-| Balsats | 发出 | 规则 |
+| Oribos | 发出 | 规则 |
 | --- | --- | --- |
 | — | `start-step` | 流首帧前一条;`finish-step` 之后的下一条**模型产出**帧前补下一条(`tool-result` 不触发) |
 | `text-delta` | 惰性 `text-start` + `text-delta` | 块 id 合成;连续 delta 一段,遇任何非 text 帧(含 `tool-call` / `finish`)补 `text-end` |
@@ -91,7 +91,7 @@ type ModelInput =
 ### 挂起表达(durable agent)
 
 - 挂起不在 chunk 流里(流以模型自己的 `finish(tool-calls)` 收尾);route 读终值后在终帧表达:`finishReason: 'other'` + `messageMetadata: { suspended: { runId, awaitingApproval } }`。
-- **不合流 `tool-approval-*`**:AI SDK 逐 `approvalId` 的流内审批与 Balsats run 级挂起 / 快照是两套机制,且审批决定是单布尔(N:1),合流会把错位藏进实现。
+- **不合流 `tool-approval-*`**:AI SDK 逐 `approvalId` 的流内审批与 Oribos run 级挂起 / 快照是两套机制,且审批决定是单布尔(N:1),合流会把错位藏进实现。
 - resume 编排归应用(自调 `durable.resume`;实施图给范式);重开条件 = 真实用例要求一键审批 UX。
 
 ### 订阅流表达(signals)

@@ -1,5 +1,5 @@
 /**
- * Balsats workflow-approval example — one expense report, one approval gate.
+ * Oribos workflow-approval example — one expense report, one approval gate.
  *
  * A scripted, non-interactive run drives one workflow over a real OpenAI model and shows the M3
  * orchestration surface end to end: the operator builder freezing into a flat entry list, the
@@ -27,27 +27,27 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-workflow-approval start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-workflow-approval start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-workflow-approval start
+ *     pnpm --filter @oribos/example-workflow-approval start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import { consoleExporter, createTracer } from '@balsats/core/observability';
+import { createApp } from '@oribos/core';
+import { consoleExporter, createTracer } from '@oribos/core/observability';
 import {
   createInMemorySnapshotStore,
   createStep,
   createWorkflow,
-} from '@balsats/core/workflows';
+} from '@oribos/core/workflows';
 import type {
   StepContext,
   WorkflowEntry,
   WorkflowEvent,
   WorkflowSnapshotStore,
-} from '@balsats/core/workflows';
+} from '@oribos/core/workflows';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

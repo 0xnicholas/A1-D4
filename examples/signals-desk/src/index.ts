@@ -1,5 +1,5 @@
 /**
- * Balsats signals-desk example — one support thread that messages and signals both land in.
+ * Oribos signals-desk example — one support thread that messages and signals both land in.
  *
  * A scripted, non-interactive run drives one shop's support desk over a real OpenAI model and
  * shows the M4 signals subsystem end to end, with the schedules primitive wired into the same
@@ -33,27 +33,27 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-signals-desk start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-signals-desk start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-signals-desk start
+ *     pnpm --filter @oribos/example-signals-desk start
  */
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import { Memory, createInMemoryStore } from '@balsats/core/memory';
-import type { StoredMessage } from '@balsats/core/memory';
+import { createApp } from '@oribos/core';
+import { Memory, createInMemoryStore } from '@oribos/core/memory';
+import type { StoredMessage } from '@oribos/core/memory';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   consoleExporter,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
-import type { ExportedSpan } from '@balsats/core/observability';
-import { createInMemoryScheduleStore } from '@balsats/core/schedules';
-import { createTool } from '@balsats/core/tools';
+} from '@oribos/core/observability';
+import type { ExportedSpan } from '@oribos/core/observability';
+import { createInMemoryScheduleStore } from '@oribos/core/schedules';
+import { createTool } from '@oribos/core/tools';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

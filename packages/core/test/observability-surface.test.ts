@@ -7,7 +7,7 @@ import {
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
+} from '@oribos/core/observability';
 import type {
   AgentRunAttributes,
   AgentStepAttributes,
@@ -24,7 +24,7 @@ import type {
   TracingEvent,
   ToolCallAttributes,
   WorkflowRunAttributes,
-} from '@balsats/core/observability';
+} from '@oribos/core/observability';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

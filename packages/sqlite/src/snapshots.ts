@@ -15,12 +15,12 @@
  * newest-suspended-first and the cursor is a
  * run id.
  */
-import type { AgentRunSnapshot, AgentRunSnapshotStore } from '@balsats/core/durable-agent';
+import type { AgentRunSnapshot, AgentRunSnapshotStore } from '@oribos/core/durable-agent';
 import type {
   WorkflowRunSnapshot,
   WorkflowRunStatus,
   WorkflowSnapshotStore,
-} from '@balsats/core/workflows';
+} from '@oribos/core/workflows';
 import type { SqliteLifecycle } from './connection.js';
 
 /** `WorkflowSnapshotStore` with every declared extension implemented (all of them are frozen). */

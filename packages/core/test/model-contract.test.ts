@@ -18,7 +18,7 @@ import type {
   ModelStreamPart,
   ModelStreamResult,
   ModelUsage,
-} from '@balsats/core/model';
+} from '@oribos/core/model';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

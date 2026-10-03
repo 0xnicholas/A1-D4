@@ -1,10 +1,10 @@
 /**
- * `@balsats/ai-sdk` — AI SDK interop capability package.
+ * `@oribos/ai-sdk` — AI SDK interop capability package.
  *
  * The agent's chunk stream as an AI SDK UI message stream: `toAISdkStream` converts body frames,
  * `createChatRoute` is the web-standard `useChat()` route, `toAISdkMessages` reads thread history
  * back as UI messages. One target generation (`ai@7` vocabulary + the `v1` wire header), zero
- * runtime dependencies, `@balsats/core` as a peer.
+ * runtime dependencies, `@oribos/core` as a peer.
  */
 export type {
   AISdkFileUIPart,

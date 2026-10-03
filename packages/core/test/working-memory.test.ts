@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsats/core/agent';
-import type { ProcessInputArgs } from '@balsats/core/agent';
-import { Memory, createInMemoryStore } from '@balsats/core/memory';
-import type { MemoryStore, SaveMessage } from '@balsats/core/memory';
-import type { ModelMessage } from '@balsats/core/model';
-import { createTool } from '@balsats/core/tools';
+import { Agent } from '@oribos/core/agent';
+import type { ProcessInputArgs } from '@oribos/core/agent';
+import { Memory, createInMemoryStore } from '@oribos/core/memory';
+import type { MemoryStore, SaveMessage } from '@oribos/core/memory';
+import type { ModelMessage } from '@oribos/core/model';
+import { createTool } from '@oribos/core/tools';
 import { captureRejection } from './helpers/assertions.js';
 import { INSTRUCTIONS } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';

@@ -1,7 +1,7 @@
 /**
- * Balsats sqlite-resume example — a durable run that outlives the process that made it.
+ * Oribos sqlite-resume example — a durable run that outlives the process that made it.
  *
- * One script, two processes, one SQLite file (`@balsats/sqlite`). The parent re-execs itself as a
+ * One script, two processes, one SQLite file (`@oribos/sqlite`). The parent re-execs itself as a
  * **worker**: the worker builds the refund desk, the model asks for the gated `issueRefund`, the
  * run suspends and its loop snapshot lands in SQLite — then the worker exits, and with it every
  * in-process trace of the run. The parent opens its **own connection** to the same file and shows
@@ -21,14 +21,14 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-sqlite-resume start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-sqlite-resume start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-sqlite-resume start
+ *     pnpm --filter @oribos/example-sqlite-resume start
  *
- * The database file defaults to a fresh temp directory; set `BALSATS_SQLITE_EXAMPLE_DB` to keep it.
+ * The database file defaults to a fresh temp directory; set `ORIBOS_SQLITE_EXAMPLE_DB` to keep it.
  * The script self-asserts (`node:assert/strict`): any violated payoff exits 1.
  */
 import assert from 'node:assert/strict';
@@ -38,12 +38,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import { createTool } from '@balsats/core/tools';
-import { createSqliteStorage } from '@balsats/sqlite';
-import type { SqliteStorage } from '@balsats/sqlite';
-import type { DurableAgent } from '@balsats/core/durable-agent';
-import type { AgentMemoryOptions } from '@balsats/core/agent';
+import { createApp } from '@oribos/core';
+import { createTool } from '@oribos/core/tools';
+import { createSqliteStorage } from '@oribos/sqlite';
+import type { SqliteStorage } from '@oribos/sqlite';
+import type { DurableAgent } from '@oribos/core/durable-agent';
+import type { AgentMemoryOptions } from '@oribos/core/agent';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {
@@ -61,9 +61,9 @@ const RESULT_PREFIX = 'SQLITE_RESUME_RESULT=';
 
 /** The SQLite file: the parent picks one, the worker is handed it. */
 function databasePath(): string {
-  const fromEnv = process.env.BALSATS_SQLITE_EXAMPLE_DB;
+  const fromEnv = process.env.ORIBOS_SQLITE_EXAMPLE_DB;
   if (fromEnv !== undefined && fromEnv !== '') return fromEnv;
-  return join(mkdtempSync(join(tmpdir(), 'balsats-sqlite-resume-')), 'balsats.db');
+  return join(mkdtempSync(join(tmpdir(), 'oribos-sqlite-resume-')), 'oribos.db');
 }
 
 /** The gated tool's ledger — what "money moves" means in this example. */
@@ -105,8 +105,8 @@ function desk(storage: SqliteStorage, ledger: number[]): { durable: DurableAgent
 // ── Worker: run to the suspension, hand the run id over, exit ────────────────────────────────────
 
 async function worker(): Promise<void> {
-  const path = process.env.BALSATS_SQLITE_EXAMPLE_DB;
-  assert.ok(path !== undefined && path !== '', 'the worker needs BALSATS_SQLITE_EXAMPLE_DB');
+  const path = process.env.ORIBOS_SQLITE_EXAMPLE_DB;
+  assert.ok(path !== undefined && path !== '', 'the worker needs ORIBOS_SQLITE_EXAMPLE_DB');
   const storage = createSqliteStorage({ path });
   storage.init();
   try {
@@ -148,7 +148,7 @@ async function parent(): Promise<void> {
     process.execPath,
     ['--experimental-strip-types', fileURLToPath(import.meta.url)],
     {
-      env: { ...process.env, BALSATS_SQLITE_EXAMPLE_ROLE: 'worker', BALSATS_SQLITE_EXAMPLE_DB: path },
+      env: { ...process.env, ORIBOS_SQLITE_EXAMPLE_ROLE: 'worker', ORIBOS_SQLITE_EXAMPLE_DB: path },
       encoding: 'utf8',
     },
   );
@@ -253,7 +253,7 @@ async function parent(): Promise<void> {
     console.log(`  schedules.listDue() → [${due.map((record) => record.id).join(', ')}]`);
 
     console.log(
-      '\n✓ Cross-process suspend/resume on @balsats/sqlite: the snapshot, the history and the ' +
+      '\n✓ Cross-process suspend/resume on @oribos/sqlite: the snapshot, the history and the ' +
         'schedule all outlived the process that wrote them.',
     );
   } finally {
@@ -261,7 +261,7 @@ async function parent(): Promise<void> {
   }
 }
 
-if (process.env.BALSATS_SQLITE_EXAMPLE_ROLE === 'worker') {
+if (process.env.ORIBOS_SQLITE_EXAMPLE_ROLE === 'worker') {
   await worker();
 } else {
   await parent();

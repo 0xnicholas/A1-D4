@@ -1,16 +1,16 @@
 /**
  * The wiring this package exists for (`docs/architecture/harness.md`「croner 封装能力包」): a
  * `cron()` fragment spreads into `schedules.save()`, `nextFireAt` is computed through croner's
- * `next`, and `tick` fires the target and advances the occurrence. Asserted against `@balsats/core`'s
+ * `next`, and `tick` fires the target and advances the occurrence. Asserted against `@oribos/core`'s
  * public entries (a devDependency, deliberately not a peer): a drift in `ScheduleSaveInput` /
  * `save` / `tick` — or in `Agent.generate`, which a fired threadless target calls — surfaces here,
  * at typecheck or at runtime.
  */
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsats/core/agent';
-import type { Model, ModelCallOptions, ModelStreamPart } from '@balsats/core/model';
-import { createInMemoryScheduleStore, createSchedules } from '@balsats/core/schedules';
-import { cron } from '@balsats/croner';
+import { Agent } from '@oribos/core/agent';
+import type { Model, ModelCallOptions, ModelStreamPart } from '@oribos/core/model';
+import { createInMemoryScheduleStore, createSchedules } from '@oribos/core/schedules';
+import { cron } from '@oribos/croner';
 
 const REPORT = 'Daily report: 3 orders open.';
 const DAY_MS = 24 * 60 * 60 * 1000;

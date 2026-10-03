@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsats/core/agent';
+import { Agent } from '@oribos/core/agent';
 import type {
   ProcessErrorArgs,
   ProcessInputArgs,
   ProcessOutputStepArgs,
   Processor,
-} from '@balsats/core/agent';
-import { ModelContractError, ModelFallbackError } from '@balsats/core/model';
-import type { Chunk } from '@balsats/core/model';
+} from '@oribos/core/agent';
+import { ModelContractError, ModelFallbackError } from '@oribos/core/model';
+import type { Chunk } from '@oribos/core/model';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
-import { createTool } from '@balsats/core/tools';
+} from '@oribos/core/observability';
+import { createTool } from '@oribos/core/tools';
 import { fakeModel } from './helpers/fake-model.js';
 import { collect } from './helpers/collect.js';
 import { spanOfType } from './helpers/spans.js';
@@ -32,7 +32,7 @@ import { spanOfType } from './helpers/spans.js';
  * - `processError`:provider / 工具错误时,返回 `{ error }` 替换错误;provider 错误替换 run 终错,工具
  *   错误替换进入 error 工具结果的错误;不做 abort/retry,取消(abort)不触发。
  *
- * 断言只走公开面(@balsats/core/agent)与脚本化假模型接缝(@see helpers/fake-model.ts):假模型录制的
+ * 断言只走公开面(@oribos/core/agent)与脚本化假模型接缝(@see helpers/fake-model.ts):假模型录制的
  * prompt 就是"模型看到的历史",是改写能力的最终证据。
  */
 

@@ -34,7 +34,7 @@ export function encodeJson(value: unknown): string | null {
   if (value === undefined) return null;
   const text = JSON.stringify(value);
   if (text === undefined) {
-    throw new TypeError('@balsats/sqlite: value is not JSON-serializable');
+    throw new TypeError('@oribos/sqlite: value is not JSON-serializable');
   }
   return text;
 }
@@ -108,7 +108,7 @@ function configure(db: DatabaseSync, path: string, busyTimeoutMs: number): void 
   const mode = readback.journal_mode;
   if (mode !== 'wal' && !(path === ':memory:' && mode === 'memory')) {
     throw new Error(
-      `@balsats/sqlite: journal_mode is '${mode}' on '${path}', not 'wal' — ` +
+      `@oribos/sqlite: journal_mode is '${mode}' on '${path}', not 'wal' — ` +
         'WAL is required (network filesystems cannot provide it)',
     );
   }
@@ -120,7 +120,7 @@ function migrate(db: DatabaseSync): void {
   const current = readback.user_version;
   if (current > LATEST_VERSION) {
     throw new Error(
-      `@balsats/sqlite: database user_version ${current} is newer than this package supports ` +
+      `@oribos/sqlite: database user_version ${current} is newer than this package supports ` +
         `(${LATEST_VERSION}) — downgrades are not supported`,
     );
   }

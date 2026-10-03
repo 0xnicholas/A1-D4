@@ -1,7 +1,7 @@
 {
-  "name": "@balsats/croner",
+  "name": "@oribos/croner",
   "version": "0.5.0",
-  "description": "Balsats croner wrapper — cron expressions as a schedules.save() fragment (next + timezone), no dependencies beyond an exact-pinned croner, no core peer.",
+  "description": "Oribos croner wrapper — cron expressions as a schedules.save() fragment (next + timezone), no dependencies beyond an exact-pinned croner, no core peer.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -31,14 +31,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xnicholas/balsats-framework.git",
+    "url": "git+https://github.com/0xnicholas/oribos-framework.git",
     "directory": "packages/croner"
   },
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
-    "@balsats/core": "workspace:*"
+    "@oribos/core": "workspace:*"
   },
   "dependencies": {
     "croner": "10.0.1"

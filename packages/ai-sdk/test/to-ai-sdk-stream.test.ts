@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Chunk } from '@balsats/core/model';
-import { toAISdkStream } from '@balsats/ai-sdk';
+import type { Chunk } from '@oribos/core/model';
+import { toAISdkStream } from '@oribos/ai-sdk';
 
 /** An in-memory chunk source: what every consumer of the converter hands it. */
 function source(...chunks: Chunk[]): AsyncIterable<Chunk> {

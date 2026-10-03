@@ -21,7 +21,7 @@ import { createWorkflow } from './workflows/workflow.js';
 import type { WorkflowBuilder, WorkflowConfig } from './workflows/workflow.js';
 
 /**
- * `@balsats/core` — composition root.
+ * `@oribos/core` — composition root.
  *
  * `createApp` is the optional thin assembly point of ADR-0002: it hands cross-cutting dependencies
  * — the observability tracer and the four storage ports — to the subsystems attached to it, so they

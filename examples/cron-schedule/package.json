@@ -1,8 +1,8 @@
 {
-  "name": "@balsats/example-cron-schedule",
+  "name": "@oribos/example-cron-schedule",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsats croner example: a cron expression as the schedules.save() fragment — save, occurrences advance, tick fires.",
+  "description": "Oribos croner example: a cron expression as the schedules.save() fragment — save, occurrences advance, tick fires.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@balsats/core": "workspace:*",
-    "@balsats/croner": "workspace:*"
+    "@oribos/core": "workspace:*",
+    "@oribos/croner": "workspace:*"
   }
 }

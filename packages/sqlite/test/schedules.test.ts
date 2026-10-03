@@ -5,8 +5,8 @@
  * optional fields (`timezone` a plain string column, `metadata` JSON, absence = omitted on read).
  */
 import { describe, expect, it } from 'vitest';
-import type { ScheduleRecord } from '@balsats/core/schedules';
-import type { SqliteStorage } from '@balsats/sqlite';
+import type { ScheduleRecord } from '@oribos/core/schedules';
+import type { SqliteStorage } from '@oribos/sqlite';
 import { caught, memoryStorage, messageOf } from './helpers.js';
 
 function record(

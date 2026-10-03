@@ -84,12 +84,12 @@ interface ScheduleStore {
 
 内存默认实现进核心;统一 adapter 家族,additive-only 演化纪律同其余 port。
 
-### croner 封装能力包(`@balsats/croner`)
+### croner 封装能力包(`@oribos/croner`)
 
 核心零依赖、cron 解析不进核心(上节),`next` 由宿主构建注入;本能力包把 croner 封装为 save 输入片段——单工厂,无 facade 包装,不 re-export croner。
 
 ```ts
-import { cron } from '@balsats/croner'
+import { cron } from '@oribos/croner'
 
 schedules.save({
   id: 'daily-report',
@@ -102,7 +102,7 @@ schedules.save({
 - **校验与错误面**:构建即全部校验——表达式结构/数值错误由 croner 构造期同步抛出(`TypeError`/`RangeError`),非法 IANA 时区由构建期探针(构造后以当前时刻调用一次 `nextRun`)一并提前到调用点;错误一律原样透出、不包装。`next(from)` 此后为纯计算。
 - **表达式落点**:表达式不落记录——`ScheduleRecord` 只带 `timezone?`,无表达式字段(SQLite 参考 adapter 表结构同,零改动);真相源在宿主侧调度定义(配置/代码),持久记录是到期缓存、与 `next` 按 id 进程内配对。重启重锚 = 宿主按定义逐个 `save()`(`save` 以 now 重锚 `nextFireAt`,定义即权威);不设 `metadata` 约定、无 rehydrate helper。
 - **DST 语义**:原样透传,本包不补偿。实测(v10.0.1,`Europe/Stockholm` 2026-03-29 缺口日):`30 2 * * *` 返回本地 **03:30 CEST**,与 `30 3 * * *` 撞同一时刻——是偏移映射,与 croner README「gaps are skipped」措辞矛盾,以上游行为为准并如实入文(重叠日与 README 一致:只跑第一次出现)。
-- **依赖预算**:croner 精确钉 `10.0.1`(MIT、零运行时依赖、engines `>=18`;`deps-budget.json` 基线 = 1 包 / 154,686 B 解包——registry `unpackedSize`,dist 27,551 B / gzip 8,059 B 为记录面)。对 core 无 peer——片段类型自含、结构兼容;`@balsats/core` 仅 devDep,接线单测(save→tick 走 croner `next`)进 verify,core 契约漂移在该单测的类型检查暴露。清单与发布口径沿 ADR-0002 M5 修订(engines `>=22.13.0`、锁步 `0.5.0`)。
+- **依赖预算**:croner 精确钉 `10.0.1`(MIT、零运行时依赖、engines `>=18`;`deps-budget.json` 基线 = 1 包 / 154,686 B 解包——registry `unpackedSize`,dist 27,551 B / gzip 8,059 B 为记录面)。对 core 无 peer——片段类型自含、结构兼容;`@oribos/core` 仅 devDep,接线单测(save→tick 走 croner `next`)进 verify,core 契约漂移在该单测的类型检查暴露。清单与发布口径沿 ADR-0002 M5 修订(engines `>=22.13.0`、锁步 `0.5.0`)。
 
 ## Observability 锚点
 

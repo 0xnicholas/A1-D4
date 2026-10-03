@@ -1,7 +1,7 @@
 import type { Model } from './contract.js';
 
 /**
- * The AI SDK provider specification version this build of `@balsats/core` supports.
+ * The AI SDK provider specification version this build of `@oribos/core` supports.
  *
  * A single version is supported and locked: models of other generations are rejected by
  * `assertModel` — never adapted (ADR-0004).
@@ -81,7 +81,7 @@ function specificationVersionMessage(actual: string): string {
   const actualGeneration = parseGeneration(actual);
   const expectedGeneration = parseGeneration(expected);
   const unsupported =
-    `Unsupported model specification version '${actual}': this build of @balsats/core supports '${expected}'.`;
+    `Unsupported model specification version '${actual}': this build of @oribos/core supports '${expected}'.`;
 
   if (
     actualGeneration === undefined ||
@@ -90,19 +90,19 @@ function specificationVersionMessage(actual: string): string {
   ) {
     return (
       `${unsupported} Upgrade the provider package if it predates this build, or upgrade ` +
-      '@balsats/core if this build predates the provider package.'
+      '@oribos/core if this build predates the provider package.'
     );
   }
 
   if (actualGeneration < expectedGeneration) {
     return (
       `${unsupported} The provider package predates this framework build — upgrade the provider ` +
-      `package, or downgrade @balsats/core to a major that supports specification version '${actual}'.`
+      `package, or downgrade @oribos/core to a major that supports specification version '${actual}'.`
     );
   }
 
   return (
-    `${unsupported} This framework build predates the provider package — upgrade @balsats/core, or ` +
+    `${unsupported} This framework build predates the provider package — upgrade @oribos/core, or ` +
     `downgrade the provider package to one that implements specification version '${expected}'.`
   );
 }

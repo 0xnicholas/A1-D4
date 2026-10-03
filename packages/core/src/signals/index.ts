@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/signals` — signals subsystem (the harness base layer).
+ * `@oribos/core/signals` — signals subsystem (the harness base layer).
  *
  * `createSignals({ agent, memory?, tracer? })`: the thread-directed interaction primitive —
  * sendMessage / queueMessage / sendSignal / subscribeToThread — with the fixed three rules:

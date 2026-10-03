@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Memory, createInMemoryStore, supportsWorkingMemory } from '@balsats/core/memory';
+import { Memory, createInMemoryStore, supportsWorkingMemory } from '@oribos/core/memory';
 import type {
   ListMessagesQuery,
   ListThreadsQuery,
@@ -14,8 +14,8 @@ import type {
   StoredResource,
   StoredThread,
   WorkingMemoryStore,
-} from '@balsats/core/memory';
-import type { ModelMessage } from '@balsats/core/model';
+} from '@oribos/core/memory';
+import type { ModelMessage } from '@oribos/core/model';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

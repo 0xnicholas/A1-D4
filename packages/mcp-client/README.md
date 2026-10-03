@@ -1,12 +1,12 @@
-# `@balsats/mcp-client`
+# `@oribos/mcp-client`
 
 Bridge a remote [MCP](https://modelcontextprotocol.io) server's tools into a
-[Balsats](https://github.com/0xnicholas/balsats-framework) tool container: one `createMcpClient()`
+[Oribos](https://github.com/0xnicholas/oribos-framework) tool container: one `createMcpClient()`
 object with a `tools` snapshot you spread straight into an agent, a `refresh()`, and a `close()`.
 
 ```ts
-import { createAgent } from '@balsats/core/agent';
-import { createMcpClient } from '@balsats/mcp-client';
+import { createAgent } from '@oribos/core/agent';
+import { createMcpClient } from '@oribos/mcp-client';
 
 const client = await createMcpClient({
   transport: { type: 'http', url: 'https://example.com/mcp' },
@@ -24,18 +24,18 @@ await client.refresh();                      // re-list remotely, swap the snaps
 await client.close();                        // tear down (idempotent)
 ```
 
-- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/tools.md)
-- SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
-- Decisions: [ADR-0008](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
-- Paired example (server + client in one script): [`examples/mcp-tools`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/mcp-tools)
+- Spec: [`docs/architecture/tools.md`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/architecture/tools.md)
+- SDK facts this package builds on: [`docs/research/mcp-v2-sdk-surface.md`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/research/mcp-v2-sdk-surface.md)
+- Decisions: [ADR-0008](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0008-tools-mcp-abstraction.md) (tools/MCP), [ADR-0002](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
+- Paired example (server + client in one script): [`examples/mcp-tools`](https://github.com/0xnicholas/oribos-framework/blob/main/examples/mcp-tools)
 
 ## Install
 
 ```bash
-npm install @balsats/mcp-client @balsats/core
+npm install @oribos/mcp-client @oribos/core
 ```
 
-`@balsats/core` is a peer dependency (one core instance by design). The only direct runtime
+`@oribos/core` is a peer dependency (one core instance by design). The only direct runtime
 dependency is `@modelcontextprotocol/client`.
 
 ## Transports and options
@@ -114,14 +114,14 @@ On modern HTTP connections the SDK must drop tools whose `x-mcp-header` declarat
 
 ## Lightweight
 
-Same axis as the rest of Balsats — install only what you use:
+Same axis as the rest of Oribos — install only what you use:
 
 - dependency closure: everything `@modelcontextprotocol/client` pulls in — its OAuth / SSE / stdio
   closure — recorded in `deps-budget.json`, where count and unpacked size are watched in CI
 - first-party code: the minified baseline is recorded in `byte-budget.json` and checked on every
   PR — a warning, not a merge gate or a public budget
-- `@balsats/core` stays a peer, so there is exactly one core instance
+- `@oribos/core` stays a peer, so there is exactly one core instance
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/oribos-framework/blob/main/LICENSE)

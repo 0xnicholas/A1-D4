@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createStep, createWorkflow } from '@balsats/core/workflows';
-import { WorkflowValidationError } from '@balsats/core/workflows';
-import type { StepContext } from '@balsats/core/workflows';
+import { createStep, createWorkflow } from '@oribos/core/workflows';
+import { WorkflowValidationError } from '@oribos/core/workflows';
+import type { StepContext } from '@oribos/core/workflows';
 import { captureError, captureRejection, expectSuccess } from './helpers/assertions.js';
 
 /**
@@ -14,7 +14,7 @@ import { captureError, captureRejection, expectSuccess } from './helpers/asserti
  *   IO schema;不一致的臂在运行期由该臂的 input 边界拦下);无真分支 = `{}`;
  * - foreach:输入必须是数组、concurrency 默认 1、>1 用自写并发闸(流式补位,不引 fastq)、保序收集、同步点,输出数组。
  *
- * 接缝 = 公开 `@balsats/core/workflows` 子路径,不触内部模块;并发断言用一次性闸门(deferred)自行
+ * 接缝 = 公开 `@oribos/core/workflows` 子路径,不触内部模块;并发断言用一次性闸门(deferred)自行
  * 控制 step 何时完成,不靠计时器。块内(parallel / branch 臂 / foreach)每次执行的事件与 span 归
  * workflows-events / workflows-observability(run 的记录仍按块聚合一条)。
  */

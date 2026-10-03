@@ -1,12 +1,12 @@
-# `@balsats/croner`
+# `@oribos/croner`
 
-Cron expressions for [Balsats](https://github.com/0xnicholas/balsats-framework) schedules: one `cron()`
+Cron expressions for [Oribos](https://github.com/0xnicholas/oribos-framework) schedules: one `cron()`
 call returns exactly the `next` + `timezone` fragment `schedules.save()` takes, so a schedule is
 registered by spreading it in — and the expression never enters the record.
 
 ```ts
-import { createSchedules } from '@balsats/core/schedules';
-import { cron } from '@balsats/croner';
+import { createSchedules } from '@oribos/core/schedules';
+import { cron } from '@oribos/croner';
 
 const schedules = createSchedules({ agents: { reporter } });
 
@@ -19,21 +19,21 @@ await schedules.save({
 await schedules.tick(); // the platform cron's endpoint calls this
 ```
 
-- Spec: [`docs/architecture/harness.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/harness.md)
-- Facts this package builds on: [`docs/research/croner.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/croner.md)
-- Decisions: [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging); harness spec ([ADR-0011](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0011-harness-semantics.md))
-- Example: [`examples/cron-schedule`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/cron-schedule) — save → occurrences advance → `tick` fires
+- Spec: [`docs/architecture/harness.md`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/architecture/harness.md)
+- Facts this package builds on: [`docs/research/croner.md`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/research/croner.md)
+- Decisions: [ADR-0002](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0002-package-structure.md) (packaging); harness spec ([ADR-0011](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0011-harness-semantics.md))
+- Example: [`examples/cron-schedule`](https://github.com/0xnicholas/oribos-framework/blob/main/examples/cron-schedule) — save → occurrences advance → `tick` fires
 
 ## Install
 
 ```bash
-npm install @balsats/croner
+npm install @oribos/croner
 ```
 
 The wrapper depends on nothing beyond `croner`, pinned exactly (`croner@10.0.1`, MIT, engines
-`>=18`), and pulls in nothing further. There is **no `@balsats/core` peer**: the fragment is
+`>=18`), and pulls in nothing further. There is **no `@oribos/core` peer**: the fragment is
 structurally just the `next` + `timezone` slice of `ScheduleSaveInput`, so this package stands
-alone — install `@balsats/core` separately when you actually call `schedules.save()`.
+alone — install `@oribos/core` separately when you actually call `schedules.save()`.
 
 ## The fragment
 

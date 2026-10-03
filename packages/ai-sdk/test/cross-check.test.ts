@@ -6,14 +6,14 @@ import {
   uiMessageChunkSchema,
 } from 'ai';
 import type { UIMessage, UIMessageChunk } from 'ai';
-import type { Chunk } from '@balsats/core/model';
-import type { StoredMessage } from '@balsats/core/memory';
+import type { Chunk } from '@oribos/core/model';
+import type { StoredMessage } from '@oribos/core/memory';
 import {
   UI_MESSAGE_STREAM_HEADERS,
   toAISdkMessages,
   toAISdkStream,
   type AISdkStreamChunk,
-} from '@balsats/ai-sdk';
+} from '@oribos/ai-sdk';
 
 /**
  * The three drift guards of the frozen spec (spec: `docs/architecture/model.md`

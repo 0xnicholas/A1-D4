@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Agent, resolveDynamicArgument } from '@balsats/core/agent';
-import type { RequestContext } from '@balsats/core/agent';
-import { ModelSpecificationVersionError } from '@balsats/core/model';
-import type { Model } from '@balsats/core/model';
-import { createTool } from '@balsats/core/tools';
+import { Agent, resolveDynamicArgument } from '@oribos/core/agent';
+import type { RequestContext } from '@oribos/core/agent';
+import { ModelSpecificationVersionError } from '@oribos/core/model';
+import type { Model } from '@oribos/core/model';
+import { createTool } from '@oribos/core/tools';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**
  * 动态参数与 RequestContext(M1-10 #31,ADR-0005):instructions / model / tools / description 四个
  * 配置字段接受静态值或 `(ctx) => T | Promise<T>` 函数,每次执行按请求上下文逐次解析;RequestContext
  * 是纯对象——框架写入 `signal` / `runId`,其余是用户 per-call 传入的开放属性袋,在动态参数解析与工具
- * ctx 中都是同一份。断言只走公开面(@balsats/core/agent 子路径)与脚本化假模型接缝
+ * ctx 中都是同一份。断言只走公开面(@oribos/core/agent 子路径)与脚本化假模型接缝
  * (@see helpers/fake-model.ts)。
  */
 describe('动态参数:逐次解析', () => {

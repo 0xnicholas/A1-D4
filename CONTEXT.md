@@ -1,4 +1,4 @@
-# Balsats
+# Oribos
 
 一个轻量的 TypeScript/Node agent 框架：设计目标对齐 mastra(从原型到生产的一体化体验),差异化轴是"轻量"。本文件是项目术语表——只放定义,不放实现细节与架构决策(后者在 `docs/adr/`)。
 
@@ -33,11 +33,11 @@ _Avoid_: 把形状内差异当缺口补齐(先判分叉)、与「有意分叉」
 _Avoid_: 把「实装存在」当兑现、用不可判真的描述充当验证面
 
 **核心包 (Core package)**:
-框架的单数核心 npm 包 `@balsats/core`,以子路径导出各子系统入口;自身保持极小,是"按需组合"的载体。
+框架的单数核心 npm 包 `@oribos/core`,以子路径导出各子系统入口;自身保持极小,是"按需组合"的载体。
 _Avoid_: 内核、平台包
 
 **能力包 (Capability package)**:
-因携带外部依赖而与核心包隔离的独立 npm 包(如 MCP、OTel exporter、存储 adapter、AI SDK 互操作),用户按需安装;命名一律 `@balsats/<能力>` 短名词、无类型后缀(如 `@balsats/mcp-server`、`@balsats/otlp`)。
+因携带外部依赖而与核心包隔离的独立 npm 包(如 MCP、OTel exporter、存储 adapter、AI SDK 互操作),用户按需安装;命名一律 `@oribos/<能力>` 短名词、无类型后缀(如 `@oribos/mcp-server`、`@oribos/otlp`)。
 _Avoid_: plugin、integration
 
 **组合根 (Composition root)**:

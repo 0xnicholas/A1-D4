@@ -35,7 +35,7 @@ export function packageManifest(fields: Readonly<Record<string, unknown>> = {}):
 
 /** 建一个临时包目录,按相对路径写入文件,返回目录绝对路径(测试结束由 cleanupFixtures 清理)。 */
 export function fixturePackage(files: Readonly<Record<string, string>>): string {
-  const dir = mkdtempSync(join(tmpdir(), 'balsats-redline-'));
+  const dir = mkdtempSync(join(tmpdir(), 'oribos-redline-'));
   fixtures.push(dir);
   for (const [relativePath, contents] of Object.entries(files)) {
     const filePath = join(dir, relativePath);

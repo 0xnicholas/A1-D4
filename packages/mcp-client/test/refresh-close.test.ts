@@ -4,7 +4,7 @@
  * teardown path (`terminateSession` → DELETE on close, once, idempotently).
  */
 import { describe, expect, it } from 'vitest';
-import { createMcpClient } from '@balsats/mcp-client';
+import { createMcpClient } from '@oribos/mcp-client';
 import { serveLegacy, toolContext, toolOf } from './helpers.js';
 
 describe('refresh', () => {

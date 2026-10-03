@@ -1,8 +1,8 @@
 # cron-schedule
 
-One cron expression, from the host's definition to a fired run: `@balsats/croner`'s `cron()` returns
+One cron expression, from the host's definition to a fired run: `@oribos/croner`'s `cron()` returns
 exactly the `next` + `timezone` fragment `schedules.save()` takes, the occurrence function walks the
-schedule as pure computation, and `tick` fires what is due and advances the record. Balsats is an
+schedule as pure computation, and `tick` fires what is due and advances the record. Oribos is an
 ultralight TypeScript agent framework — compose only what you use, run anywhere, no runtime
 baggage.
 
@@ -32,8 +32,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsats/core and @balsats/croner through their package exports (dist)
-pnpm --filter @balsats/example-cron-schedule start
+pnpm build                 # examples consume @oribos/core and @oribos/croner through their package exports (dist)
+pnpm --filter @oribos/example-cron-schedule start
 ```
 
 Expected output: the fragment's shape and the saved record, three occurrences walked from a fixed
@@ -54,6 +54,6 @@ an error that fails to surface at `cron()` — each exits non-zero instead of pr
 - **Timezone default.** With no `timezone` option the expression is read in the process's own
   timezone (croner's default). The example always passes one so its output does not depend on where
   it runs.
-- The script consumes `@balsats/croner` and `@balsats/core` through their built package exports — run
+- The script consumes `@oribos/croner` and `@oribos/core` through their built package exports — run
   `pnpm build` before `start`. Package docs: [`packages/croner`](../../packages/croner/) — the croner
   wrapper capability package.

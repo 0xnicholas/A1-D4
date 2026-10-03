@@ -199,7 +199,7 @@ export function neverAnswers(lateText: string) {
 }
 
 /** The six-piece context the framework guarantees every `execute`; only `signal` crosses the bridge. */
-export function toolContext(signal: AbortSignal = new AbortController().signal): import('@balsats/core/tools').ToolContext {
+export function toolContext(signal: AbortSignal = new AbortController().signal): import('@oribos/core/tools').ToolContext {
   return {
     signal,
     runId: '',
@@ -211,7 +211,7 @@ export function toolContext(signal: AbortSignal = new AbortController().signal):
 }
 
 /** Snapshot accessor: fails loudly on a missing name instead of testing `undefined`. */
-export function toolOf(client: { readonly tools: Record<string, import('@balsats/core/tools').Tool> }, name: string): import('@balsats/core/tools').Tool {
+export function toolOf(client: { readonly tools: Record<string, import('@oribos/core/tools').Tool> }, name: string): import('@oribos/core/tools').Tool {
   const found = client.tools[name];
   if (found === undefined) throw new Error(`tool ${name} missing from the snapshot`);
   return found;

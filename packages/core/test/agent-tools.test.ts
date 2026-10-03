@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent } from '@balsats/core/agent';
-import { createTool } from '@balsats/core/tools';
+import { Agent } from '@oribos/core/agent';
+import { createTool } from '@oribos/core/tools';
 import { fakeModel } from './helpers/fake-model.js';
 
 /**
@@ -45,7 +45,7 @@ describe('工具容器与发给模型的工具列表', () => {
       },
     });
 
-    await agent.generate('Search for balsats.');
+    await agent.generate('Search for oribos.');
 
     expect(model.streamCalls[0]?.tools).toEqual([
       {

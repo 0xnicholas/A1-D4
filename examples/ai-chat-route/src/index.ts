@@ -1,5 +1,5 @@
 /**
- * Balsats ai-chat-route example — one `useChat()`-compatible HTTP route, one durable run, one
+ * Oribos ai-chat-route example — one `useChat()`-compatible HTTP route, one durable run, one
  * app-side resume.
  *
  * The script hosts `createChatRoute` on plain `node:http` (any web-standard host works the same
@@ -21,12 +21,12 @@
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-ai-chat-route start
+ *   OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-ai-chat-route start
  *
  * Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
  *
  *   OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
- *     pnpm --filter @balsats/example-ai-chat-route start
+ *     pnpm --filter @oribos/example-ai-chat-route start
  *
  * The script self-asserts (`node:assert/strict`): any violated payoff exits 1.
  */
@@ -34,11 +34,11 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { openai } from '@ai-sdk/openai';
-import { createApp } from '@balsats/core';
-import { Memory } from '@balsats/core/memory';
-import { createTool } from '@balsats/core/tools';
-import { toAISdkMessages, createChatRoute } from '@balsats/ai-sdk';
-import type { AISdkStreamChunk } from '@balsats/ai-sdk';
+import { createApp } from '@oribos/core';
+import { Memory } from '@oribos/core/memory';
+import { createTool } from '@oribos/core/tools';
+import { toAISdkMessages, createChatRoute } from '@oribos/ai-sdk';
+import type { AISdkStreamChunk } from '@oribos/ai-sdk';
 import { z } from 'zod';
 
 if (!process.env.OPENAI_API_KEY) {

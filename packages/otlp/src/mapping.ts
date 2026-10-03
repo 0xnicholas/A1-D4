@@ -1,7 +1,7 @@
 /**
  * The seven-type mapping contract:
  * every mapped span's name is rebuilt from its template, carries `gen_ai.operation.name` where the
- * type has one and `balsats.span.type` always; `agent-step` alone is CLIENT kind and carries the
+ * type has one and `oribos.span.type` always; `agent-step` alone is CLIENT kind and carries the
  * request/usage/response attributes. Open types pass their name through untouched. GenAI semconv
  * keys are written as string literals on purpose — the constants package is incubating-only
  * (ADR-0009's reversibility asymmetry: key drift changes this package, never the core).
@@ -16,8 +16,8 @@ import {
   TOOL_CALL_SPAN,
   WORKFLOW_RUN_SPAN,
   WORKFLOW_STEP_SPAN,
-} from '@balsats/core/observability';
-import type { ExportedSpan } from '@balsats/core/observability';
+} from '@oribos/core/observability';
+import type { ExportedSpan } from '@oribos/core/observability';
 import { messagesToPromptPayload, outputToMessages } from './messages.js';
 import {
   collectAttribute,
@@ -65,15 +65,15 @@ function collectErrorAttributes(collector: AttributeCollection, span: ExportedSp
   if (span.error === undefined) return;
   collectAttribute(collector, 'error.type', errorType(span.error.details));
   const details = errorDetailsJson(span.error.details);
-  if (details !== undefined) collectAttribute(collector, 'balsats.error.details', details);
+  if (details !== undefined) collectAttribute(collector, 'oribos.error.details', details);
 }
 
-/** The user's open bag: one `balsats.metadata` JSON-text attribute, never flattened. */
+/** The user's open bag: one `oribos.metadata` JSON-text attribute, never flattened. */
 function collectMetadata(collector: AttributeCollection, span: ExportedSpan): void {
   if (span.metadata === undefined) return;
   const text = jsonTextOrUndefined(span.metadata);
   if (text === undefined || text === '{}') return;
-  collectAttribute(collector, 'balsats.metadata', text);
+  collectAttribute(collector, 'oribos.metadata', text);
 }
 
 /** Maps one span per the contract. */
@@ -97,7 +97,7 @@ export function mapSpan(span: ExportedSpan): MappedSpan {
       collectAttribute(collector, 'gen_ai.agent.name', bagString('agentName', span.name));
       if (bag.runId !== undefined) {
         consumed.add('runId');
-        collectAttribute(collector, 'balsats.run_id', bag.runId);
+        collectAttribute(collector, 'oribos.run_id', bag.runId);
       }
       collectMessagePayload(collector, span, 'agent-run');
       break;
@@ -117,7 +117,7 @@ export function mapSpan(span: ExportedSpan): MappedSpan {
           if (mapped !== undefined) {
             collectAttribute(collector, mapped, value);
           } else if (value !== undefined) {
-            collectAttribute(collector, `balsats.request.${key}`, value);
+            collectAttribute(collector, `oribos.request.${key}`, value);
           }
         }
       }
@@ -167,7 +167,7 @@ export function mapSpan(span: ExportedSpan): MappedSpan {
       collectAttribute(collector, 'gen_ai.workflow.name', bagString('workflowId', span.name));
       if (bag.runId !== undefined) {
         consumed.add('runId');
-        collectAttribute(collector, 'balsats.run_id', bag.runId);
+        collectAttribute(collector, 'oribos.run_id', bag.runId);
       }
       collectFallbackPayload(collector, span);
       break;
@@ -179,14 +179,14 @@ export function mapSpan(span: ExportedSpan): MappedSpan {
     }
     case MEMORY_RECALL_SPAN: {
       name = `memory-recall ${bagString('threadId', span.name)}`;
-      collectAttribute(collector, 'balsats.thread_id', bagString('threadId', span.name));
+      collectAttribute(collector, 'oribos.thread_id', bagString('threadId', span.name));
       collectFallbackPayload(collector, span);
       break;
     }
     case MEMORY_SAVE_SPAN: {
       name = `memory-save ${bagString('threadId', span.name)}`;
-      collectAttribute(collector, 'balsats.thread_id', bagString('threadId', span.name));
-      collectAttribute(collector, 'balsats.resource_id', bagString('resourceId', ''));
+      collectAttribute(collector, 'oribos.thread_id', bagString('threadId', span.name));
+      collectAttribute(collector, 'oribos.resource_id', bagString('resourceId', ''));
       collectFallbackPayload(collector, span);
       break;
     }
@@ -198,7 +198,7 @@ export function mapSpan(span: ExportedSpan): MappedSpan {
 
   // Framework-type marker on every span, then the attributes bag's unmapped keys under their own
   // names (whitelist-mapped keys do not repeat).
-  collectAttribute(collector, 'balsats.span.type', span.type);
+  collectAttribute(collector, 'oribos.span.type', span.type);
   for (const [key, value] of Object.entries(bag)) {
     if (!consumed.has(key)) collectAttribute(collector, key, value);
   }
@@ -229,16 +229,16 @@ function collectMessagePayload(
     }
   } else if (span.input !== undefined) {
     const json = jsonTextOrUndefined(span.input);
-    if (json !== undefined) collectAttribute(collector, 'balsats.input', json);
+    if (json !== undefined) collectAttribute(collector, 'oribos.input', json);
   }
   const output = outputToMessages(span.output);
   if (output !== undefined) collectAttribute(collector, 'gen_ai.output.messages', output);
 }
 
-/** Non-message semantics fallback: best-effort JSON text on `balsats.input` / `balsats.output`. */
+/** Non-message semantics fallback: best-effort JSON text on `oribos.input` / `oribos.output`. */
 function collectFallbackPayload(collector: AttributeCollection, span: ExportedSpan): void {
   const input = jsonTextOrUndefined(span.input);
-  if (input !== undefined) collectAttribute(collector, 'balsats.input', input);
+  if (input !== undefined) collectAttribute(collector, 'oribos.input', input);
   const output = jsonTextOrUndefined(span.output);
-  if (output !== undefined) collectAttribute(collector, 'balsats.output', output);
+  if (output !== undefined) collectAttribute(collector, 'oribos.output', output);
 }

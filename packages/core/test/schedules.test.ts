@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Agent } from '@balsats/core/agent';
-import { Memory } from '@balsats/core/memory';
+import { Agent } from '@oribos/core/agent';
+import { Memory } from '@oribos/core/memory';
 import {
   createInMemoryScheduleStore,
   createSchedules,
   type ScheduleRecord,
   type ScheduleStore,
-} from '@balsats/core/schedules';
-import { createSignals } from '@balsats/core/signals';
-import { createTool } from '@balsats/core/tools';
+} from '@oribos/core/schedules';
+import { createSignals } from '@oribos/core/signals';
+import { createTool } from '@oribos/core/tools';
 import { assistant, INSTRUCTIONS } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';
 
@@ -20,7 +20,7 @@ afterEach(() => {
  * schedules(M4 #59,`docs/architecture/harness.md`「Schedules」/「ScheduleStore」节):
  * `createInMemoryScheduleStore` 是 `ScheduleStore` port 的语义参考实现——CRUD 走深拷贝、
  * listDue 边界(到期 / 未到期 / enabled: false / 无下一次)、list 的到期升序 + null 末置 +
- * 游标。断言只走公开面(@balsats/core/schedules 子路径)。
+ * 游标。断言只走公开面(@oribos/core/schedules 子路径)。
  */
 
 /** 最小目标(threadless 形态;store 层不解释 target,仅为记录形状)。 */

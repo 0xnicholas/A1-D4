@@ -1,5 +1,5 @@
 /**
- * `@balsats/sqlite` — the first-party SQLite reference adapter. One factory, one embedded file, all
+ * `@oribos/sqlite` — the first-party SQLite reference adapter. One factory, one embedded file, all
  * four storage ports:
  * `memory` / `workflowSnapshots` / `agentRunSnapshots` / `schedules`, each a port the core defines
  * and this package implements — the core's types are untouched and every declared port extension is
@@ -17,8 +17,8 @@
  * de-duplication across processes rests on the caller using `compareAndSave`; the adapter keeps no
  * lease / claim / retry layer and lets `SQLITE_BUSY` out unchanged.
  */
-import type { WorkingMemoryStore } from '@balsats/core/memory';
-import type { ScheduleStore } from '@balsats/core/schedules';
+import type { WorkingMemoryStore } from '@oribos/core/memory';
+import type { ScheduleStore } from '@oribos/core/schedules';
 import { createLifecycle, DEFAULT_BUSY_TIMEOUT_MS } from './connection.js';
 import { createMemoryStore } from './memory.js';
 import { createScheduleStore } from './schedules.js';
@@ -59,7 +59,7 @@ export interface SqliteStorage {
  * Creates one storage instance over `path`. Nothing touches the file until `init()`.
  *
  * ```ts
- * const storage = createSqliteStorage({ path: 'balsats.db', busyTimeoutMs: 5_000 })
+ * const storage = createSqliteStorage({ path: 'oribos.db', busyTimeoutMs: 5_000 })
  * storage.memory              // WorkingMemoryStore
  * storage.workflowSnapshots   // WorkflowSnapshotStore + compareAndSave / deleteSnapshot / listSnapshots
  * storage.agentRunSnapshots   // AgentRunSnapshotStore + deleteSnapshot / listSuspended

@@ -2,9 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@balsats/core": ["../../packages/core/src/index.ts"],
-      "@balsats/core/*": ["../../packages/core/src/*/index.ts"],
-      "@balsats/sqlite": ["./src/index.ts"]
+      "@oribos/core": ["../../packages/core/src/index.ts"],
+      "@oribos/core/*": ["../../packages/core/src/*/index.ts"],
+      "@oribos/sqlite": ["./src/index.ts"]
     }
   },
   "include": ["src", "test"]

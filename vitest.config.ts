@@ -10,17 +10,17 @@ const otlpSource = fileURLToPath(new URL('./packages/otlp/src', import.meta.url)
 const cronerSource = fileURLToPath(new URL('./packages/croner/src', import.meta.url));
 
 export default defineConfig({
-  // 测试走 `@balsats/core/*` 与 `@balsats/mcp-server` / `@balsats/mcp-client` 公开入口,别名指向源码:不依赖构建,接缝与用户看到的一致。
+  // 测试走 `@oribos/core/*` 与 `@oribos/mcp-server` / `@oribos/mcp-client` 公开入口,别名指向源码:不依赖构建,接缝与用户看到的一致。
   resolve: {
     alias: [
-      { find: /^@balsats\/core$/, replacement: `${coreSource}/index.ts` },
-      { find: /^@balsats\/core\/(.*)$/, replacement: `${coreSource}/$1/index.ts` },
-      { find: /^@balsats\/mcp-server$/, replacement: `${mcpServerSource}/index.ts` },
-      { find: /^@balsats\/mcp-client$/, replacement: `${mcpClientSource}/index.ts` },
-      { find: /^@balsats\/sqlite$/, replacement: `${sqliteSource}/index.ts` },
-      { find: /^@balsats\/ai-sdk$/, replacement: `${aiSdkSource}/index.ts` },
-      { find: /^@balsats\/otlp$/, replacement: `${otlpSource}/index.ts` },
-      { find: /^@balsats\/croner$/, replacement: `${cronerSource}/index.ts` },
+      { find: /^@oribos\/core$/, replacement: `${coreSource}/index.ts` },
+      { find: /^@oribos\/core\/(.*)$/, replacement: `${coreSource}/$1/index.ts` },
+      { find: /^@oribos\/mcp-server$/, replacement: `${mcpServerSource}/index.ts` },
+      { find: /^@oribos\/mcp-client$/, replacement: `${mcpClientSource}/index.ts` },
+      { find: /^@oribos\/sqlite$/, replacement: `${sqliteSource}/index.ts` },
+      { find: /^@oribos\/ai-sdk$/, replacement: `${aiSdkSource}/index.ts` },
+      { find: /^@oribos\/otlp$/, replacement: `${otlpSource}/index.ts` },
+      { find: /^@oribos\/croner$/, replacement: `${cronerSource}/index.ts` },
     ],
   },
   test: {

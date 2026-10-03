@@ -1,9 +1,9 @@
 # signals-desk
 
-Balsats's signals subsystem in one scripted session: one support **thread** that everything lands in —
+Oribos's signals subsystem in one scripted session: one support **thread** that everything lands in —
 a customer message that wakes an idle run, a message **injected** into the run while it is live, two
 queued messages that keep their order, a typed **system signal**, and a **scheduled trigger** fired
-by the schedules primitive. Balsats is an ultralight TypeScript agent framework — compose only what you
+by the schedules primitive. Oribos is an ultralight TypeScript agent framework — compose only what you
 use, run anywhere, no runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It drives a
@@ -57,8 +57,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsats/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-signals-desk start
+pnpm build                 # examples consume @oribos/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-signals-desk start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -66,7 +66,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsats/example-signals-desk start
+  pnpm --filter @oribos/example-signals-desk start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. Expected output: the acts, one
@@ -97,5 +97,5 @@ and at the end, and the schedule record advancing from one 09:00 UTC to the next
   for `agent-run` spans to end and for the thread to be released before starting the next run. The
   waits are guarded — a model that never calls `pageSupervisor` fails the act loudly instead of
   hanging.
-- Like the other examples, the script consumes `@balsats/core` through its built package exports — run
+- Like the other examples, the script consumes `@oribos/core` through its built package exports — run
   `pnpm build` before `start`.

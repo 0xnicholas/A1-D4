@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/workflows` — workflow engine.
+ * `@oribos/core/workflows` — workflow engine.
  *
  * The definition surface: `createStep` (id + IO schemas + optional resume/suspend schemas +
  * retries + execute), the `StepContext` bag every step executes with, and the mutable

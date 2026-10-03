@@ -2,9 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@balsats/core": ["../../packages/core/src/index.ts"],
-      "@balsats/core/*": ["../../packages/core/src/*/index.ts"],
-      "@balsats/ai-sdk": ["./src/index.ts"]
+      "@oribos/core": ["../../packages/core/src/index.ts"],
+      "@oribos/core/*": ["../../packages/core/src/*/index.ts"],
+      "@oribos/ai-sdk": ["./src/index.ts"]
     }
   },
   "include": ["src", "test"]

@@ -1,15 +1,15 @@
-# `@balsats/sqlite`
+# `@oribos/sqlite`
 
-The first-party SQLite storage adapter for [Balsats](https://github.com/0xnicholas/balsats-framework):
+The first-party SQLite storage adapter for [Oribos](https://github.com/0xnicholas/oribos-framework):
 one factory over one embedded file, implementing all four storage ports — memory history, workflow
 snapshots, durable-run snapshots and schedules — plus every declared port extension. Zero
 dependencies: the driver is Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html),
 so it installs nothing and runs no service.
 
 ```ts
-import { createSqliteStorage } from '@balsats/sqlite';
+import { createSqliteStorage } from '@oribos/sqlite';
 
-const storage = createSqliteStorage({ path: 'balsats.db', busyTimeoutMs: 5_000 });
+const storage = createSqliteStorage({ path: 'oribos.db', busyTimeoutMs: 5_000 });
 
 storage.memory              // MemoryStore (with getResource / saveResource -> working memory)
 storage.workflowSnapshots   // WorkflowSnapshotStore + compareAndSave / deleteSnapshot / listSnapshots
@@ -21,18 +21,18 @@ storage.init();             // idempotent: open + pragmas (WAL / synchronous NOR
 await storage.close();      // idempotent; after it every port method throws
 ```
 
-- Spec: [`docs/architecture/storage.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/storage.md)
-- Driver facts this package builds on: [`docs/research/sqlite-driver-landscape.md`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/research/sqlite-driver-landscape.md)
-- Decisions: [ADR-0010](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0010-storage-port-strategy.md) (storage ports), [ADR-0002](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
-- Example: [`examples/sqlite-resume`](https://github.com/0xnicholas/balsats-framework/blob/main/examples/sqlite-resume) — a durable run suspends in one process and a new process resumes it from the file
+- Spec: [`docs/architecture/storage.md`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/architecture/storage.md)
+- Driver facts this package builds on: [`docs/research/sqlite-driver-landscape.md`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/research/sqlite-driver-landscape.md)
+- Decisions: [ADR-0010](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0010-storage-port-strategy.md) (storage ports), [ADR-0002](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0002-package-structure.md) (packaging)
+- Example: [`examples/sqlite-resume`](https://github.com/0xnicholas/oribos-framework/blob/main/examples/sqlite-resume) — a durable run suspends in one process and a new process resumes it from the file
 
 ## Install
 
 ```bash
-npm install @balsats/sqlite @balsats/core
+npm install @oribos/sqlite @oribos/core
 ```
 
-`@balsats/core` is a peer dependency (one core instance by design). `@balsats/sqlite` has no other
+`@oribos/core` is a peer dependency (one core instance by design). `@oribos/sqlite` has no other
 runtime dependency. Requires Node **`>=22.13.0`** — the flag-free floor of `node:sqlite`
 (experimental, release candidate since Node 25.7; Bun / Deno / Workers stubs are not a promise).
 
@@ -106,8 +106,8 @@ is only correct when the caller uses `compareAndSave`; `':memory:'` databases ar
 - dependencies: none — the driver is built into Node, so there is no `deps-budget.json` to watch
 - first-party code: the minified baseline is recorded in `byte-budget.json` and checked on every
   PR — a warning, not a merge gate or a public budget
-- `@balsats/core` stays a peer, so there is exactly one core instance
+- `@oribos/core` stays a peer, so there is exactly one core instance
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/oribos-framework/blob/main/LICENSE)

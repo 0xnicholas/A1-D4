@@ -1,7 +1,7 @@
 // 依赖红线硬闸门(ADR-0015,M5 修订推广):产物的导入说明符只允许
 // Node 内置 ∪ 相对/绝对路径 ∪ 本包 manifest 运行时字段(dependencies ∪ optionalDependencies
 // ∪ peerDependencies)声明的包名——「仅声明依赖」;名字精确匹配、含子路径(`pkg/sub`)。
-// 零运行时依赖的包(@balsats/core,ADR-0001 硬线)合法集恒为空集:三字段非空即红,原语义不变。
+// 零运行时依赖的包(@oribos/core,ADR-0001 硬线)合法集恒为空集:三字段非空即红,原语义不变。
 // devDependencies 不在合法集——源码误引 devDependency(清单却干净)的绕过路径照旧被挡;
 // 传递依赖不入扫描(重量由 deps-budget 数字承载,见 check-deps-budget.mjs)。
 // 落位(ADR-0015 M5 修订):共享实现居根 scripts/,各包以 `node ../../scripts/check-runtime-deps.mjs`

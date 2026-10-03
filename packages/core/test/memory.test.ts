@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Memory, createInMemoryStore } from '@balsats/core/memory';
-import type { SaveMessage } from '@balsats/core/memory';
+import { Memory, createInMemoryStore } from '@oribos/core/memory';
+import type { SaveMessage } from '@oribos/core/memory';
 import { captureError, captureRejection } from './helpers/assertions.js';
 
 /**

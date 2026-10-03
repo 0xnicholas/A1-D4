@@ -1,8 +1,8 @@
 # ai-chat-route
 
-One `useChat()`-compatible HTTP route around a durable agent: [`@balsats/ai-sdk`](../../packages/ai-sdk/)'s
+One `useChat()`-compatible HTTP route around a durable agent: [`@oribos/ai-sdk`](../../packages/ai-sdk/)'s
 `createChatRoute` speaks the AI SDK UI message stream, memory is the conversation authority, and a gated
-tool call suspends inside the stream — the application resumes it out-of-band. Balsats is an ultralight
+tool call suspends inside the stream — the application resumes it out-of-band. Oribos is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
 The example hosts the route on plain `node:http` (`src/index.ts`; any web-standard host works the same
@@ -29,14 +29,14 @@ From the repo root:
 ```bash
 pnpm install
 pnpm build
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-ai-chat-route start
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-ai-chat-route start
 ```
 
 Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsats/example-ai-chat-route start
+  pnpm --filter @oribos/example-ai-chat-route start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. The script self-asserts
@@ -47,7 +47,7 @@ second turn that fails to recall — each exits non-zero instead of printing a h
 
 - The `node:http` adapter is example glue — `createChatRoute` returns a web-standard
   `(request: Request) => Promise<Response>`, so Next.js / Hono / Workers hosts plug in directly.
-- The example consumes `@balsats/core` and `@balsats/ai-sdk` through their built package exports — run
+- The example consumes `@oribos/core` and `@oribos/ai-sdk` through their built package exports — run
   `pnpm build` before `start`. Package docs: [`packages/ai-sdk`](../../packages/ai-sdk/) — the AI SDK
   interoperability capability package; the suspension/resume underneath it is the core's durable-agent
   semantics.

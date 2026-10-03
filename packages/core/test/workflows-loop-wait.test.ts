@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createStep, createWorkflow } from '@balsats/core/workflows';
-import { WorkflowValidationError } from '@balsats/core/workflows';
-import type { RequestContext } from '@balsats/core/agent';
-import type { StepContext } from '@balsats/core/workflows';
+import { createStep, createWorkflow } from '@oribos/core/workflows';
+import { WorkflowValidationError } from '@oribos/core/workflows';
+import type { RequestContext } from '@oribos/core/agent';
+import type { StepContext } from '@oribos/core/workflows';
 import { captureError, captureRejection, expectSuccess } from './helpers/assertions.js';
 
 /** 一次性闸门 / 信号:测试自行控制时机,不靠计时器(沿 workflows-control-flow 的 idiom)。 */
@@ -28,7 +28,7 @@ function deferred() {
  * - `retries`:step 级固定间隔(1000ms)重试,最多 `retries + 1` 次尝试;step 边界的 IO 校验
  *   只做一次(不重试)。
  *
- * 接缝 = 公开 `@balsats/core/workflows` 子路径,不触内部模块。循环条件「迭代前 / 迭代后」的
+ * 接缝 = 公开 `@oribos/core/workflows` 子路径,不触内部模块。循环条件「迭代前 / 迭代后」的
  * 求值点与 sleep 的动态时长参数包形状是本票的实施期裁决(spec 修订(#50))。循环内每次迭代的事件
  * 与 span 归 workflows-events / workflows-observability(记录仍按块记一条)。
  */

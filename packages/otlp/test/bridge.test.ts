@@ -4,8 +4,8 @@
  * 「三事件 → OTLP 桥法」). Wire-level against a local capture endpoint, JSON protocol.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createOtlpExporter } from '@balsats/otlp';
-import type { ExportedSpan } from '@balsats/core/observability';
+import { createOtlpExporter } from '@oribos/otlp';
+import type { ExportedSpan } from '@oribos/core/observability';
 import {
   decodeSpans,
   exportAndFlush,
@@ -84,16 +84,16 @@ describe('createOtlpExporter: span_ended bridge', () => {
     }
   });
 
-  it('synthesizes the resource (service.name balsats, no telemetry.sdk.*) and the scope', async () => {
+  it('synthesizes the resource (service.name oribos, no telemetry.sdk.*) and the scope', async () => {
     const capture = await startCapture();
     try {
       const exporter = createOtlpExporter({ protocol: 'json', url: capture.url });
       await exportAndFlush(exporter, { kind: 'span_ended', span: testSpan() });
 
       const span = decodeSpans((await capture.waitForRequests(1))[0]!.body)[0]!;
-      expect(span.resource['service.name']).toBe('balsats');
+      expect(span.resource['service.name']).toBe('oribos');
       expect(Object.keys(span.resource).some((key) => key.startsWith('telemetry.sdk.'))).toBe(false);
-      expect(span.scope.name).toBe('@balsats/otlp');
+      expect(span.scope.name).toBe('@oribos/otlp');
       expect(span.scope.version).toBeUndefined();
     } finally {
       await capture.close();
@@ -149,7 +149,7 @@ describe('createOtlpExporter: span_ended bridge', () => {
       await exportAndFlush(exporter, { kind: 'span_ended', span: testSpan() });
 
       const span = decodeSpans((await capture.waitForRequests(1))[0]!.body)[0]!;
-      expect(span.resource['service.name']).toBe('balsats');
+      expect(span.resource['service.name']).toBe('oribos');
       expect(span.resource['deployment.environment']).toBe('prod');
       expect(span.resource.region).toBe('eu-west');
     } finally {

@@ -1,9 +1,9 @@
 # workflow-approval
 
-Balsats's workflow engine in one scripted session: an **operator-built definition frozen into a flat
+Oribos's workflow engine in one scripted session: an **operator-built definition frozen into a flat
 entry list**, a **for-loop walker** interpreting it, an **agent wrapped into a step**, and an
 **approval gate** where the run suspends into a JSON snapshot and a fresh run object resumes the
-walk. Balsats is an ultralight TypeScript agent framework — compose only what you use, run anywhere,
+walk. Oribos is an ultralight TypeScript agent framework — compose only what you use, run anywhere,
 no runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It drives
@@ -50,8 +50,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsats/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-workflow-approval start
+pnpm build                 # examples consume @oribos/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-workflow-approval start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -59,12 +59,12 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsats/example-workflow-approval start
+  pnpm --filter @oribos/example-workflow-approval start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one.
 
-Expected output: the flat entry list, the console exporter's `[balsats] span_started / …` lines, one
+Expected output: the flat entry list, the console exporter's `[oribos] span_started / …` lines, one
 `[event] …` line per lifecycle event, the write log and the loaded snapshot, and finally the
 receipt:
 
@@ -97,5 +97,5 @@ receipt:
   test suite. The definition surface's v1 kill-list — the operators deliberately cut, like nested
   workflows or a `state` blackboard — and the seam that carries each cut are design decisions, not
   example choices.
-- Like the other examples, the script consumes `@balsats/core` through its built package exports — run
+- Like the other examples, the script consumes `@oribos/core` through its built package exports — run
   `pnpm build` before `start`.

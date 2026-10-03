@@ -1,5 +1,5 @@
 /**
- * `@balsats/mcp-client` — the MCP client capability package: bridge a remote MCP server's tools
+ * `@oribos/mcp-client` — the MCP client capability package: bridge a remote MCP server's tools
  * into the framework's `Record<string, Tool>` container, ready to spread straight into an agent.
  *
  * One connection, one object with three members: `tools` (a getter over the current snapshot),
@@ -27,11 +27,11 @@ import type {
   VersionNegotiationMode,
 } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import type { Tool, ToolContext } from '@balsats/core/tools';
-import type { StandardSchema } from '@balsats/core/tools';
+import type { Tool, ToolContext } from '@oribos/core/tools';
+import type { StandardSchema } from '@oribos/core/tools';
 
 /** The identity this package advertises to servers — its own name and version, not overridable. */
-const CLIENT_NAME = '@balsats/mcp-client';
+const CLIENT_NAME = '@oribos/mcp-client';
 const { version: CLIENT_VERSION } = createRequire(import.meta.url)('../package.json') as { version: string };
 
 /** How to reach the server: a stdio subprocess the SDK owns, or a Streamable HTTP endpoint. */
@@ -239,7 +239,7 @@ function jsonSchemaPassthrough(remote: Record<string, unknown>): StandardSchema<
   const wrapper: StandardSchema<unknown, unknown> = {
     '~standard': Object.freeze({
       version: 1,
-      vendor: 'balsats',
+      vendor: 'oribos',
       types: Object.freeze({ input: undefined, output: undefined }),
       validate: Object.freeze((value: unknown) => ({ value })),
       jsonSchema: Object.freeze({

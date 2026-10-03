@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createMcpClient } from '@balsats/mcp-client';
+import { createMcpClient } from '@oribos/mcp-client';
 import { sleep, toolContext, toolOf } from './helpers.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/stdio-server.ts', import.meta.url));
@@ -38,7 +38,7 @@ async function waitExited(pid: number, timeoutMs = 15_000): Promise<void> {
 
 describe('stdio transport', () => {
   it('spawns, bridges, and tears down the subprocess; env is the whole environment', { timeout: 60_000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'balsats-mcp-client-stdio-'));
+    const dir = mkdtempSync(join(tmpdir(), 'oribos-mcp-client-stdio-'));
     const pidfile = join(dir, 'pid');
     try {
       const client = await createMcpClient({
@@ -46,7 +46,7 @@ describe('stdio transport', () => {
           type: 'stdio',
           command: process.execPath,
           args: ['--experimental-strip-types', fixture, pidfile],
-          env: { BALSATS_STDIO_MARKER: 'passed-through' },
+          env: { ORIBOS_STDIO_MARKER: 'passed-through' },
         },
       });
       const pid = Number(await waitFor(pidfile));

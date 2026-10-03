@@ -1,8 +1,8 @@
 # sqlite-resume
 
 A durable run that outlives the process that made it: the refund desk suspends in a worker process, its
-loop snapshot lands in SQLite through [`@balsats/sqlite`](../../packages/sqlite/), the worker exits — and a
-brand-new process opens its own connection to the same file and resumes the run. Balsats is an ultralight
+loop snapshot lands in SQLite through [`@oribos/sqlite`](../../packages/sqlite/), the worker exits — and a
+brand-new process opens its own connection to the same file and resumes the run. Oribos is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
 One script, two processes (`src/index.ts` re-execs itself as the worker), four acts:
@@ -26,18 +26,18 @@ From the repo root:
 ```bash
 pnpm install
 pnpm build
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-sqlite-resume start
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-sqlite-resume start
 ```
 
 Any OpenAI-compatible endpoint works too, e.g. a local Ollama:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsats/example-sqlite-resume start
+  pnpm --filter @oribos/example-sqlite-resume start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. The SQLite file defaults to a fresh
-temp directory; set `BALSATS_SQLITE_EXAMPLE_DB` to keep it. The script self-asserts
+temp directory; set `ORIBOS_SQLITE_EXAMPLE_DB` to keep it. The script self-asserts
 (`node:assert/strict`): a worker that fails to suspend, a snapshot that is not in the file, a resume that
 does not execute the held call — each exits non-zero instead of printing a happy face.
 
@@ -46,6 +46,6 @@ does not execute the held call — each exits non-zero instead of printing a hap
 - **This is the SQLite adapter's whole point**: `storage.memory`, `storage.agentRunSnapshots` and
   `storage.schedules` are handed to the composition root, so the snapshot, the message history and the
   schedule all land in one file that outlives the process.
-- The example consumes `@balsats/core` and `@balsats/sqlite` through their built package exports — run
+- The example consumes `@oribos/core` and `@oribos/sqlite` through their built package exports — run
   `pnpm build` before `start`. Package docs: [`packages/sqlite`](../../packages/sqlite/) — the SQLite
   reference adapter.

@@ -1,8 +1,8 @@
 {
-  "name": "@balsats/example-ai-chat-route",
+  "name": "@oribos/example-ai-chat-route",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsats AI SDK example: a useChat-compatible chat route over node:http, with durable suspension in the stream and the app-side resume orchestration.",
+  "description": "Oribos AI SDK example: a useChat-compatible chat route over node:http, with durable suspension in the stream and the app-side resume orchestration.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsats/core": "workspace:*",
-    "@balsats/ai-sdk": "workspace:*",
+    "@oribos/core": "workspace:*",
+    "@oribos/ai-sdk": "workspace:*",
     "zod": "^4.6.5"
   }
 }

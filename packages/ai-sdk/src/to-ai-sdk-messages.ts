@@ -9,8 +9,8 @@
  * memory are not the route's business.
  */
 
-import type { ModelFilePart, ModelToolResultPart } from '@balsats/core/model';
-import type { StoredMessage } from '@balsats/core/memory';
+import type { ModelFilePart, ModelToolResultPart } from '@oribos/core/model';
+import type { StoredMessage } from '@oribos/core/memory';
 import type {
   AISdkAssistantUIMessage,
   AISdkFileUIPart,

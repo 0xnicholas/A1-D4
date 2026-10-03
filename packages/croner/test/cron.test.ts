@@ -6,7 +6,7 @@
  * timezone would otherwise leak in (croner's default is the process timezone).
  */
 import { describe, expect, it } from 'vitest';
-import { cron, type CronFragment, type CronOptions } from '@balsats/croner';
+import { cron, type CronFragment, type CronOptions } from '@oribos/croner';
 
 describe('the save fragment', () => {
   it('returns { next }, and adds timezone only when one is given', () => {

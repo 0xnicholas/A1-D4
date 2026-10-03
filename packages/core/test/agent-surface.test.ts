@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsats/core/agent';
+import { Agent } from '@oribos/core/agent';
 import type {
   AgentConfig,
   AgentMemoryOptions,
@@ -8,11 +8,11 @@ import type {
   ModelInput,
   Processor,
   RequestContext,
-} from '@balsats/core/agent';
-import { Memory } from '@balsats/core/memory';
-import { ModelContractError, ModelSpecificationVersionError } from '@balsats/core/model';
-import type { Model } from '@balsats/core/model';
-import { createTracer } from '@balsats/core/observability';
+} from '@oribos/core/agent';
+import { Memory } from '@oribos/core/memory';
+import { ModelContractError, ModelSpecificationVersionError } from '@oribos/core/model';
+import type { Model } from '@oribos/core/model';
+import { createTracer } from '@oribos/core/observability';
 import { captureError, expectAssignable } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 

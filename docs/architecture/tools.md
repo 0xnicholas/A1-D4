@@ -82,7 +82,7 @@ createStep({
 
 ## MCP server 能力包
 
-独立 npm 包 `@balsats/mcp-server`(ADR-0002 M5 修订;`@balsats/core` 走 peer,清单三件套沿能力包先例)。直连依赖仅 `@modelcontextprotocol/server@^2.2.0`——传递闭包 server / core / zod 3 包;Node `node:http` 绑定与 Host/Origin 防护归用户侧(官方 `@modelcontextprotocol/node`,文档钉接线),不直连。v1 单包 `@modelcontextprotocol/sdk`(92 安装包、硬拉 express+hono)为过时路径,明确排除。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
+独立 npm 包 `@oribos/mcp-server`(ADR-0002 M5 修订;`@oribos/core` 走 peer,清单三件套沿能力包先例)。直连依赖仅 `@modelcontextprotocol/server@^2.2.0`——传递闭包 server / core / zod 3 包;Node `node:http` 绑定与 Host/Origin 防护归用户侧(官方 `@modelcontextprotocol/node`,文档钉接线),不直连。v1 单包 `@modelcontextprotocol/sdk`(92 安装包、硬拉 express+hono)为过时路径,明确排除。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
 
 ```ts
 const server = createMcpServer(
@@ -99,14 +99,14 @@ await server.close()                        // 闭合已开入口、中止在途
 - **era 姿态**:默认双代全服务(HTTP `legacy: 'stateless'`、stdio `legacy: 'serve'`);可切 `'reject'` 只服务 modern。legacy sessionful 不做——需要者用官方 SDK 自布线(`McpServer.connect(transport)`;更底层的 `Server` 类已 deprecated)。
 - **原语范围**:v1 仅 tools;prompts / resources 后加(minor)。
 - **ToolContext 合成**:`signal ← ctx.mcpReq.signal`;`toolCallId ← String(ctx.mcpReq.id)`(JSON-RPC 请求身份,跨连接不保证稳定);`runId` / `traceId` / `spanId` 为空串——MCP 无 run、v1 不注入 tracer,与 NoOpSpan / 手动直调语义对齐;`requestContext` 冻结空袋(框架只写 `signal` 与 `runId: ''`,不塞 `authInfo` / `era` 等 MCP 事实;授权归传输层中间件,需要 per-request 工具集的宿主走官方 SDK 自布线)。
-- **结果与错误投影**:`outputSchema` 存在 → `structuredContent = output` 原文 + `content = [{ type: 'text', text: render(output) }]`;无 `outputSchema` → 仅 content。`render` = `string` 原样、其余 `JSON.stringify`(`undefined` 退化 `String`)。输入校验 / execute 抛错 / 输出校验三线全由 SDK 归一为 `{ content: […], isError: true }` 结果——Balsats 不加层、不改消息;未知 / 禁用工具沿 SDK 的协议错误(JSON-RPC error),wire 错误还原为本框架语义是 client 包的职责。
+- **结果与错误投影**:`outputSchema` 存在 → `structuredContent = output` 原文 + `content = [{ type: 'text', text: render(output) }]`;无 `outputSchema` → 仅 content。`render` = `string` 原样、其余 `JSON.stringify`(`undefined` 退化 `String`)。输入校验 / execute 抛错 / 输出校验三线全由 SDK 归一为 `{ content: […], isError: true }` 结果——Oribos 不加层、不改消息;未知 / 禁用工具沿 SDK 的协议错误(JSON-RPC error),wire 错误还原为本框架语义是 client 包的职责。
 - **工具名合法性**:`[A-Za-z0-9_.-]{1,128}`(对齐 MCP 规范 SHOULD,ADR-0008 修订);`createMcpServer()` 构造期逐键校验,非法即抛——agent 域合法不代表 MCP 域合法。
 - **每请求实例**:SDK 工厂模型——HTTP 每请求、stdio 每连接(含 discover 探测重进)新建实例;桥接层按次整组注册全部工具(工具 Record 本身不改),工厂须廉价、无副作用。
 - **schema 零适配**:Tool 的 inputSchema/outputSchema 是 `StandardSchemaV1 & StandardJSONSchemaV1`(ADR-0003);SDK 以 `~standard.validate()` 校验(输入/输出,transform 生效)、以 `~standard.jsonSchema` 目标 `draft-2020-12` 出 JSON Schema(与发 provider 的 draft-07 目标同源不同出口);inputSchema 需 object 根。执行输入是 SDK 校验后的值——校验职责整体移交 SDK,与 agent loop 的框架侧校验同义。
 
 ## MCP client 能力包
 
-独立 npm 包 `@balsats/mcp-client`(#72 首批六包之一;ADR-0002 M5 修订)。直连依赖仅 `@modelcontextprotocol/client@^2.2.0`(`.` 与 `./stdio` 两个子路径面;13 包 / 14.1 MiB,#6 实测;大头是 OAuth/SSE/stdio,属功能必需),`@balsats/core` 走 peer(清单三件套沿能力包先例)。**与 server 包分开是按需组合的硬要求**:依赖是包级粒度,合包则 server 用户连坐 client 的 13 包。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
+独立 npm 包 `@oribos/mcp-client`(#72 首批六包之一;ADR-0002 M5 修订)。直连依赖仅 `@modelcontextprotocol/client@^2.2.0`(`.` 与 `./stdio` 两个子路径面;13 包 / 14.1 MiB,#6 实测;大头是 OAuth/SSE/stdio,属功能必需),`@oribos/core` 走 peer(清单三件套沿能力包先例)。**与 server 包分开是按需组合的硬要求**:依赖是包级粒度,合包则 server 用户连坐 client 的 13 包。数字口径归 `deps-budget.json`(实施图落基线),本节只冻包集合与版本线。
 
 ```ts
 const client = await createMcpClient({
@@ -124,7 +124,7 @@ await client.close()    // HTTP 先 terminateSession(失败静默)→ client.clo
 
 - **接入形态唯一**:外部 MCP 工具转译为本框架 Tool 直接进 agent 容器;不做 mastra 式 MCPConfiguration 平行容器。
 - **传输**:stdio(`command + args + env`,SDK 自拥子进程)+ Streamable HTTP(`url + headers` → transport `requestInit.headers`)。`env` 语义照 SDK:给了就是**整份**环境,不给 = SDK 白名单(不继承整份 `process.env`);`stderr` 缺省 inherit——子进程日志进父 stderr,正是 MCP 要的。旋钮面收口:stdio 的 `stderr` / `cwd` / `maxBufferSize`、HTTP 的 `fetch` / `authProvider` / `sessionId`、`listMaxPages`、响应缓存三件(`responseCacheStore` / `cachePartition` / `defaultCacheTtlMs`)与客户端中间件 v1 一律不暴露;逃逸口是官方 SDK 自布线(与 server 票同一条纪律)。**不接受 SDK transport 实例注入**。
-- **身份**:SDK 的 `Client({ name, version })` 由包内定(`@balsats/mcp-client` + 包版本),v1 不暴露覆写。
+- **身份**:SDK 的 `Client({ name, version })` 由包内定(`@oribos/mcp-client` + 包版本),v1 不暴露覆写。
 - **era 姿态**:缺省 `'auto'`(先 `server/discover` 探测,定不了就回退 legacy `initialize`);可切 `'legacy'`(零探测,即 SDK 自身缺省)或 `{ pin: '2026-07-28' }`(不回退,失败即抛)——**我们显式把缺省抬到 auto**,SDK 缺省是 legacy。代价是 connect 期成本:stdio 上多一次短命兄弟探测进程;HTTP 探测静默超时按 outage 拒绝、不回落。
 - **超时**:SDK 逐请求缺省 60s(`DEFAULT_REQUEST_TIMEOUT_MSEC`),且**没有 client 级默认值设置**——`timeoutMs` 必须由本包在 connect 与**每次** `callTool` 上透传(长工具调用的唯一入口);不提供 per-call 覆盖。
 - **认证**:headers 透传(bearer 等)覆盖多数远程 server;OAuth 授权流助手裁出 v1(SDK 的 `authProvider` 不接线;裁它不缩小安装树,裁的是产品面)。
@@ -134,8 +134,8 @@ await client.close()    // HTTP 先 terminateSession(失败静默)→ client.clo
 - **ToolContext 消费**:`signal` → `callTool({ signal })` 直通(不额外预检);`toolCallId` / `runId` / `traceId` / `spanId` **不出网**(协议无对应位、v1 不注入 tracer),`requestContext` 不透传(远端进程读不到)。与 server 票的对称点写进文档:`toolCallId` 是本地身份,不承诺跨连接稳定;把 toolCallId 经 `_meta` / 自定义头送远端做关联不做(minor 位)。
 - **结果投影**:`structuredContent !== undefined` → **直接返回该值**(`ToolResultChunk.output` 是 `unknown`,任意 JSON 自然流通);否则 text 块按换行拼接;非 text 块(图片 / 音频 / resource link)降级为占位文本——工具结果通道没有多模态 part,是 v1 的诚实边界。`isError: true` → 抛错,由框架转成 `Tool 'x' failed: …` 错误结果回喂(与「三线归一」同一条路)。空结果返回 `''`。
 - **MRTR 姿态**:无 elicitation / sampling / roots handler,`inputRequired.autoFulfill: false` 显式钉死——远端的 `input_required` 变成确定性 `SdkError(UnsupportedResultType)` 回喂,而不是「没有 handler 的自动流程」。
-- **桥接工具的 schema**:「JSON Schema 直通」的 Standard Schema 包装(内部工厂,不公开导出)——工厂返回**显式标注 `StandardSchema<unknown, unknown>`** 的对象(注解不可省:字面量给不出 `~standard.types` 时核心推断落成 `never`);`vendor: 'balsats'`、`version: 1`、运行时 `types: { input: unknown, output: unknown }`;`~standard.validate(value, options?)` 永远**同步**返回 `{ value }`(忽略 options;校验在远端,失败经 execute 错误回喂);`~standard.jsonSchema.input({ target })` 返回远端 `inputSchema` 原文(**忽略 target**、同引用);`~standard.jsonSchema.output` **直接抛**(桥接 Tool 不承载 outputSchema,误触达即炸,不给假值)。wrapper 与 `~standard` 一并冻结。**目标版本边界**:远端 schema 常为 2020-12 而核心发 provider 的是 draft-07 子集——原样直通,框架不改写、不剥元字段;要 draft-07 就在远端侧改写。
-- **不挂 outputSchema**:桥接 Tool 的 `outputSchema` 缺省——远端与 SDK 客户端已按远端 outputSchema 校验 `structuredContent`(非 isError 结果缺它 → 抛 `InvalidRequest`、不合 → 抛 `InvalidParams`),Balsats 侧再挂只会得到「永不失败的 validate」假校验。代价:MCP→MCP 再导出丢 `structuredContent`、只出 text;保真诉求留 minor(显式 opt-in)。
+- **桥接工具的 schema**:「JSON Schema 直通」的 Standard Schema 包装(内部工厂,不公开导出)——工厂返回**显式标注 `StandardSchema<unknown, unknown>`** 的对象(注解不可省:字面量给不出 `~standard.types` 时核心推断落成 `never`);`vendor: 'oribos'`、`version: 1`、运行时 `types: { input: unknown, output: unknown }`;`~standard.validate(value, options?)` 永远**同步**返回 `{ value }`(忽略 options;校验在远端,失败经 execute 错误回喂);`~standard.jsonSchema.input({ target })` 返回远端 `inputSchema` 原文(**忽略 target**、同引用);`~standard.jsonSchema.output` **直接抛**(桥接 Tool 不承载 outputSchema,误触达即炸,不给假值)。wrapper 与 `~standard` 一并冻结。**目标版本边界**:远端 schema 常为 2020-12 而核心发 provider 的是 draft-07 子集——原样直通,框架不改写、不剥元字段;要 draft-07 就在远端侧改写。
+- **不挂 outputSchema**:桥接 Tool 的 `outputSchema` 缺省——远端与 SDK 客户端已按远端 outputSchema 校验 `structuredContent`(非 isError 结果缺它 → 抛 `InvalidRequest`、不合 → 抛 `InvalidParams`),Oribos 侧再挂只会得到「永不失败的 validate」假校验。代价:MCP→MCP 再导出丢 `structuredContent`、只出 text;保真诉求留 minor(显式 opt-in)。
 - **名冲突**:纯函数 helper `prefixTools(tools, prefix, separator = '_')`——返回新冻结 Record,键 = `prefix + separator + name`;execute 闭包内的远端名不变(**前缀不进 wire**),固定前缀是同构映射故不做冲突检测;不进 client 配置面。远端工具名**不在桥接层校验或清洗**(MCP 规范 SHOULD 允许 `.` 等,provider 各自更严——那是用户与 helper 的事)。
 
 ## 砍单与承载缝

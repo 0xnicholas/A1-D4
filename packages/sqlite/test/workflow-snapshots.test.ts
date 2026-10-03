@@ -7,8 +7,8 @@
  * deterministic.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WorkflowRunSnapshot } from '@balsats/core/workflows';
-import type { SqliteStorage } from '@balsats/sqlite';
+import type { WorkflowRunSnapshot } from '@oribos/core/workflows';
+import type { SqliteStorage } from '@oribos/sqlite';
 import { caught, memoryStorage, messageOf } from './helpers.js';
 
 /** A snapshot with the shape's full nesting: `unknown` payloads, iteration site, trace. */

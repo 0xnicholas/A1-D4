@@ -1,32 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createApp } from '@balsats/core';
-import type { App, AppConfig } from '@balsats/core';
-import { Agent } from '@balsats/core/agent';
-import type { AgentConfig } from '@balsats/core/agent';
+import { createApp } from '@oribos/core';
+import type { App, AppConfig } from '@oribos/core';
+import { Agent } from '@oribos/core/agent';
+import type { AgentConfig } from '@oribos/core/agent';
 import {
   createInMemoryAgentRunSnapshotStore,
-} from '@balsats/core/durable-agent';
-import type { AgentRunSnapshot, AgentRunSnapshotStore, DurableAgent } from '@balsats/core/durable-agent';
-import { createInMemoryStore, Memory } from '@balsats/core/memory';
-import { createInMemoryScheduleStore } from '@balsats/core/schedules';
-import type { ScheduleRecord, ScheduleStore, Schedules } from '@balsats/core/schedules';
-import type { Signals } from '@balsats/core/signals';
+} from '@oribos/core/durable-agent';
+import type { AgentRunSnapshot, AgentRunSnapshotStore, DurableAgent } from '@oribos/core/durable-agent';
+import { createInMemoryStore, Memory } from '@oribos/core/memory';
+import { createInMemoryScheduleStore } from '@oribos/core/schedules';
+import type { ScheduleRecord, ScheduleStore, Schedules } from '@oribos/core/schedules';
+import type { Signals } from '@oribos/core/signals';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
-import { createInMemorySnapshotStore, createStep } from '@balsats/core/workflows';
+} from '@oribos/core/observability';
+import { createInMemorySnapshotStore, createStep } from '@oribos/core/workflows';
 import type {
   StepContext,
   Workflow,
   WorkflowBuilder,
   WorkflowRunSnapshot,
   WorkflowSnapshotStore,
-} from '@balsats/core/workflows';
+} from '@oribos/core/workflows';
 import { expectAssignable, expectSuspended } from './helpers/assertions.js';
 import { INSTRUCTIONS } from './helpers/agent.js';
 import { fakeModel } from './helpers/fake-model.js';

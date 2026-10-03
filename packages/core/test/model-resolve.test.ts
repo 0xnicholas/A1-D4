@@ -4,7 +4,7 @@ import {
   ModelContractError,
   ModelSpecificationVersionError,
   assertModel,
-} from '@balsats/core/model';
+} from '@oribos/core/model';
 import { captureError } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 
@@ -41,7 +41,7 @@ describe('assertModel:specificationVersion 硬断言', () => {
     expect(error.message).toContain("'v3'");
     expect(error.message).toContain("'v4'");
     expect(error.message).toMatch(/upgrade the provider package/);
-    expect(error.message).toMatch(/downgrade @balsats\/core/);
+    expect(error.message).toMatch(/downgrade @oribos\/core/);
   });
 
   it('provider 包过新(v5):报错并指点升级框架或降级 provider 包', () => {
@@ -50,7 +50,7 @@ describe('assertModel:specificationVersion 硬断言', () => {
     expect(error).toBeInstanceOf(ModelSpecificationVersionError);
     expect(error.message).toContain("'v5'");
     expect(error.message).toContain("'v4'");
-    expect(error.message).toMatch(/upgrade @balsats\/core/);
+    expect(error.message).toMatch(/upgrade @oribos\/core/);
     expect(error.message).toMatch(/downgrade the provider package/);
   });
 
@@ -60,7 +60,7 @@ describe('assertModel:specificationVersion 硬断言', () => {
     expect(error).toBeInstanceOf(ModelSpecificationVersionError);
     expect(error.message).toContain("'next'");
     expect(error.message).toMatch(/upgrade the provider package/i);
-    expect(error.message).toMatch(/upgrade @balsats\/core/i);
+    expect(error.message).toMatch(/upgrade @oribos\/core/i);
   });
 
   it('同代但拼写不同的版本串按未知处理,同样给出两个方向的动作', () => {
@@ -69,7 +69,7 @@ describe('assertModel:specificationVersion 硬断言', () => {
     expect(error).toBeInstanceOf(ModelSpecificationVersionError);
     expect(error.message).toContain("'v4.1'");
     expect(error.message).toMatch(/upgrade the provider package/i);
-    expect(error.message).toMatch(/upgrade @balsats\/core/i);
+    expect(error.message).toMatch(/upgrade @oribos\/core/i);
   });
 
   it('缺 specificationVersion 的对象不是模型', () => {

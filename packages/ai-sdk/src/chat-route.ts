@@ -13,10 +13,10 @@
  * application's orchestration (call `durable.resume(runId, …)`; the example shows the pattern).
  */
 
-import type { Agent, AgentRunOptions, AgentStreamResult } from '@balsats/core/agent';
-import type { DurableAgent, DurableStreamResult } from '@balsats/core/durable-agent';
-import type { MemoryThreadRef } from '@balsats/core/memory';
-import type { Chunk, ModelFilePart, ModelTextPart } from '@balsats/core/model';
+import type { Agent, AgentRunOptions, AgentStreamResult } from '@oribos/core/agent';
+import type { DurableAgent, DurableStreamResult } from '@oribos/core/durable-agent';
+import type { MemoryThreadRef } from '@oribos/core/memory';
+import type { Chunk, ModelFilePart, ModelTextPart } from '@oribos/core/model';
 import type { AISdkFinishReason, AISdkSuspendedMetadata, AISdkStreamChunk } from './chunks.js';
 import { UI_MESSAGE_STREAM_HEADERS } from './headers.js';
 import { toAISdkStream } from './to-ai-sdk-stream.js';

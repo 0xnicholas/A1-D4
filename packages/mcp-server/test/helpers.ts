@@ -5,7 +5,7 @@
  * 2026-07-28 client sends (protocol revision is mandatory in both the header and the envelope).
  */
 import type { JSONRPCMessage, Transport } from '@modelcontextprotocol/server';
-import type { McpServer } from '@balsats/mcp-server';
+import type { McpServer } from '@oribos/mcp-server';
 
 export interface JsonRpcRequest {
   readonly jsonrpc: '2.0';
@@ -63,7 +63,7 @@ export function withEnvelope(params: Record<string, unknown>): Record<string, un
     ...params,
     _meta: {
       'io.modelcontextprotocol/protocolVersion': '2026-07-28',
-      'io.modelcontextprotocol/clientInfo': { name: 'balsats-test', version: '0.0.0' },
+      'io.modelcontextprotocol/clientInfo': { name: 'oribos-test', version: '0.0.0' },
       'io.modelcontextprotocol/clientCapabilities': {},
     },
   };
@@ -81,7 +81,7 @@ export function sendWire(transport: Transport, request: JsonRpcRequest): Promise
 export function initializeRequest(id = 1): JsonRpcRequest {
   return rpc(
     'initialize',
-    { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'balsats-test', version: '0.0.0' } },
+    { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'oribos-test', version: '0.0.0' } },
     id,
   );
 }

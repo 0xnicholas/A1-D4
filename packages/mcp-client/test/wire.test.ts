@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { SdkError, SdkErrorCode } from '@modelcontextprotocol/client';
-import { createMcpClient } from '@balsats/mcp-client';
+import { createMcpClient } from '@oribos/mcp-client';
 import { serveLegacy, toolContext, toolOf } from './helpers.js';
 
 const TOOLS = [{ name: 'alpha', description: 'First', inputSchema: { type: 'object', properties: {} } }];
@@ -30,7 +30,7 @@ describe('createMcpClient era postures and identity', () => {
       const initialize = served.calls.find((call) => call.jsonRpc?.method === 'initialize');
       expect(initialize).toBeDefined();
       expect(initialize?.jsonRpc?.params?.clientInfo).toEqual({
-        name: '@balsats/mcp-client',
+        name: '@oribos/mcp-client',
         version: packageVersion(),
       });
       expect(Object.keys(client.tools)).toEqual(['alpha']);

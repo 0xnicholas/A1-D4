@@ -10,7 +10,7 @@ import type {
   StandardSchema,
   StandardSchemaV1,
   StandardTypedV1,
-} from '@balsats/core/tools';
+} from '@oribos/core/tools';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

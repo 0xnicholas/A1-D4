@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Agent } from '@balsats/core/agent';
-import type { AgentMemoryOptions, ProcessInputArgs, RequestContext } from '@balsats/core/agent';
-import { Memory, createInMemoryStore } from '@balsats/core/memory';
-import type { MemoryStore, SaveMessage } from '@balsats/core/memory';
-import { createTool } from '@balsats/core/tools';
+import { Agent } from '@oribos/core/agent';
+import type { AgentMemoryOptions, ProcessInputArgs, RequestContext } from '@oribos/core/agent';
+import { Memory, createInMemoryStore } from '@oribos/core/memory';
+import type { MemoryStore, SaveMessage } from '@oribos/core/memory';
+import { createTool } from '@oribos/core/tools';
 import { captureRejection } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 

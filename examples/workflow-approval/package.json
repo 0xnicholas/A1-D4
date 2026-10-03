@@ -1,8 +1,8 @@
 {
-  "name": "@balsats/example-workflow-approval",
+  "name": "@oribos/example-workflow-approval",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsats workflow example: an expense report walks an approval gate (suspend → snapshot → resume).",
+  "description": "Oribos workflow example: an expense report walks an approval gate (suspend → snapshot → resume).",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsats/core": "workspace:*",
+    "@oribos/core": "workspace:*",
     "zod": "^4.6.5"
   }
 }

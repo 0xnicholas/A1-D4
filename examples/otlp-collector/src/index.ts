@@ -1,26 +1,26 @@
 /**
- * Balsats otlp-collector example — a traced agent run lands in a local OTLP collector as GenAI
+ * Oribos otlp-collector example — a traced agent run lands in a local OTLP collector as GenAI
  * semconv spans.
  *
  * One script, no external services: a **local collector** (`node:http`) plays the OTLP backend —
  * Langfuse / LangSmith / any OTel collector speak the same wire — a **scripted model** (defined in
- * this file: no API key, no network) drives a real agent run, and `@balsats/otlp` ships the run's
+ * this file: no API key, no network) drives a real agent run, and `@oribos/otlp` ships the run's
  * spans over OTLP/JSON.
  *
  * 1. **The run is traced** — `createApp({ tracer })` distributes the tracer to the desk agent;
  *    the run produces the framework's automatic spans: `agent-run` → `agent-step` → `tool-call`.
- * 2. **The collector receives semconv, not Balsats shapes** — the kernel's own span model never
- *    leaves the process: the `@balsats/otlp` exporter rebuilds every span for backends —
+ * 2. **The collector receives semconv, not Oribos shapes** — the kernel's own span model never
+ *    leaves the process: the `@oribos/otlp` exporter rebuilds every span for backends —
  *    `invoke_agent refund-desk`, `chat scripted-mini` (CLIENT kind; `gen_ai.*` request / usage /
  *    response attributes; messages as parts), `execute_tool checkOrder` (arguments / result) —
- *    plus `balsats.span.type` / `balsats.run_id` for Balsats-side correlation.
+ *    plus `oribos.span.type` / `oribos.run_id` for Oribos-side correlation.
  * 3. **The failure face** — with the collector unreachable the run still completes: `export()`
  *    never throws. Only an explicit `flush()` surfaces the transport failure, straight from the
  *    official exporter stack.
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   pnpm --filter @balsats/example-otlp-collector start
+ *   pnpm --filter @oribos/example-otlp-collector start
  *
  * The collector endpoint defaults to this script's local collector; export
  * `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) to point the exporter at
@@ -34,11 +34,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createApp } from '@balsats/core';
-import { createTracer } from '@balsats/core/observability';
-import { createTool } from '@balsats/core/tools';
-import type { Model, ModelStreamPart } from '@balsats/core/model';
-import { createOtlpExporter } from '@balsats/otlp';
+import { createApp } from '@oribos/core';
+import { createTracer } from '@oribos/core/observability';
+import { createTool } from '@oribos/core/tools';
+import type { Model, ModelStreamPart } from '@oribos/core/model';
+import { createOtlpExporter } from '@oribos/otlp';
 import { z } from 'zod';
 
 // ── The scripted model: two turns — ask for the tool, then answer ────────────────────────────────
@@ -244,7 +244,7 @@ function printSpans(spans: readonly CollectedSpan[]): void {
     const parent = span.parentSpanId === undefined ? 'root' : span.parentSpanId.slice(0, 8);
     console.log(`  ${span.name.padEnd(28)} kind=${span.kind}  trace=${span.traceId.slice(0, 8)}  parent=${parent}`);
     const interesting = Object.entries(span.attributes).filter(([key]) =>
-      key.startsWith('gen_ai.') || key.startsWith('balsats.'),
+      key.startsWith('gen_ai.') || key.startsWith('oribos.'),
     );
     for (const [key, value] of interesting) {
       const text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -292,8 +292,8 @@ async function main(): Promise<void> {
     assert.equal(tool.parentSpanId, chats[0]!.spanId, 'tool-call hangs under the step that asked');
 
     // The contract's payoff attributes — the shape Langfuse / LangSmith / OTel backends read.
-    assert.equal(root.attributes['balsats.span.type'], 'agent-run');
-    assert.equal(typeof root.attributes['balsats.run_id'], 'string', 'runId rides the root span');
+    assert.equal(root.attributes['oribos.span.type'], 'agent-run');
+    assert.equal(typeof root.attributes['oribos.run_id'], 'string', 'runId rides the root span');
 
     const firstChat = chats[0]!;
     assert.equal(firstChat.kind, 3, 'agent-step maps to OTLP CLIENT kind');
@@ -320,7 +320,7 @@ async function main(): Promise<void> {
       tool.attributes['gen_ai.tool.call.result'],
       '{"orderId":"A-4471","eligible":true,"reason":"duplicate charge"}',
     );
-    console.log('  ✓ span tree, kinds, and gen_ai.* / balsats.* attributes all asserted');
+    console.log('  ✓ span tree, kinds, and gen_ai.* / oribos.* attributes all asserted');
 
     // ── Act 2: the failure face — a dead collector never breaks the run ────────────────────────
     console.log('\n──────── Act 2 — the collector is unreachable; the run still completes ────────');

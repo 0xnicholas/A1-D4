@@ -1,11 +1,11 @@
 {
   "metric": "esbuild-minified-bytes",
   "entries": {
-    ".": 49371,
-    "./model": 3949,
-    "./agent": 20080,
+    ".": 49367,
+    "./model": 3945,
+    "./agent": 20076,
     "./tools": 224,
-    "./observability": 5343,
+    "./observability": 5342,
     "./workflows": 17368,
     "./memory": 5193,
     "./signals": 5160,

@@ -8,7 +8,7 @@
  * Records are JSON text: `target` is always JSON; `timezone` is a plain string column; `metadata`
  * absent is SQL NULL and stays an absent field on the way back.
  */
-import type { ScheduleListQuery, ScheduleRecord, ScheduleStore } from '@balsats/core/schedules';
+import type { ScheduleListQuery, ScheduleRecord, ScheduleStore } from '@oribos/core/schedules';
 import type { SqliteLifecycle } from './connection.js';
 import { decodeJson, encodeJson } from './connection.js';
 

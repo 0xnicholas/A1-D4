@@ -2,9 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@balsats/core": ["../../packages/core/src/index.ts"],
-      "@balsats/core/*": ["../../packages/core/src/*/index.ts"],
-      "@balsats/croner": ["./src/index.ts"]
+      "@oribos/core": ["../../packages/core/src/index.ts"],
+      "@oribos/core/*": ["../../packages/core/src/*/index.ts"],
+      "@oribos/croner": ["./src/index.ts"]
     }
   },
   "include": ["src", "test"]

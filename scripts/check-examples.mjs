@@ -12,7 +12,7 @@
 // 接入新案只需往 CASES 加行(不改运行器)——条目 = 一条命令 + 可选 env + 可选超时,将来带 mock 的
 // 三个例(本地 mock 端点 + `OPENAI_API_KEY=mock`)与需真 key 的例都走同一形状:
 //
-//   { name: 'sqlite-resume', cmd: 'pnpm', args: ['--filter', '@balsats/example-sqlite-resume', 'start'],
+//   { name: 'sqlite-resume', cmd: 'pnpm', args: ['--filter', '@oribos/example-sqlite-resume', 'start'],
 //     env: { OPENAI_API_KEY: 'mock', OPENAI_BASE_URL: 'http://127.0.0.1:11434/v1' } }
 //
 // 自测只走 `--cases <文件>` 这唯一缝(注入案表),见 packages/core/test/check-examples.test.ts。
@@ -28,13 +28,13 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 
 /** 内建案表:四个离线入口 / 三个 example(HTTP 与 stdio 是 mcp-tools 的两个入口)。 */
 const CASES = [
-  { name: 'cron-schedule', cmd: 'pnpm', args: ['--filter', '@balsats/example-cron-schedule', 'start'] },
-  { name: 'otlp-collector', cmd: 'pnpm', args: ['--filter', '@balsats/example-otlp-collector', 'start'] },
-  { name: 'mcp-tools-http', cmd: 'pnpm', args: ['--filter', '@balsats/example-mcp-tools', 'start'] },
+  { name: 'cron-schedule', cmd: 'pnpm', args: ['--filter', '@oribos/example-cron-schedule', 'start'] },
+  { name: 'otlp-collector', cmd: 'pnpm', args: ['--filter', '@oribos/example-otlp-collector', 'start'] },
+  { name: 'mcp-tools-http', cmd: 'pnpm', args: ['--filter', '@oribos/example-mcp-tools', 'start'] },
   {
     name: 'mcp-tools-stdio',
     cmd: 'pnpm',
-    args: ['--filter', '@balsats/example-mcp-tools', 'start'],
+    args: ['--filter', '@oribos/example-mcp-tools', 'start'],
     env: { MCP_TRANSPORT: 'stdio' },
   },
 ];

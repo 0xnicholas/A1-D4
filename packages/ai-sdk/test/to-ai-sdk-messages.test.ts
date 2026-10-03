@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ModelMessage } from '@balsats/core/model';
-import type { StoredMessage } from '@balsats/core/memory';
-import { toAISdkMessages } from '@balsats/ai-sdk';
+import type { ModelMessage } from '@oribos/core/model';
+import type { StoredMessage } from '@oribos/core/memory';
+import { toAISdkMessages } from '@oribos/ai-sdk';
 
 function stored(message: ModelMessage, id: string): StoredMessage {
   return { ...message, id, threadId: 't-1', resourceId: 'r-1', createdAt: new Date(0) };

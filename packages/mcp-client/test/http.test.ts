@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { inputRequired } from '@modelcontextprotocol/server';
 import { SdkError, SdkErrorCode } from '@modelcontextprotocol/client';
-import { createMcpClient } from '@balsats/mcp-client';
+import { createMcpClient } from '@oribos/mcp-client';
 import { neverAnswers, serveSdkServer, sleep, toolContext, toolOf, type Served } from './helpers.js';
 
 /** Captures a rejection (or a resolution's absence) as a value for asserting on. */

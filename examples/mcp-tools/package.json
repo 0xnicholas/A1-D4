@@ -1,8 +1,8 @@
 {
-  "name": "@balsats/example-mcp-tools",
+  "name": "@oribos/example-mcp-tools",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsats MCP paired example: serve a tool container with @balsats/mcp-server, bridge it back with @balsats/mcp-client, assert the round-trip.",
+  "description": "Oribos MCP paired example: serve a tool container with @oribos/mcp-server, bridge it back with @oribos/mcp-client, assert the round-trip.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -13,9 +13,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@balsats/core": "workspace:*",
-    "@balsats/mcp-client": "workspace:*",
-    "@balsats/mcp-server": "workspace:*",
+    "@oribos/core": "workspace:*",
+    "@oribos/mcp-client": "workspace:*",
+    "@oribos/mcp-server": "workspace:*",
     "zod": "^4.6.5"
   }
 }

@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/agent` — agent core.
+ * `@oribos/core/agent` — agent core.
  *
  * Five-field surface, dynamic arguments and RequestContext, dual-consumption output object,
  * built-in loop, processors, structured output, and as-tool composition.

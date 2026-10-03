@@ -165,9 +165,9 @@ interface WorkflowSnapshotStore {
 | **B6** `resumeData` 只给被点名的那一次执行 | 需要广播 → 显式走 `getStepResult` / 参数管道 | 有意分叉 | 记录回放模型下数据归属明确;无「广播给兄弟臂 / 后续迭代」语义(ADR-0006) |
 | **B7** 快照 = 固定五字段 + 可选 `traceId` / `iterationSite` | `iterationSite` 承载块内现场(`CONTEXT.md` 迭代现场) | 有意分叉 | 最小可判 JSON 快照;快照是库语义不是历史(只留最新一份)(ADR-0006 / 0010) |
 | **B8** 无 `suspendedPaths` / `serializedStepGraph` 路径模型 | 位置 = 扁平 `position` + `iterationSite`(下「CUT-W9」行互引) | 有意分叉 | 不建路径模型——`suspendedPaths` 式多路径挂起模型在 `CONTEXT.md` 记 _Avoid_(ADR-0006) |
-| **CUT-W9** resume CAS / serializedStepGraph / 多引擎适配 | **已兑现段**:CAS 已落为 adapter 可选扩展(`compareAndSave`,`@balsats/sqlite` 已实现);**两件指针**:`serializedStepGraph` 随「B8 不建路径模型」,多引擎 → 外部 runner 能力包 | 已兑现 + 有意分叉 | 三件已分流:一件已兑现(ADR-0010)、一件随 B8 分叉、一件是能力包方向(ADR-0006) |
+| **CUT-W9** resume CAS / serializedStepGraph / 多引擎适配 | **已兑现段**:CAS 已落为 adapter 可选扩展(`compareAndSave`,`@oribos/sqlite` 已实现);**两件指针**:`serializedStepGraph` 随「B8 不建路径模型」,多引擎 → 外部 runner 能力包 | 已兑现 + 有意分叉 | 三件已分流:一件已兑现(ADR-0010)、一件随 B8 分叉、一件是能力包方向(ADR-0006) |
 | **CUT-W7** time-travel / restart / restartAll | `load` → 重进原语,**需先截断该位之后的记录**;durable 侧重启归 Harness | 有意分叉 | 调试 / 审计场景非 v1 判据;records-first 回放决定它不是「薄变种」(ADR-0006 / 0011);延后清单「time-travel / restart」 |
-| **CUT-W8** shouldPersistSnapshot / prune 钩子 | 固定 step 边界写;保留期清理 = adapter 扩展(`deleteSnapshot` / `listSnapshots`,`@balsats/sqlite` 已落) | 有意分叉 | 固定边界写是良定义策略;保留期策略归 adapter(ADR-0006 / 0010) |
+| **CUT-W8** shouldPersistSnapshot / prune 钩子 | 固定 step 边界写;保留期清理 = adapter 扩展(`deleteSnapshot` / `listSnapshots`,`@oribos/sqlite` 已落) | 有意分叉 | 固定边界写是良定义策略;保留期策略归 adapter(ADR-0006 / 0010) |
 | **B2** `retries` = 额外尝试数 + 固定 1000ms + 可打断 | backoff 策略对象已留扩展位;重试只包 `execute` | 有意分叉 | 最多 `retries + 1` 次最直观;固定间隔 = 最小配置、无退避矩阵;等待可打断 = abort 一致语义(ADR-0006) |
 | **B3** `sleep` 动态时长收 `RequestContext` | 需要上一步输出算时长 → 显式传参 / 内联 step 计算 | 有意分叉 | 全字段统一动态参数口径(`T \| ((ctx) => T)`);`RequestContext` 是唯一解析上下文(ADR-0006 / 0005) |
 | **CUT-W11** durable sleep / 长延时等待 | **宿主平台 cron / `tick` → 应用 `listSnapshots` + `resume`**(`ScheduleTarget` 只收 agent / signal,workflows 无调度目标) | 有意分叉 | 核心 `.sleep` = `setTimeout`,非 durable;与 `harness.md`「CUT-H8 durable sleep」行互引(ADR-0006 / 0011) |

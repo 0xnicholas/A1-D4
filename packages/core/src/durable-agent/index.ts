@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/durable-agent` — durable agents (one of the three harness subsystems).
+ * `@oribos/core/durable-agent` — durable agents (one of the three harness subsystems).
  *
  * `createDurableAgent({ agent, storage?, approval? })`: the agent wrapped so a run may suspend at a
  * tool-calling boundary — the model's calls are known, none has executed yet, and one of them hits

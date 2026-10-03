@@ -1,7 +1,7 @@
 {
-  "name": "@balsats/otlp",
+  "name": "@oribos/otlp",
   "version": "0.5.0",
-  "description": "Balsats OTLP exporter — spans to GenAI semconv shape over OTLP/HTTP (protobuf or JSON), official OpenTelemetry exporter stack underneath.",
+  "description": "Oribos OTLP exporter — spans to GenAI semconv shape over OTLP/HTTP (protobuf or JSON), official OpenTelemetry exporter stack underneath.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -31,17 +31,17 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xnicholas/balsats-framework.git",
+    "url": "git+https://github.com/0xnicholas/oribos-framework.git",
     "directory": "packages/otlp"
   },
   "publishConfig": {
     "access": "public"
   },
   "peerDependencies": {
-    "@balsats/core": "workspace:^"
+    "@oribos/core": "workspace:^"
   },
   "devDependencies": {
-    "@balsats/core": "workspace:*"
+    "@oribos/core": "workspace:*"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",

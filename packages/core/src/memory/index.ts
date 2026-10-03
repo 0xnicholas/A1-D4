@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/memory` — memory subsystem.
+ * `@oribos/core/memory` — memory subsystem.
  *
  * Thread/resource identity, message history (recall), working memory, the storage port, and its
  * in-memory default implementation.

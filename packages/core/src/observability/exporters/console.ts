@@ -24,7 +24,7 @@ export function consoleExporter(options: ConsoleExporterOptions = {}): Observabi
 function formatEvent(event: TracingEvent): string[] {
   const span = event.span;
   const header = [
-    `[balsats] ${event.kind}`,
+    `[oribos] ${event.kind}`,
     `${span.type} "${span.name}"`,
     `id=${span.id}`,
     `trace=${span.traceId}`,

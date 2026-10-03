@@ -6,9 +6,9 @@
  * `messages` foreign key that the reference does not have.
  */
 import { describe, expect, it } from 'vitest';
-import { supportsWorkingMemory } from '@balsats/core/memory';
-import type { StoredMessage, StoredThread } from '@balsats/core/memory';
-import type { SqliteStorage } from '@balsats/sqlite';
+import { supportsWorkingMemory } from '@oribos/core/memory';
+import type { StoredMessage, StoredThread } from '@oribos/core/memory';
+import type { SqliteStorage } from '@oribos/sqlite';
 import { caught, memoryStorage, messageOf } from './helpers.js';
 
 function thread(

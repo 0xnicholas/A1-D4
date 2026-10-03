@@ -20,14 +20,14 @@
     "skipLibCheck": true,
     "types": ["node"],
     "paths": {
-      "@balsats/core": ["./packages/core/src/index.ts"],
-      "@balsats/core/*": ["./packages/core/src/*/index.ts"],
-      "@balsats/ai-sdk": ["./packages/ai-sdk/src/index.ts"],
-      "@balsats/croner": ["./packages/croner/src/index.ts"],
-      "@balsats/mcp-client": ["./packages/mcp-client/src/index.ts"],
-      "@balsats/mcp-server": ["./packages/mcp-server/src/index.ts"],
-      "@balsats/otlp": ["./packages/otlp/src/index.ts"],
-      "@balsats/sqlite": ["./packages/sqlite/src/index.ts"]
+      "@oribos/core": ["./packages/core/src/index.ts"],
+      "@oribos/core/*": ["./packages/core/src/*/index.ts"],
+      "@oribos/ai-sdk": ["./packages/ai-sdk/src/index.ts"],
+      "@oribos/croner": ["./packages/croner/src/index.ts"],
+      "@oribos/mcp-client": ["./packages/mcp-client/src/index.ts"],
+      "@oribos/mcp-server": ["./packages/mcp-server/src/index.ts"],
+      "@oribos/otlp": ["./packages/otlp/src/index.ts"],
+      "@oribos/sqlite": ["./packages/sqlite/src/index.ts"]
     },
     "noEmit": true
   }

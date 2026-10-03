@@ -1,30 +1,32 @@
-# Balsats
+# Oribos
 
 Ultralight TypeScript agent framework. Compose only what you use — run anywhere, no runtime baggage.
 
-> **Balsats** is the umbrella brand; this repository — **balsats-framework** — is its framework
-> subproject. Packages publish under the `@balsats/*` scope (starting with `@balsats/core`), and future
+> **Oribos** is the umbrella brand; this repository — **oribos-framework** — is its framework
+> subproject. Packages publish under the `@oribos/*` scope (starting with `@oribos/core`), and future
 > subprojects live alongside it.
 
 > **Status:** pre-1.0. Agents, memory, workflows, the harness trio — durable agents, signals,
 > schedules — and the six M5 capability packages are implemented and verified
-> ([roadmap](docs/ROADMAP.md)). **0.5.0 is published**: all seven `@balsats/*` packages are on npm
+> ([roadmap](docs/ROADMAP.md)). **0.5.0 is published**: all seven packages are on npm
 > ([`@balsats/core`](https://www.npmjs.com/package/@balsats/core) plus the six capability
-> packages), out together under a single `v0.5.0` tag. It carries all of M1–M5, which is
-> everything this README describes; 0.1.0 / 0.2 / 0.3 are **not** published separately. Install the
-> published packages with the command below, and see
-> [Capability packages](#capability-packages-m5) for the core-external packages.
+> packages), out together under a single `v0.5.0` tag — released under the then-current
+> `@balsats/*` scope, before the project took the name Oribos. It carries all of M1–M5, which is
+> everything this README describes; 0.1.0 / 0.2 / 0.3 are **not** published separately. The
+> `@oribos/*` scope, together with the OTel attribute family, environment-variable prefix and
+> service name, ships with the next release ([ADR-0013](docs/adr/0013-naming-and-branding.md)).
+> See [Capability packages](#capability-packages-m5) for the core-external packages.
 
-## Why Balsats
+## Why Oribos
 
-Balsats's differentiating axis is **lightweight**, in two precise senses:
+Oribos's differentiating axis is **lightweight**, in two precise senses:
 
 - **Compose only what you use.** Every subsystem ships behind its own subpath export
-  (`@balsats/core/agent`, `/tools`, `/memory`, `/workflows`, …). What you don't import costs you
+  (`@oribos/core/agent`, `/tools`, `/memory`, `/workflows`, …). What you don't import costs you
   nothing — not in the dependency tree (the core has zero runtime dependencies), not in concept
   space.
 - **No runtime burden.** No database, queue, or long-running process is required. Storage ports
-  default to in-memory implementations, and Balsats embeds in your application instead of taking it
+  default to in-memory implementations, and Oribos embeds in your application instead of taking it
   over.
 
 A small mental surface runs through everything: an agent is a handful of fields, a tool is four,
@@ -40,9 +42,11 @@ from the AI SDK provider ecosystem — no adapters, no registries.
 ## Install
 
 ```bash
-npm install @balsats/core zod @ai-sdk/openai
+npm install @oribos/core zod @ai-sdk/openai
 ```
 
+This is the install line from the next release on. Until `@oribos/*` is out, the published 0.5.0
+packages are installed under the previous scope: `npm install @balsats/core zod @ai-sdk/openai`.
 See [Status](#status) for what 0.5.0 covers. To work on this repo itself, follow
 [Development](#development).
 
@@ -50,8 +54,8 @@ See [Status](#status) for what 0.5.0 covers. To work on this repo itself, follow
 
 ```ts
 import { openai } from '@ai-sdk/openai';
-import { Agent } from '@balsats/core/agent';
-import { createTool } from '@balsats/core/tools';
+import { Agent } from '@oribos/core/agent';
+import { createTool } from '@oribos/core/tools';
 import { z } from 'zod';
 
 // A tool is a four-field plain object — description, optional inputSchema / outputSchema,
@@ -73,7 +77,7 @@ const agent = new Agent({
   tools: { weather },
 });
 
-// One run, two consumption styles on the same object: `for await` streams Balsats's own chunk
+// One run, two consumption styles on the same object: `for await` streams Oribos's own chunk
 // protocol; the terminal values (text, usage, steps, finishReason) are awaited on it.
 const result = agent.stream('What is the weather in Paris right now?');
 
@@ -98,7 +102,7 @@ Every configuration field is a **dynamic argument**: it accepts either a value `
 Each subsystem lives behind its own subpath export — pull in only the ones you use. The
 [package surface](#package-surface) table below is the full import map.
 
-### Agents — `@balsats/core/agent`
+### Agents — `@oribos/core/agent`
 
 `Agent` wraps a model, instructions, and tools into something you can `generate()` / `stream()`.
 Cross-cutting concerns — guardrails, redaction, rate limiting, evals — live in exactly one place:
@@ -107,10 +111,10 @@ declaration order. Multi-agent collaboration is **as-tool composition**: wrap on
 tool and hang it on another; delegation is an ordinary tool call, and there is no supervisor
 protocol or sub-agent concept in the core.
 
-### Memory — `@balsats/core/memory`
+### Memory — `@oribos/core/memory`
 
 ```ts
-import { Memory, createInMemoryStore } from '@balsats/core/memory';
+import { Memory, createInMemoryStore } from '@oribos/core/memory';
 
 const memory = new Memory({ storage: createInMemoryStore() });
 const agent = new Agent({ name, instructions, model, memory });
@@ -130,10 +134,10 @@ next conversation of that user, in any thread, starts already knowing their prof
 through a port with an in-memory default; swapping in a persistent adapter changes nothing above
 the port.
 
-### Workflows — `@balsats/core/workflows`
+### Workflows — `@oribos/core/workflows`
 
 ```ts
-import { createStep, createWorkflow } from '@balsats/core/workflows';
+import { createStep, createWorkflow } from '@oribos/core/workflows';
 
 const workflow = createWorkflow({ id: 'expense-approval', inputSchema, outputSchema })
   .foreach(checkItem, { concurrency: 2 })
@@ -163,11 +167,11 @@ boundary (start input, step input, resume data) is validated against its Standar
 `suspend` / `resume` rest on JSON snapshots at step boundaries, persisted through a storage port
 (in-memory by default).
 
-### Observability — `@balsats/core/observability`
+### Observability — `@oribos/core/observability`
 
 ```ts
-import { createApp } from '@balsats/core';
-import { consoleExporter, createTracer } from '@balsats/core/observability';
+import { createApp } from '@oribos/core';
+import { consoleExporter, createTracer } from '@oribos/core/observability';
 
 // The composition root is an optional thin assembly point: one tracer assembled here is
 // handed to every agent built through the app — no per-agent wiring.
@@ -175,23 +179,23 @@ const app = createApp({ tracer: createTracer({ exporters: [consoleExporter()] })
 const agent = app.agent({ name, instructions, model, tools });
 ```
 
-Balsats has its own minimal span model (not OTel): every agent run, model step, tool call, workflow
+Oribos has its own minimal span model (not OTel): every agent run, model step, tool call, workflow
 run/step, and memory recall/save is traced, with console and memory exporters built in. OTLP
 (GenAI semantic conventions) ships as a separate capability package. A standalone
 `new Agent({ … })` with no app and no tracer stays fully first-class — zero overhead, no span
 objects.
 
-### Signals — `@balsats/core/signals`
+### Signals — `@oribos/core/signals`
 
 `createSignals({ agent, memory? })` is the thread-directed interaction primitive: inject user input
 into an active run, wake an idle thread into a new run, or queue in order — injected content lands
 in the message history. Single-process semantics; cross-instance distribution belongs to capability
 packages.
 
-### Durable agents — `@balsats/core/durable-agent`
+### Durable agents — `@oribos/core/durable-agent`
 
 ```ts
-import { createDurableAgent } from '@balsats/core/durable-agent';
+import { createDurableAgent } from '@oribos/core/durable-agent';
 
 // The agent wrapped so a run can stop and wait for a human: a tool call whose name is on the
 // approval list does not execute — the run suspends with its loop snapshot written to a port.
@@ -207,10 +211,10 @@ core stays permission-free. Snapshots are JSON-only and go through `AgentRunSnap
 one human interaction stays one trace. Crash recovery, multi-replica leases and a resumable stream
 are deliberately not core.
 
-### Schedules — `@balsats/core/schedules`
+### Schedules — `@oribos/core/schedules`
 
 ```ts
-import { createSchedules } from '@balsats/core/schedules';
+import { createSchedules } from '@oribos/core/schedules';
 
 const schedules = createSchedules({ agents: { desk: agent }, signals });
 await schedules.save({ id: 'morning-sweep', next: (from) => nextDailyAt(9, from), target: { … } });
@@ -227,34 +231,35 @@ parsing never enters the core. A trigger is either threadless (`agent.generate`)
 
 | Import path | What it gives you |
 | --- | --- |
-| `@balsats/core` | `createApp` — the optional composition root |
-| `@balsats/core/agent` | `Agent`, dynamic arguments, structured output, processors |
-| `@balsats/core/model` | the model contract and chunk protocol types |
-| `@balsats/core/tools` | `createTool` and the tool types |
-| `@balsats/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
-| `@balsats/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
-| `@balsats/core/observability` | `createTracer`, console / memory exporters, span types |
-| `@balsats/core/signals` | `createSignals` — inject / wake / queue on a thread |
-| `@balsats/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
-| `@balsats/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
+| `@oribos/core` | `createApp` — the optional composition root |
+| `@oribos/core/agent` | `Agent`, dynamic arguments, structured output, processors |
+| `@oribos/core/model` | the model contract and chunk protocol types |
+| `@oribos/core/tools` | `createTool` and the tool types |
+| `@oribos/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
+| `@oribos/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
+| `@oribos/core/observability` | `createTracer`, console / memory exporters, span types |
+| `@oribos/core/signals` | `createSignals` — inject / wake / queue on a thread |
+| `@oribos/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
+| `@oribos/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
 
 ### Capability packages (M5)
 
-Capability packages that carry external dependencies ship as separate `@balsats/<capability>`
+Capability packages that carry external dependencies ship as separate `@oribos/<capability>`
 packages — install only what you use. All six are implemented and verified: unit tests in
 `pnpm verify`, five end-to-end examples covering all six (see [Examples](#examples)), and
 minified byte budgets plus dependency-closure baselines where there is a dependency to measure
-([roadmap](docs/ROADMAP.md), M5). All six ship in the `0.5.0` release — all seven `@balsats/*`
-packages went out together (see [Status](#status)):
+([roadmap](docs/ROADMAP.md), M5). All six ship in the `0.5.0` release — all seven packages went
+out together under the then-current `@balsats/*` scope, and publish as `@oribos/*` from the next
+release (see [Status](#status)):
 
 | Package | What it gives you | Spec |
 | --- | --- | --- |
-| `@balsats/otlp` | an OTLP exporter: Balsats spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
-| `@balsats/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
-| `@balsats/mcp-client` | another MCP server's tools, as Balsats tools | [tools.md](docs/architecture/tools.md) |
-| `@balsats/sqlite` | a SQLite adapter for all four storage ports | [storage.md](docs/architecture/storage.md) |
-| `@balsats/ai-sdk` | AI SDK UI message stream interop and a `useChat` route | [model.md](docs/architecture/model.md) |
-| `@balsats/croner` | cron expressions as the injected `next` function | [harness.md](docs/architecture/harness.md) |
+| `@oribos/otlp` | an OTLP exporter: Oribos spans mapped to GenAI semantic conventions | [observability.md](docs/architecture/observability.md) |
+| `@oribos/mcp-server` | your tools served over MCP (HTTP / stdio) | [tools.md](docs/architecture/tools.md) |
+| `@oribos/mcp-client` | another MCP server's tools, as Oribos tools | [tools.md](docs/architecture/tools.md) |
+| `@oribos/sqlite` | a SQLite adapter for all four storage ports | [storage.md](docs/architecture/storage.md) |
+| `@oribos/ai-sdk` | AI SDK UI message stream interop and a `useChat` route | [model.md](docs/architecture/model.md) |
+| `@oribos/croner` | cron expressions as the injected `next` function | [harness.md](docs/architecture/harness.md) |
 
 The bunfold memory bridge was evaluated and ruled out for now; its reopen conditions live in the
 roadmap's deferred list. Packaging and dependency-redline rules are in
@@ -266,8 +271,8 @@ Runnable, self-asserting examples live in [`examples/`](examples/). From the rep
 
 ```bash
 pnpm install
-pnpm build                  # examples consume @balsats/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-minimal-agent start
+pnpm build                  # examples consume @oribos/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-minimal-agent start
 ```
 
 Any OpenAI-compatible endpoint works too, e.g. a local Ollama:

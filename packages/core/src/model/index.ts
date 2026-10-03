@@ -1,5 +1,5 @@
 /**
- * `@balsats/core/model` — model layer.
+ * `@oribos/core/model` — model layer.
  *
  * The model contract (a minimal vendor subset of the AI SDK provider spec) and the chunk protocol,
  * plus the thin normalization layer that turns a model-native stream into chunks of the core's own

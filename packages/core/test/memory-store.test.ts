@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createInMemoryStore } from '@balsats/core/memory';
-import type { StoredMessage, StoredThread, WorkingMemoryStore } from '@balsats/core/memory';
-import type { ModelTextPart } from '@balsats/core/model';
+import { createInMemoryStore } from '@oribos/core/memory';
+import type { StoredMessage, StoredThread, WorkingMemoryStore } from '@oribos/core/memory';
+import type { ModelTextPart } from '@oribos/core/model';
 import { captureRejection } from './helpers/assertions.js';
 
 /**

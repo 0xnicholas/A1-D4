@@ -1,14 +1,14 @@
 /**
- * Balsats MCP paired example — one script, both capability packages.
+ * Oribos MCP paired example — one script, both capability packages.
  *
- * The server side (`@balsats/mcp-server`) serves a small tool container over MCP; the client side
- * (`@balsats/mcp-client`) connects and bridges the remote tools back into a `Record<string, Tool>`
+ * The server side (`@oribos/mcp-server`) serves a small tool container over MCP; the client side
+ * (`@oribos/mcp-client`) connects and bridges the remote tools back into a `Record<string, Tool>`
  * — the same shape an agent's tool container takes. The whole round-trip self-asserts with
  * `node:assert` (exit 0 on success; any failure exits 1).
  *
  * Run it (from the repo root, after `pnpm install && pnpm build`):
  *
- *   pnpm --filter @balsats/example-mcp-tools start
+ *   pnpm --filter @oribos/example-mcp-tools start
  *
  * Both transports are exercised:
  *
@@ -20,11 +20,11 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { createTool } from '@balsats/core/tools';
-import { createMcpClient, prefixTools } from '@balsats/mcp-client';
-import type { McpClient } from '@balsats/mcp-client';
-import { createMcpServer } from '@balsats/mcp-server';
-import type { Tool } from '@balsats/core/tools';
+import { createTool } from '@oribos/core/tools';
+import { createMcpClient, prefixTools } from '@oribos/mcp-client';
+import type { McpClient } from '@oribos/mcp-client';
+import { createMcpServer } from '@oribos/mcp-server';
+import type { Tool } from '@oribos/core/tools';
 import { z } from 'zod';
 
 // --- the shared tool container -------------------------------------------------------------
@@ -56,11 +56,11 @@ const failing = createTool({
 
 const container = { echo, weather, failing };
 
-const server = createMcpServer({ name: 'balsats-example-tools', version: '1.0.0', tools: container });
+const server = createMcpServer({ name: 'oribos-example-tools', version: '1.0.0', tools: container });
 
 // --- role split: stdio child mode ----------------------------------------------------------
 
-if (process.env.BALSATS_MCP_EXAMPLE_ROLE === 'stdio-server') {
+if (process.env.ORIBOS_MCP_EXAMPLE_ROLE === 'stdio-server') {
   server.serveStdio(); // stdin/stdout is the JSON-RPC channel; logs below go to stderr
   console.error('[mcp-tools] stdio server child up');
 } else {
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
           type: 'stdio' as const,
           command: process.execPath,
           args: ['--experimental-strip-types', fileURLToPath(import.meta.url)],
-          env: { BALSATS_MCP_EXAMPLE_ROLE: 'stdio-server' },
+          env: { ORIBOS_MCP_EXAMPLE_ROLE: 'stdio-server' },
         }
       : { type: 'http' as const, url: await serveHttp() };
 

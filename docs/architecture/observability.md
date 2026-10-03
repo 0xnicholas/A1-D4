@@ -105,13 +105,13 @@ tracer 存在时框架自动开 span,缺席时 NoOp 零开销:
 ## Exporter 清单
 
 - **核心包自带两个**:`console`(开发调试美化打印)与 `memory`(环形缓冲,测试/集成断言的抓手)。
-- **OTLP 能力包一个**(独立 npm 包 `@balsats/otlp`,沿 ADR-0002 M5 修订记):把 span 映射为 GenAI semconv 形状——`{operation} {model}` 命名、`gen_ai.operation.name / provider.name / request.model / usage.*` 属性、parts 格式消息;usage 只挂 `chat` span 防后端重复计数。transport 仅 HTTP/protobuf + HTTP/JSON,**不做 gRPC**(Langfuse 不收 gRPC,`@grpc/grpc-js` 依赖重);协议层依赖 OTel 官方 exporter 包,隔离在包边界。带 env-var 零配置 preset。设计冻结见下节「OTLP 能力包(M5 设计冻结)」。
+- **OTLP 能力包一个**(独立 npm 包 `@oribos/otlp`,沿 ADR-0002 M5 修订记):把 span 映射为 GenAI semconv 形状——`{operation} {model}` 命名、`gen_ai.operation.name / provider.name / request.model / usage.*` 属性、parts 格式消息;usage 只挂 `chat` span 防后端重复计数。transport 仅 HTTP/protobuf + HTTP/JSON,**不做 gRPC**(Langfuse 不收 gRPC,`@grpc/grpc-js` 依赖重);协议层依赖 OTel 官方 exporter 包,隔离在包边界。带 env-var 零配置 preset。设计冻结见下节「OTLP 能力包(M5 设计冻结)」。
 - **不做厂商专用 exporter**:Langfuse / LangSmith 均把裸 OTLP + `gen_ai.*` 当一等摄入路径,发标准形状即同时覆盖多家后端。
 - **OTel bridge**(复用进程内 OTel SDK 上下文):延后。mastra 同类包至今 experimental;记为地图 fog,路线图阶段判断。
 
 ## OTLP 能力包(M5 设计冻结)
 
-> 决策:wayfinder ticket #73(决策:OTLP exporter 能力包)。包名 `@balsats/otlp`(沿 ADR-0002 M5 修订记),对 `@balsats/core` 走 peer(`workspace:^`)、与全 `@balsats/*` 锁步发布;事实底座 = `docs/research/otlp-js-packages.md`(2026-09-30 实测,版本钉 `exporter-trace-otlp-{proto,http}@0.222.0` / `sdk-trace@2.11.0` / `resources@2.11.0` / `api@1.9.1`)。本节是冻结态:包面、依赖路线、三事件桥法与映射契约都不留实现期判断。
+> 决策:wayfinder ticket #73(决策:OTLP exporter 能力包)。包名 `@oribos/otlp`(沿 ADR-0002 M5 修订记),对 `@oribos/core` 走 peer(`workspace:^`)、与全 `@oribos/*` 锁步发布;事实底座 = `docs/research/otlp-js-packages.md`(2026-09-30 实测,版本钉 `exporter-trace-otlp-{proto,http}@0.222.0` / `sdk-trace@2.11.0` / `resources@2.11.0` / `api@1.9.1`)。本节是冻结态:包面、依赖路线、三事件桥法与映射契约都不留实现期判断。
 
 ### 包面
 
@@ -130,8 +130,8 @@ createOtlpExporter(options?: {
 
 - **配置优先级 = 显式选项 > env > 官方默认**。未给的项由官方 exporter 基座解析 env:`OTEL_EXPORTER_OTLP_{ENDPOINT,HEADERS,TIMEOUT,COMPRESSION,CERTIFICATE,CLIENT_CERTIFICATE,CLIENT_KEY}` + `..._TRACES_*` 特化(headers 合并、特化优先;通用 endpoint 自动拼 `v1/traces`);url 缺省 `http://localhost:4318/v1/traces`。
 - **`protocol` 是本包自己的 env 面**:官方两个 exporter 包都不读 `OTEL_EXPORTER_OTLP_PROTOCOL`(协议 = 选包),本包读它做选包,显式选项优先。
-- **resource(必填,官方 transformer 缺它直接抛)**:`service.name` 合并序 `'balsats'` < `OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES` < `serviceName` 选项 < `resourceAttributes` 选项(后者整体覆盖);**不发 `telemetry.sdk.*`**——本包没走 OTel SDK,不冒领。
-- `instrumentationScope = { name: '@balsats/otlp' }`(不带 version,免锁步版本漂移)。
+- **resource(必填,官方 transformer 缺它直接抛)**:`service.name` 合并序 `'oribos'` < `OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES` < `serviceName` 选项 < `resourceAttributes` 选项(后者整体覆盖);**不发 `telemetry.sdk.*`**——本包没走 OTel SDK,不冒领。
+- `instrumentationScope = { name: '@oribos/otlp' }`(不带 version,免锁步版本漂移)。
 - **`flush()` → 批处理器 `forceFlush()`;`shutdown()` → `shutdown()`**,原样透传(框架 tracer 的同名方法转发到这里)。
 - **失败面**:`export()` 只入队、永不抛;队列满静默丢、导出失败静默(官方批处理器语义),诊断走 OTel diag(`diag.setLogger`)。不自研重试 / 日志 / `onError` 回调——可重试状态(429/502/503/504 + `Retry-After`)、超时、并发是官方 exporter 基座职责。
 - **不重复的核心面**:`hideInput` / `hideOutput`(上游 trace 级已擦,exporter 永远看不到)、`spanProcessors`(核心已跑完)、采样(合成 span 的 `traceFlags` 恒 `SAMPLED`——到包里的必然已通过 root 采样)。
@@ -139,7 +139,7 @@ createOtlpExporter(options?: {
 ### 依赖路线
 
 - **路线 = 官方 exporter 包 + 官方批处理器**(调研 §7 路线①):直接依赖 `@opentelemetry/exporter-trace-otlp-proto` / `-http`(双协议)、`@opentelemetry/sdk-trace`(`BatchSpanProcessor`)、`@opentelemetry/resources`(`resourceFromAttributes` + env 检测器)、`@opentelemetry/api`(`SpanKind` / `SpanStatusCode` / `TraceFlags`);五件全部**精确钉版本**并以 `dependencies` 声明(exporter 系列走 0.x 且对 SDK 用精确版本;`api` 作直接依赖,免 peer 解析面)。
-- **安装树实测 12 包 / 19,312,287 B(≈18.42 MiB unpacked)**:`semantic-conventions` 单包 12.0 MB(62%,`core` / `resources` / `sdk-trace` 的传递依赖,无法从树里移除)、`sdk-metrics` + `sdk-logs` + `api-logs` ≈2.67 MB(transformer 同时编码三信号)。数字口径归 `deps-budget.json` 黄灯(实施图落基线,#72);`@balsats/core` peer 豁免。
+- **安装树实测 12 包 / 19,312,287 B(≈18.42 MiB unpacked)**:`semantic-conventions` 单包 12.0 MB(62%,`core` / `resources` / `sdk-trace` 的传递依赖,无法从树里移除)、`sdk-metrics` + `sdk-logs` + `api-logs` ≈2.67 MB(transformer 同时编码三信号)。数字口径归 `deps-budget.json` 黄灯(实施图落基线,#72);`@oribos/core` peer 豁免。
 - 不选的路线:仅 `otlp-transformer` + 自写 HTTP(只省 0.67 MiB,却把传输 / 重试 / 并发簿记搬进本包);自实现序列化(把 semconv 演进从「跟版本」升级成「自己维护」)。
 - **不 import `semantic-conventions`**:`gen_ai.*` 键名按字符串直写(常量包只在 incubating 入口携带且全 Development;它在意不在树不是本包引入的);键名漂移只改本包、核心不随动(ADR-0009 的可逆性不对称)。
 
@@ -153,38 +153,38 @@ createOtlpExporter(options?: {
 
 ### 映射契约(七类 + 兜底)
 
-七类 span 的 `name` 一律按模板重建(不用框架原 name);开放 type 原样。每张映射 span 都带 `balsats.span.type`(框架 type 原样),`balsats.*` 键的框架多词字段转 snake_case。
+七类 span 的 `name` 一律按模板重建(不用框架原 name);开放 type 原样。每张映射 span 都带 `oribos.span.type`(框架 type 原样),`oribos.*` 键的框架多词字段转 snake_case。
 
 | type | span name | `gen_ai.operation.name` | kind | 专属属性 |
 | --- | --- | --- | --- | --- |
-| `agent-run` | `invoke_agent {agentName}` | `invoke_agent` | INTERNAL | `gen_ai.agent.name`、`balsats.run_id` |
+| `agent-run` | `invoke_agent {agentName}` | `invoke_agent` | INTERNAL | `gen_ai.agent.name`、`oribos.run_id` |
 | `agent-step` | `chat {model}` | `chat` | CLIENT | `gen_ai.provider.name`、`gen_ai.request.model`、`gen_ai.request.stream: true`、参数白名单、`gen_ai.usage.{input_tokens,output_tokens}`、`gen_ai.response.finish_reasons`、`gen_ai.response.time_to_first_chunk` |
 | `tool-call` | `execute_tool {toolName}` | `execute_tool` | INTERNAL | `gen_ai.tool.name`、`gen_ai.tool.call.id` |
-| `workflow-run` | `invoke_workflow {workflowId}` | `invoke_workflow` | INTERNAL | `gen_ai.workflow.name`、`balsats.run_id` |
+| `workflow-run` | `invoke_workflow {workflowId}` | `invoke_workflow` | INTERNAL | `gen_ai.workflow.name`、`oribos.run_id` |
 | `workflow-step` | `workflow-step {stepId}` | — | INTERNAL | — |
-| `memory-recall` | `memory-recall {threadId}` | — | INTERNAL | `balsats.thread_id` |
-| `memory-save` | `memory-save {threadId}` | — | INTERNAL | `balsats.thread_id`、`balsats.resource_id` |
+| `memory-recall` | `memory-recall {threadId}` | — | INTERNAL | `oribos.thread_id` |
+| `memory-save` | `memory-save {threadId}` | — | INTERNAL | `oribos.thread_id`、`oribos.resource_id` |
 | 开放 type | `span.name` 原样 | — | INTERNAL | — |
 
-- 无 semconv operation 的类(workflow-step / memory / 用户 span)**不硬蹭**:稳定 kebab 名 + `balsats.*` 语境,后端可按 `balsats.span.type` 过滤。
-- `agent-step` 参数白名单(`parameters` = 用户 `modelSettings` 原文):`temperature`→`gen_ai.request.temperature`、`topP`→`top_p`、`topK`→`top_k`、`maxOutputTokens`→`max_tokens`、`stopSequences`→`stop_sequences`、`presencePenalty`→`presence_penalty`、`frequencyPenalty`→`frequency_penalty`、`seed`→`seed`;其余键 → `balsats.request.<key>`(通用值域规则)。
+- 无 semconv operation 的类(workflow-step / memory / 用户 span)**不硬蹭**:稳定 kebab 名 + `oribos.*` 语境,后端可按 `oribos.span.type` 过滤。
+- `agent-step` 参数白名单(`parameters` = 用户 `modelSettings` 原文):`temperature`→`gen_ai.request.temperature`、`topP`→`top_p`、`topK`→`top_k`、`maxOutputTokens`→`max_tokens`、`stopSequences`→`stop_sequences`、`presencePenalty`→`presence_penalty`、`frequencyPenalty`→`frequency_penalty`、`seed`→`seed`;其余键 → `oribos.request.<key>`(通用值域规则)。
 - `gen_ai.request.stream: true` **恒发**:agent loop 对每次模型尝试(含 fallback 链)都走 `doStream`,框架无非流式模型调用路径;semconv 语义是「unset 假定非流式」,不发即失真。
 - `timeToFirstChunk`(毫秒)→ `gen_ai.response.time_to_first_chunk`(秒,number;框架测点 = step 起点到首 chunk,≈请求发出,偏差记此);`finishReason` 原样单元素数组落 `gen_ai.response.finish_reasons`(不发明翻译层,`suspended` 等框架词汇直传);`usage` 只发输入 / 输出两项(semconv 无 total 键,防后端重复计数)。
-- `status`:成功 `UNSET`(OTel 不默认 OK);`error` 时 `{ code: ERROR, message }` + `error.type`(取 `details.name` 字符串,否则 `_OTHER`)+ `balsats.error.details` best-effort JSON(不可序列化则省略——Error 自有属性不可枚举,发 `{}` 不如不发)。
+- `status`:成功 `UNSET`(OTel 不默认 OK);`error` 时 `{ code: ERROR, message }` + `error.type`(取 `details.name` 字符串,否则 `_OTHER`)+ `oribos.error.details` best-effort JSON(不可序列化则省略——Error 自有属性不可枚举,发 `{}` 不如不发)。
 
 ### 载荷映射(input / output)
 
 - **消息语义(agent-run / agent-step)**:`ModelMessage[]` 拆分——`role: 'system'` → `gen_ai.system_instructions`,`user` / `assistant` / `tool` → `gen_ai.input.messages`;span 属性上按规范允许的 JSON 字符串形态落值(数组本体)。`agent-step` 的 input 是该次模型调用的完整 prompt(含历史),不裁剪。
 - parts 转换:`text`→`text`、reasoning→`reasoning`、`tool-call`→`tool_call`(id / name / arguments)、`tool-result`(含 assistant 内联结果)→`tool_call_response`;file / custom / approval 等未识别 part → 单个 `text` part 的 JSON 文本兜底;`ModelToolResultOutput` 的联合(text / json / error-* / execution-denied / content)按同规则降为文本或 JSON 文本。
 - `agent-step` output = 模型文本 → `gen_ai.output.messages = [{ role: 'assistant', parts: [{ type: 'text', content }] }]`(空字符串不发);工具调用不在 step output 里,以 tool-call span 呈现(文档写明)。`agent-run` output = 终值文本;`structuredOutput` 的对象 → 单个 `text` part 的 JSON 文本。
-- `tool-call`:`input` → `gen_ai.tool.call.arguments`、`output` → `gen_ai.tool.call.result`(均 JSON 字符串;result **仅成功时**发,失败信息由 `error.type` / `status.message` / `balsats.error.details` 承载)。
-- **非消息语义兜底(workflow-run / workflow-step / memory-* / 开放 type)**:`input` → `balsats.input`、`output` → `balsats.output`,best-effort JSON 字符串,失败省略。
+- `tool-call`:`input` → `gen_ai.tool.call.arguments`、`output` → `gen_ai.tool.call.result`(均 JSON 字符串;result **仅成功时**发,失败信息由 `error.type` / `status.message` / `oribos.error.details` 承载)。
+- **非消息语义兜底(workflow-run / workflow-step / memory-* / 开放 type)**:`input` → `oribos.input`、`output` → `oribos.output`,best-effort JSON 字符串,失败省略。
 - **不截断**:v1 不做内建截断 / 大小上限——整形缝已在上游(`spanProcessors` 同步改写 + `hideInput` / `hideOutput` trace 级擦除),本包不重复开关;超大 prompt 原样上线是已知代价,宿主用处理器裁剪。
 
 ### 值域与兜底规则
 
 - OTel 属性只收原语:原语 / 原语数组直通(数组中的 null / undefined 剔除,剔空即丢);对象及其他值 `JSON.stringify` 成字符串落同名键;序列化失败丢弃并计 `droppedAttributesCount`。
-- `attributes` 袋走通用规则(白名单已映射的键不重复);`metadata` 开放袋 → 单属性 `balsats.metadata` JSON 字符串(空 / 失败省略;不摊平——避免污染命名空间与撞 semconv 键)。
+- `attributes` 袋走通用规则(白名单已映射的键不重复);`metadata` 开放袋 → 单属性 `oribos.metadata` JSON 字符串(空 / 失败省略;不摊平——避免污染命名空间与撞 semconv 键)。
 - 框架侧 `undefined` 一律省略属性,不发空串哨兵。
 
 ### 裁单
@@ -201,7 +201,7 @@ createOtlpExporter(options?: {
 | **CUT-OBS2** OTel bridge / metrics / logs | OTLP 导出面 + 用户已有 OTel 采集管线自接 | 有意分叉 | v1 只 tracing(ADR-0009);bridge 归延后清单「OTel bridge 能力包」 |
 | **CUT-OBS3** 自研批处理 / 重试 / 日志 / 错误回调 | 官方 `BatchSpanProcessor` / OTel 侧配置 | 有意分叉 | 官方基座在树内且更完整;诊断走 diag(ADR-0009) |
 | **CUT-OBS4** 内建截断 / 敏感数据规则库 | `spanProcessors` 同步改写 + `hideInput` / `hideOutput` trace 级擦除 | 有意分叉 | 上游处理器 + hide 开关是唯一整形缝;「不截断」是记明的已知代价(ADR-0009) |
-| **CUT-OBS5** `gen_ai.conversation.id` 补全 | memory span 已发 `balsats.thread_id`;需要时用户 spanProcessor 自补 | 有意分叉 | agent-step 属性面无 threadId;不做跨 span 推断(ADR-0009) |
+| **CUT-OBS5** `gen_ai.conversation.id` 补全 | memory span 已发 `oribos.thread_id`;需要时用户 spanProcessor 自补 | 有意分叉 | agent-step 属性面无 threadId;不做跨 span 推断(ADR-0009) |
 | **CUT-OBS6** exporter `init?()` / `name` 字段 | 用户侧 wrapper 包一层 | 有意分叉 | 三事件最小面 = 标准字面「无 init·name」(ADR-0009) |
 | **CUT-OBS7** `MODEL_CHUNK` / `MODEL_GENERATION` span | `agent-step` span 已载 model / provider / usage / finishReason;chunk 级细节由用户侧消费 chunk 流自行埋点 | 有意分叉 | 七类型冻结;chunk 级埋点与「缺席零开销」相抵(ADR-0009) |
 | **E1** 快照只持久化 `traceId` | span 由 exporter 出进程;完整 trace 上下文归观测侧(与 `workflows.md` / `harness.md` 互引) | 有意分叉 | 快照是 JSON-only 状态、不是 tracing 载体;`traceId` 只作续接锚(ADR-0006 / 0011) |

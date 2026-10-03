@@ -88,10 +88,10 @@ const researcherAsTool = async (ctx: RequestContext) =>
 | **A6** `maxSteps` 耗尽 → `finishReason: 'tool-calls'` | `steps[]` + `usage` 可判「第 N 步仍在要求工具」 | 有意分叉 | 截断信号归框架、不 relay provider 原始 reason,`finishReason` 五值冻结(ADR-0005 / 0004) |
 | **A2** 同一步多工具**串行** | 工具自身可内部并发;需求信号到 → 按 run 开关 | 有意分叉 + 验证面欠账 → **P-1** | 并发策略 v1 不做、留待需求信号——顺序确定、失败路径单一、abort 语义简单(ADR-0005) |
 | **CUT-AG1** scorers / evals | Processor 或独立 scorer 消费 run 结果(`steps` / `text` / `usage` 均公开面) | 有意分叉 | evals 是 CI / 线上的断言体系,超出 agent 定义表面;Processor 三钩是唯一横切点(ADR-0005);延后清单「Evals / scorers」 |
-| **CUT-AG2** voice / browser / channels / workspace / skills | 能力包 / 应用层;`browser` 具名入延后清单出域档行,`skills` → [#84](https://github.com/0xnicholas/balsats-framework/issues/84) | 有意分叉 | 六项皆平台 / 应用层能力面,与「定义表面最小 + 零权限模型」立场一致(ADR-0005) |
+| **CUT-AG2** voice / browser / channels / workspace / skills | 能力包 / 应用层;`browser` 具名入延后清单出域档行,`skills` → [#84](https://github.com/0xnicholas/oribos-framework/issues/84) | 有意分叉 | 六项皆平台 / 应用层能力面,与「定义表面最小 + 零权限模型」立场一致(ADR-0005) |
 | **CUT-AG3** editor / rawConfig | 应用层 / 宿主工具链 | 有意分叉 | Studio / editor 出域——定位裁决改变才重开(ADR-0005);延后清单「Studio / editor / stored agents」 |
 | **CUT-AG4** durable / pubsub / backgroundTasks / signals / goal / notifications | **已兑现段**:durable / signals(含进程内 pubsub)已成独立子系统并冻结(`docs/architecture/harness.md`,ADR-0011)。**剩余三件指针**:backgroundTasks → 延后清单「Background tasks」;goals → 延后清单「Goals / State signals」;notifications → `sendSignal({ type: 'notification' })` 即时注入 | 已兑现 + 有意分叉 | 本行「砍的是字段位置」的原表述随 durable / signals 出账失效;剩余三件是能力形缺口,不是字段位置(ADR-0005 / 0011) |
-| **CUT-AG5** defaultOptions / metadata | 用户一行包装 + 组合根 `createApp` 分发;metadata 走观测的开放袋 → `balsats.metadata` | 有意分叉 | 全局默认归组合根 / 宿主职责;run 级开放袋归观测(ADR-0002 / 0009) |
+| **CUT-AG5** defaultOptions / metadata | 用户一行包装 + 组合根 `createApp` 分发;metadata 走观测的开放袋 → `oribos.metadata` | 有意分叉 | 全局默认归组合根 / 宿主职责;run 级开放袋归观测(ADR-0002 / 0009) |
 | **CUT-AG6** hooks / transform / maxRetries | `processInput` / `processOutputStep` / `processError` + 模型 fallback 链 | 有意分叉 | Processor 三钩是唯一横切点,不引入第二套钩子矩阵;重试归 fallback 链(仅未产出 chunk 时切换)(ADR-0005 / 0004) |
 | **CUT-AG7** 标题生成 | 应用层;要走模型 → Processor + metadata | 有意分叉 | 标题是产品态不是 agent 语义;`title` 是调用方字段(ADR-0005 / 0007) |
 

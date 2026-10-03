@@ -16,7 +16,7 @@ import { OTLPTraceExporter as OTLPTraceExporterProto } from '@opentelemetry/expo
 import { detectResources, envDetector, resourceFromAttributes } from '@opentelemetry/resources';
 import type { Resource } from '@opentelemetry/resources';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace';
-import type { ObservabilityExporter } from '@balsats/core/observability';
+import type { ObservabilityExporter } from '@oribos/core/observability';
 import { toReadableSpan } from './to-readable.js';
 
 /** Batch tuning, passed straight to the official `BatchSpanProcessor`. */
@@ -59,14 +59,14 @@ function resolveProtocol(explicit: OtlpExporterOptions['protocol']): 'protobuf' 
   if (fromEnv === 'json') return 'json';
   if (fromEnv !== undefined && fromEnv !== '' && fromEnv !== 'protobuf') {
     diag.warn(
-      `@balsats/otlp: OTEL_EXPORTER_OTLP_PROTOCOL="${fromEnv}" is not supported (protobuf | json); falling back to protobuf`,
+      `@oribos/otlp: OTEL_EXPORTER_OTLP_PROTOCOL="${fromEnv}" is not supported (protobuf | json); falling back to protobuf`,
     );
   }
   return 'protobuf';
 }
 
 /**
- * The span resource every synthesized span carries: `service.name` defaults to `balsats`, env
+ * The span resource every synthesized span carries: `service.name` defaults to `oribos`, env
  * (`OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES`) overrides the default, explicit options
  * override env — `resourceAttributes` wholly over `serviceName`. No `telemetry.sdk.*`: this
  * package does not run the OTel SDK and does not claim it.
@@ -78,7 +78,7 @@ function buildResource(options: OtlpExporterOptions): Resource {
   if (options.resourceAttributes !== undefined) {
     Object.assign(explicit, options.resourceAttributes);
   }
-  return resourceFromAttributes({ 'service.name': 'balsats' })
+  return resourceFromAttributes({ 'service.name': 'oribos' })
     .merge(envResource)
     .merge(resourceFromAttributes(explicit));
 }
@@ -125,7 +125,7 @@ export function createOtlpExporter(options: OtlpExporterOptions = {}): Observabi
         processor.onEnd(toReadableSpan(event.span, resource));
       } catch (error) {
         // A span that cannot be synthesized is dropped silently — telemetry never breaks the traced code.
-        diag.warn(`@balsats/otlp: dropping unsynthesizable span: ${error instanceof Error ? error.message : String(error)}`);
+        diag.warn(`@oribos/otlp: dropping unsynthesizable span: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
     flush(): Promise<void> {

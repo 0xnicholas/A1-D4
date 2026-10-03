@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Agent, resolveDynamicArgument } from '@balsats/core/agent';
-import type { RequestContext } from '@balsats/core/agent';
+import { Agent, resolveDynamicArgument } from '@oribos/core/agent';
+import type { RequestContext } from '@oribos/core/agent';
 import {
   AGENT_RUN_SPAN,
   AGENT_STEP_SPAN,
   TOOL_CALL_SPAN,
   createTracer,
   memoryExporter,
-} from '@balsats/core/observability';
-import type { ExportedSpan } from '@balsats/core/observability';
-import { createTool } from '@balsats/core/tools';
-import type { Tool } from '@balsats/core/tools';
+} from '@oribos/core/observability';
+import type { ExportedSpan } from '@oribos/core/observability';
+import { createTool } from '@oribos/core/tools';
+import type { Tool } from '@oribos/core/tools';
 import { captureRejection } from './helpers/assertions.js';
 import { fakeModel } from './helpers/fake-model.js';
 import { SPAN_ID, TRACE_ID } from './helpers/spans.js';
@@ -56,7 +56,7 @@ function findSpan(spans: readonly ExportedSpan[], type: string, name: string): E
 
 describe('委派即一次普通工具调用', () => {
   it('父模型调用委派工具:子 agent 完成 generate,文本结果经普通工具结果回喂', async () => {
-    const childModel = fakeModel([{ text: 'Balsats is a lightweight TypeScript agent framework.' }]);
+    const childModel = fakeModel([{ text: 'Oribos is a lightweight TypeScript agent framework.' }]);
     const researcher = new Agent({
       name: 'researcher',
       instructions: RESEARCHER_INSTRUCTIONS,
@@ -66,10 +66,10 @@ describe('委派即一次普通工具调用', () => {
     const parentModel = fakeModel([
       {
         toolCalls: [
-          { toolCallId: 'delegate-1', toolName: 'researcher', input: { prompt: 'What is balsats?' } },
+          { toolCallId: 'delegate-1', toolName: 'researcher', input: { prompt: 'What is oribos?' } },
         ],
       },
-      { text: 'Balsats is a lightweight framework.' },
+      { text: 'Oribos is a lightweight framework.' },
     ]);
     const coordinator = new Agent({
       name: 'coordinator',
@@ -79,7 +79,7 @@ describe('委派即一次普通工具调用', () => {
       tools: async (ctx) => ({ researcher: await asTool(researcher)(ctx) }),
     });
 
-    const result = await coordinator.generate('Tell me about balsats.', { tenant: 'acme' });
+    const result = await coordinator.generate('Tell me about oribos.', { tenant: 'acme' });
 
     // 委派 = 普通工具调用:父模型收到的工具列表带包装处解析出的 description 与 input schema
     expect(parentModel.streamCalls[0]?.tools).toEqual([
@@ -95,7 +95,7 @@ describe('委派即一次普通工具调用', () => {
     expect(childModel.streamCalls).toHaveLength(1);
     expect(childModel.streamCalls[0]?.prompt).toEqual([
       { role: 'system', content: RESEARCHER_INSTRUCTIONS },
-      { role: 'user', content: [{ type: 'text', text: 'What is balsats?' }] },
+      { role: 'user', content: [{ type: 'text', text: 'What is oribos?' }] },
     ]);
 
     // 子 run 的结果作为普通工具结果回喂:父模型第二步的 prompt 末尾是 tool 消息
@@ -109,21 +109,21 @@ describe('委派即一次普通工具调用', () => {
           output: {
             type: 'json',
             value: expect.objectContaining({
-              text: 'Balsats is a lightweight TypeScript agent framework.',
+              text: 'Oribos is a lightweight TypeScript agent framework.',
             }),
           },
         },
       ],
     });
 
-    expect(result.text).toBe('Balsats is a lightweight framework.');
+    expect(result.text).toBe('Oribos is a lightweight framework.');
     expect(result.toolResults).toEqual([
       {
         type: 'tool-result',
         toolCallId: 'delegate-1',
         toolName: 'researcher',
         output: expect.objectContaining({
-          text: 'Balsats is a lightweight TypeScript agent framework.',
+          text: 'Oribos is a lightweight TypeScript agent framework.',
         }),
         isError: false,
       },

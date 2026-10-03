@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createStep, createWorkflow } from '@balsats/core/workflows';
-import type { Step, Workflow, WorkflowBuilder } from '@balsats/core/workflows';
+import { createStep, createWorkflow } from '@oribos/core/workflows';
+import type { Step, Workflow, WorkflowBuilder } from '@oribos/core/workflows';
 import { expectAssignable } from './helpers/assertions.js';
 
 /**

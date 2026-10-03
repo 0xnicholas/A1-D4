@@ -37,7 +37,7 @@ adapter 自拥连接生命周期:可选暴露 `init?()` / `close?()`;**核心永
 ## 第一方 adapter 清单
 
 - **内存实现**:核心自带,四个 port 各一;不接 storage 即纯内存(已钉于各子系统规范)。SQLite 侧也有一个完整实现的参照件(下节)。
-- **SQLite 系参考 adapter** = `@balsats/sqlite`(能力包,恰好一个 durable 第一方):嵌入式文件库、零服务,覆盖最常见自托管形态,同时充当四个 port 的真实后端验证。驱动已冻 = `node:sqlite`,engines 基线 `>=22.13.0`(M5 设计冻结,见下节);build 时机归路线图(#16)。
+- **SQLite 系参考 adapter** = `@oribos/sqlite`(能力包,恰好一个 durable 第一方):嵌入式文件库、零服务,覆盖最常见自托管形态,同时充当四个 port 的真实后端验证。驱动已冻 = `node:sqlite`,engines 基线 `>=22.13.0`(M5 设计冻结,见下节);build 时机归路线图(#16)。
 - **其余后端(Postgres / Redis / Upstash / Mongo 等)不做第一方**,留社区。
 
 ### Adapter 作者指南(要点)
@@ -48,7 +48,7 @@ adapter 自拥连接生命周期:可选暴露 `init?()` / `close?()`;**核心永
 
 ## SQLite 参考 adapter(M5 设计冻结)
 
-第一方 durable adapter = `@balsats/sqlite` 一包(目录与清单字段沿 ADR-0002 M5 修订记;对核心走 peer,零外部依赖)。本节是冻结态:实施图按此直落,表结构、编码、并发与迁移口径都不留实现期判断。
+第一方 durable adapter = `@oribos/sqlite` 一包(目录与清单字段沿 ADR-0002 M5 修订记;对核心走 peer,零外部依赖)。本节是冻结态:实施图按此直落,表结构、编码、并发与迁移口径都不留实现期判断。
 
 ### 驱动与版本基线
 
@@ -59,7 +59,7 @@ adapter 自拥连接生命周期:可选暴露 `init?()` / `close?()`;**核心永
 ### 工厂面
 
 ```ts
-const storage = createSqliteStorage({ path: 'balsats.db', busyTimeoutMs: 5_000 })
+const storage = createSqliteStorage({ path: 'oribos.db', busyTimeoutMs: 5_000 })
 
 storage.memory              // MemoryStore(条件对已实现 → supportsWorkingMemory 为真)
 storage.workflowSnapshots   // WorkflowSnapshotStore + compareAndSave / deleteSnapshot / listSnapshots
@@ -165,7 +165,7 @@ port 是框架唯一面向「生态作者」的契约,稳定性与核心同步:*
 | **CUT-ST3** harness 专属存储域(lease / notifications / thread-state) | `AgentRunSnapshotStore` / `ScheduleStore` 已落;lease / PubSub 归能力包,inbox 裁出 | 有意分叉 | 挂起快照与调度 = 两个最小 port(#18 已裁)(ADR-0011);`harness.md` CUT-H3 行互引 |
 | **CUT-ST4** PG / Redis 等第一方 adapter | 统一 adapter 家族 + 作者指南(上文) | 有意分叉 | 第一方清单只收内存 + SQLite;后端生态归社区(ADR-0010);延后清单「适配器生态」 |
 | **CUT-ST5** CAS 进基础 port | SQLite 已实现 `compareAndSave`;基础 port 只留 `load` / `save` | 有意分叉 | 可选扩展 + 能力标志;内存版不必假装支持(ADR-0010) |
-| **CUT-ST6** 核心托管连接生命周期(进程 hook / settled 式) | adapter 自拥 `init?()` / `close?()`(`@balsats/sqlite` 已落),应用调用(**组合根代管未落 → 必须项 M-9** 改判为「不代管」) | 有意分叉 | 核心永不隐式 init / close;生命周期归 adapter 与应用(ADR-0010 / 0002) |
+| **CUT-ST6** 核心托管连接生命周期(进程 hook / settled 式) | adapter 自拥 `init?()` / `close?()`(`@oribos/sqlite` 已落),应用调用(**组合根代管未落 → 必须项 M-9** 改判为「不代管」) | 有意分叉 | 核心永不隐式 init / close;生命周期归 adapter 与应用(ADR-0010 / 0002) |
 
 ## 与其它子系统的关系
 

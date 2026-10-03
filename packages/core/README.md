@@ -1,6 +1,6 @@
-# `@balsats/core`
+# `@oribos/core`
 
-The core package of [Balsats](https://github.com/0xnicholas/balsats-framework) — an ultralight
+The core package of [Oribos](https://github.com/0xnicholas/oribos-framework) — an ultralight
 TypeScript agent framework: model contract, agents, tools, memory, workflows, observability,
 signals, durable agents and schedules, each behind its own subpath export. Compose only what you
 use: what you don't import costs you nothing, not in the dependency tree and not in concept space.
@@ -9,8 +9,8 @@ Schema dual interfaces, so the core itself carries no runtime dependencies.
 
 ```ts
 import { openai } from '@ai-sdk/openai';
-import { Agent } from '@balsats/core/agent';
-import { createTool } from '@balsats/core/tools';
+import { Agent } from '@oribos/core/agent';
+import { createTool } from '@oribos/core/tools';
 import { z } from 'zod';
 
 const weather = createTool({
@@ -35,16 +35,16 @@ for await (const chunk of result) {
 console.log(await result.finishReason, await result.usage);
 ```
 
-- Framework README: [balsats-framework](https://github.com/0xnicholas/balsats-framework#readme) — quick start, examples, capability packages
-- Specs: [`docs/architecture/`](https://github.com/0xnicholas/balsats-framework/blob/main/docs/architecture/README.md) — one per subsystem
-- Decisions: [`docs/adr/`](https://github.com/0xnicholas/balsats-framework/tree/main/docs/adr) — the decisions behind the specs
-- Glossary: [`CONTEXT.md`](https://github.com/0xnicholas/balsats-framework/blob/main/CONTEXT.md) — every domain term, defined once
-- Example: [`examples/minimal-agent`](https://github.com/0xnicholas/balsats-framework/tree/main/examples/minimal-agent) — one agent, one tool, streaming, console tracing
+- Framework README: [oribos-framework](https://github.com/0xnicholas/oribos-framework#readme) — quick start, examples, capability packages
+- Specs: [`docs/architecture/`](https://github.com/0xnicholas/oribos-framework/blob/main/docs/architecture/README.md) — one per subsystem
+- Decisions: [`docs/adr/`](https://github.com/0xnicholas/oribos-framework/tree/main/docs/adr) — the decisions behind the specs
+- Glossary: [`CONTEXT.md`](https://github.com/0xnicholas/oribos-framework/blob/main/CONTEXT.md) — every domain term, defined once
+- Example: [`examples/minimal-agent`](https://github.com/0xnicholas/oribos-framework/tree/main/examples/minimal-agent) — one agent, one tool, streaming, console tracing
 
 ## Install
 
 ```bash
-npm install @balsats/core zod @ai-sdk/openai
+npm install @oribos/core zod @ai-sdk/openai
 ```
 
 Requires Node.js **≥ 22.13**. The provider package (any AI SDK provider, any OpenAI-compatible
@@ -55,16 +55,16 @@ yours to pick — the core has no runtime dependencies of its own.
 
 | Import path | What it gives you |
 | --- | --- |
-| `@balsats/core` | `createApp` — the optional composition root |
-| `@balsats/core/agent` | `Agent`, dynamic arguments, structured output, processors |
-| `@balsats/core/model` | the model contract and chunk protocol types |
-| `@balsats/core/tools` | `createTool` and the tool types |
-| `@balsats/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
-| `@balsats/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
-| `@balsats/core/observability` | `createTracer`, console / memory exporters, span types |
-| `@balsats/core/signals` | `createSignals` — inject / wake / queue on a thread |
-| `@balsats/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
-| `@balsats/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
+| `@oribos/core` | `createApp` — the optional composition root |
+| `@oribos/core/agent` | `Agent`, dynamic arguments, structured output, processors |
+| `@oribos/core/model` | the model contract and chunk protocol types |
+| `@oribos/core/tools` | `createTool` and the tool types |
+| `@oribos/core/memory` | `Memory`, `createInMemoryStore`, the memory storage ports |
+| `@oribos/core/workflows` | `createWorkflow`, `createStep`, snapshot store |
+| `@oribos/core/observability` | `createTracer`, console / memory exporters, span types |
+| `@oribos/core/signals` | `createSignals` — inject / wake / queue on a thread |
+| `@oribos/core/durable-agent` | `createDurableAgent`, the approval gate, `AgentRunSnapshotStore` |
+| `@oribos/core/schedules` | `createSchedules`, `tick`, `ScheduleStore` |
 
 ## The composition root
 
@@ -72,9 +72,9 @@ yours to pick — the core has no runtime dependencies of its own.
 every subsystem built through the app, so there is no per-agent wiring.
 
 ```ts
-import { createApp } from '@balsats/core';
-import { createInMemoryStore } from '@balsats/core/memory';
-import { consoleExporter, createTracer } from '@balsats/core/observability';
+import { createApp } from '@oribos/core';
+import { createInMemoryStore } from '@oribos/core/memory';
+import { consoleExporter, createTracer } from '@oribos/core/observability';
 
 const app = createApp({
   tracer: createTracer({ exporters: [consoleExporter()] }),
@@ -91,11 +91,11 @@ is first-class, with zero span overhead. Explicit assembly wins: a config that b
 ## Lightweight
 
 - runtime dependencies: none — the zero-dependency redline is a hard CI gate over both the manifest
-  and the built output ([ADR-0015](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0015-ci-lightweight-redlines.md))
+  and the built output ([ADR-0015](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0015-ci-lightweight-redlines.md))
 - first-party code: the minified baseline lives in `byte-budget.json` and is checked on every PR —
-  an internal regression reference, not a public budget ([ADR-0001](https://github.com/0xnicholas/balsats-framework/blob/main/docs/adr/0001-lightweight-definition.md))
+  an internal regression reference, not a public budget ([ADR-0001](https://github.com/0xnicholas/oribos-framework/blob/main/docs/adr/0001-lightweight-definition.md))
 - the capability packages ship separately, so a deployment installs only what it uses
 
 ## License
 
-[Apache-2.0](https://github.com/0xnicholas/balsats-framework/blob/main/LICENSE)
+[Apache-2.0](https://github.com/0xnicholas/oribos-framework/blob/main/LICENSE)

@@ -1,13 +1,13 @@
 # 实施路线图
 
-极致轻量 TypeScript/Node agent 框架的粗粒度实施路线图:**只讲顺序、依赖与可验证产出,不含排期**。规范本体见 `docs/architecture/`(入口:`docs/architecture/README.md`),术语见 `CONTEXT.md`,决策依据见 `docs/adr/`。本图由 [决策:粗粒度实施路线图](https://github.com/0xnicholas/balsats-framework/issues/16) 产出。
+极致轻量 TypeScript/Node agent 框架的粗粒度实施路线图:**只讲顺序、依赖与可验证产出,不含排期**。规范本体见 `docs/architecture/`(入口:`docs/architecture/README.md`),术语见 `CONTEXT.md`,决策依据见 `docs/adr/`。本图由 [决策:粗粒度实施路线图](https://github.com/0xnicholas/oribos-framework/issues/16) 产出。
 
 ## 切分原则
 
 - **垂直切片(walking skeleton)**:每个里程碑都是一条可跑的细流,可独立验证、可提前叫停;不按子系统水平分层。
 - **Instrumentation-first**:观测内核(span 模型 / tracer / NoOpSpan)与各边界自动埋点随各子系统落地时就建进去;exporter 与 OTLP 能力包后置,永不对已完成子系统开膛回补。
 - **可验证产出两件套**:每个里程碑 = 可运行 example(`examples/`)+ 覆盖该范围的测试套件。
-- **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/balsats-framework/issues/6))。
+- **守轻量从第一天**:CI 字节预算在 M1 上线(零依赖 + preset 分层 + CI 字节预算三件套,见 [调研:轻量化基准与 MCP 现状](https://github.com/0xnicholas/oribos-framework/issues/6))。
 - **串行默认**:小团队单线推进;各里程碑「依赖」行标注可并行项,不排双轨。
 
 ## 里程碑
@@ -59,7 +59,7 @@
 
 - **OTLP exporter 包**:GenAI semconv 映射,HTTP only(依赖 M1 观测内核)
 - **MCP server 包 / MCP client 包**:同一份 Tool 双向流通,桥接 schema 直通零适配(依赖 M1 工具)
-- **SQLite 参考 adapter**:实现全部四个存储 port;驱动已冻 = `node:sqlite`(免 flag 基线 ≥22.13,见下「设计冻结」;port 策略见 [决策:存储适配策略](https://github.com/0xnicholas/balsats-framework/issues/15))(依赖 M2–M4 的 ports)
+- **SQLite 参考 adapter**:实现全部四个存储 port;驱动已冻 = `node:sqlite`(免 flag 基线 ≥22.13,见下「设计冻结」;port 策略见 [决策:存储适配策略](https://github.com/0xnicholas/oribos-framework/issues/15))(依赖 M2–M4 的 ports)
 - **AI SDK 互操作包**:chunk 协议 ↔ AI SDK 流格式等外部格式转换(依赖 M1)
 - **croner 封装包**:cron 表达式 → `next` 注入片段的便利件(表达式仍归宿主侧定义,不入记录;依赖 M4 schedules 的 `NextFn`;M4 地图移交件)
 - **bunfold 桥接包(按需可裁)**:外部记忆系统桥接参考实现,价值在验证 memory seam 设计(依赖 M2)——**M5 裁定:裁**(不产桥接包;重开条件见延后清单「外部记忆引擎桥接」)
@@ -67,26 +67,26 @@
 **验证**:OTLP → 本地 collector example;MCP server/client 对打 example;SQLite 跨进程挂起恢复 example。
 **依赖**:各包分别挂 M1–M4 对应接缝,包间可并行。
 
-**设计冻结(M5 收尾,2026-09-30)**:[wayfinder 地图:M5 生态能力包](https://github.com/0xnicholas/balsats-framework/issues/65) 收线——七件全部落成决策(六包 + bunfold 裁单),各件定义表面冻结在 `docs/architecture/` 的增补节,实施按 spec 直落、不再需要裁决。**实施已收口(2026-10-01,见下「实施完成」)**;发布动作(0.5,owner 手工)口径不变(见下「发布节奏与 v1.0 门槛」与 [#45](https://github.com/0xnicholas/balsats-framework/issues/45))。
+**设计冻结(M5 收尾,2026-09-30)**:[wayfinder 地图:M5 生态能力包](https://github.com/0xnicholas/oribos-framework/issues/65) 收线——七件全部落成决策(六包 + bunfold 裁单),各件定义表面冻结在 `docs/architecture/` 的增补节,实施按 spec 直落、不再需要裁决。**实施已收口(2026-10-01,见下「实施完成」)**;发布动作(0.5,owner 手工)口径不变(见下「发布节奏与 v1.0 门槛」与 [#45](https://github.com/0xnicholas/oribos-framework/issues/45))。
 
 | 件 | 冻结规范(节) | 决策 | 事实底座 |
 | --- | --- | --- | --- |
-| OTLP exporter `@balsats/otlp` | `docs/architecture/observability.md`「OTLP 能力包(M5 设计冻结)」 | [#73](https://github.com/0xnicholas/balsats-framework/issues/73) | `docs/research/otlp-js-packages.md` |
-| MCP server `@balsats/mcp-server` | `docs/architecture/tools.md`「MCP server 能力包」 | [#74](https://github.com/0xnicholas/balsats-framework/issues/74) | `docs/research/mcp-v2-sdk-surface.md` |
-| MCP client `@balsats/mcp-client` | `docs/architecture/tools.md`「MCP client 能力包」 | [#75](https://github.com/0xnicholas/balsats-framework/issues/75) | 同上 |
-| SQLite adapter `@balsats/sqlite` | `docs/architecture/storage.md`「SQLite 参考 adapter(M5 设计冻结)」 | [#76](https://github.com/0xnicholas/balsats-framework/issues/76) | `docs/research/sqlite-driver-landscape.md` |
-| AI SDK 互操作 `@balsats/ai-sdk` | `docs/architecture/model.md`「AI SDK 互操作能力包(M5 设计冻结)」 | [#77](https://github.com/0xnicholas/balsats-framework/issues/77) | `docs/research/ai-sdk-ui-stream-protocol.md` |
-| croner 封装 `@balsats/croner` | `docs/architecture/harness.md`「croner 封装能力包」 | [#78](https://github.com/0xnicholas/balsats-framework/issues/78) | `docs/research/croner.md` |
-| bunfold 桥(**已裁**,不建包) | `docs/architecture/memory.md`「外部记忆引擎(M5 裁定:不产桥接包)」 | [#79](https://github.com/0xnicholas/balsats-framework/issues/79) | `docs/research/bunfold.md` |
-| 横切基建政策(目录 / 依赖红线 / 发布口径) | `docs/architecture/README.md` 能力包口径 + ADR-0002 / ADR-0015 的 M5 修订记 | [#72](https://github.com/0xnicholas/balsats-framework/issues/72) | — |
+| OTLP exporter `@oribos/otlp` | `docs/architecture/observability.md`「OTLP 能力包(M5 设计冻结)」 | [#73](https://github.com/0xnicholas/oribos-framework/issues/73) | `docs/research/otlp-js-packages.md` |
+| MCP server `@oribos/mcp-server` | `docs/architecture/tools.md`「MCP server 能力包」 | [#74](https://github.com/0xnicholas/oribos-framework/issues/74) | `docs/research/mcp-v2-sdk-surface.md` |
+| MCP client `@oribos/mcp-client` | `docs/architecture/tools.md`「MCP client 能力包」 | [#75](https://github.com/0xnicholas/oribos-framework/issues/75) | 同上 |
+| SQLite adapter `@oribos/sqlite` | `docs/architecture/storage.md`「SQLite 参考 adapter(M5 设计冻结)」 | [#76](https://github.com/0xnicholas/oribos-framework/issues/76) | `docs/research/sqlite-driver-landscape.md` |
+| AI SDK 互操作 `@oribos/ai-sdk` | `docs/architecture/model.md`「AI SDK 互操作能力包(M5 设计冻结)」 | [#77](https://github.com/0xnicholas/oribos-framework/issues/77) | `docs/research/ai-sdk-ui-stream-protocol.md` |
+| croner 封装 `@oribos/croner` | `docs/architecture/harness.md`「croner 封装能力包」 | [#78](https://github.com/0xnicholas/oribos-framework/issues/78) | `docs/research/croner.md` |
+| bunfold 桥(**已裁**,不建包) | `docs/architecture/memory.md`「外部记忆引擎(M5 裁定:不产桥接包)」 | [#79](https://github.com/0xnicholas/oribos-framework/issues/79) | `docs/research/bunfold.md` |
+| 横切基建政策(目录 / 依赖红线 / 发布口径) | `docs/architecture/README.md` 能力包口径 + ADR-0002 / ADR-0015 的 M5 修订记 | [#72](https://github.com/0xnicholas/oribos-framework/issues/72) | — |
 
-**实施完成(M5 收尾,2026-10-01)**:六包全部落码并核验(实施票 [#87](https://github.com/0xnicholas/balsats-framework/issues/87)–[#92](https://github.com/0xnicholas/balsats-framework/issues/92) 全关,bunfold 沿裁单不产包)——`@balsats/mcp-server` / `@balsats/mcp-client` / `@balsats/sqlite` / `@balsats/ai-sdk` / `@balsats/otlp` / `@balsats/croner`,各含单测 + 双预算基线(ai-sdk 空集基线;sqlite 零运行时依赖,沿脚本语义免 deps 基线,同 core)+ 最小英文 README;五 example 全跑通(`examples/mcp-tools` 双 transport / `sqlite-resume` 跨进程 / `ai-chat-route` / `otlp-collector` / `cron-schedule`,负例 exit 1);导出面核对:core 的 export-map / entry-points 测试在位(按设计只覆盖 core 导出表),产物面由 `check:dist` 逐包验真(七包 **16 子路径**全过);`check:runtime-deps` 白名单闸门全绿;`deps-budget` 六包逐包核对(五份基线 + sqlite 免基线)**全部在数、零黄灯**;字节预算 **16/16 零超支**;`pnpm verify` 全绿(**856 例 67 文件**)。发布交接口径见下「发布节奏与 v1.0 门槛」M5 收尾修订。依据 [实施:M5 收尾——verify 全绿核对 + 导出/预算总表 + ROADMAP/README 修订 + 发布交接口径](https://github.com/0xnicholas/balsats-framework/issues/93) 决议评论。
+**实施完成(M5 收尾,2026-10-01)**:六包全部落码并核验(实施票 [#87](https://github.com/0xnicholas/oribos-framework/issues/87)–[#92](https://github.com/0xnicholas/oribos-framework/issues/92) 全关,bunfold 沿裁单不产包)——`@oribos/mcp-server` / `@oribos/mcp-client` / `@oribos/sqlite` / `@oribos/ai-sdk` / `@oribos/otlp` / `@oribos/croner`,各含单测 + 双预算基线(ai-sdk 空集基线;sqlite 零运行时依赖,沿脚本语义免 deps 基线,同 core)+ 最小英文 README;五 example 全跑通(`examples/mcp-tools` 双 transport / `sqlite-resume` 跨进程 / `ai-chat-route` / `otlp-collector` / `cron-schedule`,负例 exit 1);导出面核对:core 的 export-map / entry-points 测试在位(按设计只覆盖 core 导出表),产物面由 `check:dist` 逐包验真(七包 **16 子路径**全过);`check:runtime-deps` 白名单闸门全绿;`deps-budget` 六包逐包核对(五份基线 + sqlite 免基线)**全部在数、零黄灯**;字节预算 **16/16 零超支**;`pnpm verify` 全绿(**856 例 67 文件**)。发布交接口径见下「发布节奏与 v1.0 门槛」M5 收尾修订。依据 [实施:M5 收尾——verify 全绿核对 + 导出/预算总表 + ROADMAP/README 修订 + 发布交接口径](https://github.com/0xnicholas/oribos-framework/issues/93) 决议评论。
 
 ## 下一阶段(完善)
 
 **目标形态 = 子系统完整判据**(不绑版本号):把八个子系统(模型 / Agent / 工具 / 工作流 / 记忆 / 观测 / 存储 / Harness)各自的「什么算完整」定死——规范承诺兑现 + 已记录砍单项清账 + 有意分叉写明 + 质量面达标——再以它为准判掉三份盘点:**有意分叉**写明理由并落各篇规范的「砍单与承载缝」表,**欠账**提升为下「必须项」表(自定触发 = 完整判据本身,验证面 = 兑现的第二半)。判定口径:二元结论(有意分叉 / 欠账)+ 两道门(写不出分叉理由的按欠账;写不出验证面的欠账不得提升)+ 禁跟单(mastra 有 / 以后有用 / 不贵)。术语见 `CONTEXT.md`(完整判据 / 自定触发 / 有意分叉·欠账 / 形状内语义差异 / 验证面)。
 
-**依据与产出**:本段由规划型地图 [Wayfinder 地图:完善现有功能](https://github.com/0xnicholas/balsats-framework/issues/102) 产出——判据票 [#104](https://github.com/0xnicholas/balsats-framework/issues/104)(八份完整判据 + 二元判定口径)、[决策:§3 形状内语义差异逐条判定](https://github.com/0xnicholas/balsats-framework/issues/105)、[决策:砍单表逐条判定](https://github.com/0xnicholas/balsats-framework/issues/106)、[决策:质量与债务处置](https://github.com/0xnicholas/balsats-framework/issues/107);事实底座 = `docs/research/completeness-audit.md`(审计报告:八篇规范 456 条承诺三方对账 + 60 行砍单复核 + §3 语义 33 条 + 质量/债务盘点)与 `docs/research/mastra-gap-analysis.md`(对比总账)。**实施另起 wayfinder 地图**——本节只出必须项、顺序与验证面;每项的票据级大纲见 [任务:计划成文](https://github.com/0xnicholas/balsats-framework/issues/108) 决议评论。
+**依据与产出**:本段由规划型地图 [Wayfinder 地图:完善现有功能](https://github.com/0xnicholas/oribos-framework/issues/102) 产出——判据票 [#104](https://github.com/0xnicholas/oribos-framework/issues/104)(八份完整判据 + 二元判定口径)、[决策:§3 形状内语义差异逐条判定](https://github.com/0xnicholas/oribos-framework/issues/105)、[决策:砍单表逐条判定](https://github.com/0xnicholas/oribos-framework/issues/106)、[决策:质量与债务处置](https://github.com/0xnicholas/oribos-framework/issues/107);事实底座 = `docs/research/completeness-audit.md`(审计报告:八篇规范 456 条承诺三方对账 + 60 行砍单复核 + §3 语义 33 条 + 质量/债务盘点)与 `docs/research/mastra-gap-analysis.md`(对比总账)。**实施另起 wayfinder 地图**——本节只出必须项、顺序与验证面;每项的票据级大纲见 [任务:计划成文](https://github.com/0xnicholas/oribos-framework/issues/108) 决议评论。
 
 ### 必须项(11 行)
 
@@ -129,11 +129,11 @@
 
 - **标注 0.6**(序列 0.5.0 → 0.6,0.4 已跳空):提升项内容量 = 断言补齐 + 两个闸门 + 一个 additive 配置槽 + 文档对齐——**无破型、无新子系统**。
 - **与 1.0 门槛的关系**:倾向「与 1.0 门槛合并评估」——**本阶段不定义 1.0**(1.0 门槛自 M5 口径修订起搁置,见下「发布节奏与 v1.0 门槛」);若 0.6 收线后提升项自然构成门槛,另起 effort 正式定义。
-- **随 0.6 记账的既有破型**:品牌改名把 OTel 属性族 `balsa.*` → `balsats.*`、`service.name` 默认 `balsats`,对 0.5.0 消费者是观测 wire 面破型(pre-1.0 窗口内落,ADR-0009 已注记)——与本节提升项无关,但同一发布承载。
+- **随 0.6 记账的既有破型**:品牌改名把 OTel 属性族 `balsa.*` → `oribos.*`、`service.name` 默认 `oribos`、console 前缀与 mcp-client vendor 同步——**线上 0.5.0 tarball 实测仍是 `balsa.*` / `balsa`**(`balsats` 一次换名只落在仓库、未随发布上线),故下一次发布承载的是**合并后的一次破型**,对 0.5.0 消费者是观测 wire 面破型(pre-1.0 窗口内落,ADR-0009 已注记)——与本节提升项无关,但同一发布承载。
 
 ## 发布节奏与 v1.0 门槛
 
-- **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/balsats-framework/issues/20)。
+- **M1 末发 0.1**:walking skeleton 尽早公开,最早验证子路径导出与字节预算的打包链路;**以定名为门**——首次发布前必须完成 [决策:项目命名与品牌](https://github.com/0xnicholas/oribos-framework/issues/20)。
 - 之后每个里程碑一个 0.x;0.x 阶段允许跨里程碑破型。
 - **M5 完成 = v1.0**;存储 port 的 additive-only 演化纪律自 1.0 起生效(ADR-0010)。
 - **修订(M2 收尾,2026-09-29)**:M1 末未执行发布(定名门已过,版本仍 0.0.0);首个公开版本拍板为 **0.1.0**——含 M1+M2 全部内容、不跳号;changelog = GitHub Release notes(tag + Release,仓库不新增 `CHANGELOG.md`);凭证 = owner 手动发布(前置:创建 npm org `@balsa`,registry 查实仍 FREE);此后 M3→0.2、M4→0.3、M5→1.0。依据 [实施:M2 收尾——字节预算、导出核对、verify 全绿](https://github.com/0xnicholas/balsats-framework/issues/44) 决议评论。
@@ -149,33 +149,35 @@
 - **修订(下一阶段成文,2026-10-02)**:新增上「下一阶段(完善)」段(规划型地图 [#102](https://github.com/0xnicholas/balsats-framework/issues/102) 产出)——八份子系统完整判据定死「什么算完整」,以它为准判掉三份盘点(§3 语义 33 条 + §2 砍单 60 行 + §1/§4 131 行):**必须项 11 行**(M-1…M-10 + P-1,逐项带自定触发与验证面)、**有意分叉 110 行**落八篇规范的「砍单与承载缝」表、延后清单 20 能力项全部原地留(重开条件不变)。**版本口径标注 0.6**(倾向:与 1.0 门槛合并评估;1.0 门槛仍未定义)。依据 [任务:计划成文——ROADMAP 增补段「下一阶段(完善)」+ 实施票大纲](https://github.com/0xnicholas/balsats-framework/issues/108)。
 - **修订(M-7 发布路径加固,2026-10-03)**:七包 manifest 各加 `prepublishOnly` = `pnpm -w verify`(在 workspace 根跑一次完整闸门)——发布动作现由「七包 `prepublishOnly` 跑 `verify`」前置,且前置发生在打包**之前**(`cwd` = 该包目录)⇒ 线上 tarball 内的 `dist` 必为当次构建产物、闸门未过则该包不打包也不发布;根 workspace 与十 example 是 private(无发布通路),不加。**代价记账(接受)**:`pnpm -r publish` 对每包各跑一次 ⇒ 每次发布约 +7 × `verify` 墙钟(基线 26.7s / 865 例;本机演练实测 `pnpm -r publish --dry-run --no-git-checks` 全程 **3m03s**、七包各跑一次 `verify`)≈ 3 分钟——发布是低频 owner 手工动作,不为消除它引入哨兵文件 / 缓存戳一类隐藏状态。**已知缺口(进核对单,不修)**:`pnpm pack` 不触发 `prepublishOnly`,「pack 出来的即新鲜产物」不成立;发布通路本身的证明走 `publish --dry-run` 演练。tag / Release / `CHANGELOG` / 发布 workflow / 版本 bump 流程零改动。依据 [实施:M-7 发布路径加固——七包 prepublishOnly + 发布后核对单](https://github.com/0xnicholas/balsats-framework/issues/112)。
 
+- **修订(更名 oribos,2026-10-03)**:对外品牌名 `Balsats` → **`Oribos`**、仓库/项目名 `balsats-framework` → **`oribos-framework`**、npm scope `@balsats/*` → **`@oribos/*`**——三仓 umbrella 同步更名,本行落 framework 仓。**活面**:根 `package.json` name、七包 name / description / `repository.url`、十 example 包名与依赖、源码与测试 import(含七包子路径)、`tsconfig.base.json` `paths`、`vitest.config.ts` 别名、`pnpm-lock.yaml` 重生成、脚本常量(`lib.mjs` / `check-runtime-deps` / `check-deps-budget` / `check-examples` / `check-export-surface`)、`README` / `CONTEXT.md` / `AGENTS.md` / `docs/architecture/**`(8 文件)与包 README prose;**wire 面一并换名**:OTel 属性族 `balsats.*` → **`oribos.*`**(`span.type` / `run_id` / `thread_id` / `resource_id` / `request.*` / `input` / `output` / `metadata` / `error.details`)、resource 默认 `service.name` `balsats` → `oribos`、mcp-client 桥接 `~standard.vendor` `balsats` → `oribos`、console exporter 前缀 `[oribos]`、sqlite 默认库名 `oribos.db`、示例 env `BALSATS_*` → `ORIBOS_*` 与探针 / 临时目录名。**代价(实测记账)**:(1) **0.5.0 已上线且 tarball 不可回改**——实测线上 `@balsats/*@0.5.0` 的 wire 面仍是 `balsa.*` / `service.name: balsa` / `[balsa]` / `vendor: 'balsa'`、元数据仍是 "Balsa …" 与 `balsa-framework`,**`balsats` 一次换名只落在仓库、未随发布上线** ⇒ 下一次发布承载的是 `balsa.*` → `oribos.*` 的**合并后一次破型**;(2) **GitHub org `oribos` 已被占**(Organization,2020-08-03 创建)⇒ 沿 2026-09-28 `balsa` 先例,**个人账号同名仓库 `0xnicholas/oribos-framework` 保留完整品牌面**,ADR-0013「GitHub 归属 = org」的迁移后置口径对 `oribos` 不成立;(3) **域名 `oribos.com` 已注册**(2016-01-13、2027-01-13 到期、NameBright DNS、clientTransferProhibited)⇒ 域名根待 owner 另裁;(4) **npm org `@oribos` 创建依赖 owner 动作**(`@oribos/core` 实测 404 = FREE;`@oribos` 名下 0 包),`@balsats/*` 的 deprecate 指向动作归发布票;(5) **侧翼仓名不在本次改动面**(`balsats-docs` / `balsats-website` 归各自动线,本仓活面引用按保留面处理)。**README 口径修正**:活面机制命中会把「0.5.0 已发布」误写成新 scope,已回改为「**0.5.0 以旧 scope `@balsats/*` 上线,`@oribos/*` 自下一版起**」——已发布事实不随改名改。**保留面**:ADR 正文与既有修订记、本文件既有修订行、`docs/research/` 快照 prose;活面文档内链接已统一改写为新仓库名(dated records 内链接按 ADR 惯例保留旧地址)。**核验**:`pnpm verify` 全绿(**902 例 70 文件**)、`check:dist` 16 子路径全过、`check:runtime-deps` 七包全绿、`check:export-surface` 七包零缺口;字节预算 **16/16 零超支**——**基线随改名重钉**(core `.` / `./model` / `./agent` 各 −4 B、`./observability` −1 B、mcp-client `.` −2 B、otlp `.` −17 B、sqlite `.` −3 B:品牌串变短的机械减量);`deps-budget` **1 黄灯**(mcp-server 的 `@modelcontextprotocol/server` 闭包 13,898,836 B → 13,943,961 B、+45,125 B、包数不变 3——**外部 registry 漂移,依赖声明面未动、非改名所致**,按 ADR-0001 黄灯不卡合并,基线是否吸收另裁);example 以终态品牌复跑:`check:examples` 四案(含 `otlp-collector` 断言 `oribos.*` 属性族、`mcp-tools` HTTP + stdio)全 exit 0。依据 [改名:balsats → oribos(品牌 / npm scope / wire 面 / 仓库全换)](https://github.com/0xnicholas/oribos-framework/issues/129)。
+
 ### 发布后核对单(M-7)
 
 发布动作已由「七包 `prepublishOnly` 跑 `verify`」前置(逐包、打包前):闸门全绿且当次构建就绪才打包,闸门红则该包不发布。发布完成(owner 手工 `pnpm -r publish --no-git-checks`)后按下表逐项核对——**本段是核对单的单一真相源,别处不复制**;七包 = `core` / `ai-sdk` / `croner` / `mcp-client` / `mcp-server` / `otlp` / `sqlite`,`<ver>` = 当次版本,命令在仓库根跑。
 
 | # | 项 | 命令 | 期望 |
 | --- | --- | --- | --- |
-| 1 | `description` | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do npm view @balsats/$p description; done` | 七行全部以 `Balsats ` 开头(仍见 `Balsa ` = 0.5.0 旧名元数据没随本次发布刷新) |
-| 2 | `repository.url` | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do npm view @balsats/$p repository.url; done` | 七行全部 `git+https://github.com/0xnicholas/balsats-framework.git`(`balsa-framework` 零命中) |
-| 3 | dist-tags | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do npm view @balsats/$p dist-tags.latest; done` | 七行全部 `<ver>`(`latest` = 消费者默认安装到的版本) |
-| 4 | `exports` | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do printf '%s ' @balsats/$p; npm view @balsats/$p exports --json \| node -pe 'Object.keys(JSON.parse(require("fs").readFileSync(0,"utf8"))).length'; done` | `@balsats/core` 10 + 六能力包各 1 = 合计 **16**,与 `pnpm check:dist` 的 16 子路径一致(线上公开面未缩) |
+| 1 | `description` | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do npm view @oribos/$p description; done` | 七行全部以 `Oribos ` 开头(仍见 `Balsa ` / `Balsats ` = 旧名元数据没随本次发布刷新) |
+| 2 | `repository.url` | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do npm view @oribos/$p repository.url; done` | 七行全部 `git+https://github.com/0xnicholas/oribos-framework.git`(`balsa-framework` / `balsats-framework` 零命中) |
+| 3 | dist-tags | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do npm view @oribos/$p dist-tags.latest; done` | 七行全部 `<ver>`(`latest` = 消费者默认安装到的版本) |
+| 4 | `exports` | `for p in core ai-sdk croner mcp-client mcp-server otlp sqlite; do printf '%s ' @oribos/$p; npm view @oribos/$p exports --json \| node -pe 'Object.keys(JSON.parse(require("fs").readFileSync(0,"utf8"))).length'; done` | `@oribos/core` 10 + 六能力包各 1 = 合计 **16**,与 `pnpm check:dist` 的 16 子路径一致(线上公开面未缩) |
 
 > 0.5.0 的 `description` / `repository.url` 是旧名(不可原地修改的既有事实):上表第 1 / 2 项在 0.5.0 上必然报红——这两项守的是**下次发布**,也是这次加固要防的那类「线上元数据与仓库不一致」。
-> `pnpm pack` 的边界:pack 不触发 `prepublishOnly`,故 pack 产物不由闸门保鲜;要核对发布通路本身,走演练 `pnpm --filter @balsats/<pkg> publish --dry-run --no-git-checks`(打印前置执行与 tarball 内容、不触注册表;本地版本已在注册表时需加 `--force` 才会走完全程)。
+> `pnpm pack` 的边界:pack 不触发 `prepublishOnly`,故 pack 产物不由闸门保鲜;要核对发布通路本身,走演练 `pnpm --filter @oribos/<pkg> publish --dry-run --no-git-checks`(打印前置执行与 tarball 内容、不触注册表;本地版本已在注册表时需加 `--force` 才会走完全程)。
 
 ## 延后清单(post-v1,需求信号触发)
 
 以下能力经路线图裁决**延后或出域**,不进 v1 任一里程碑。**本清单是「重开条件」的单一真相源**(术语见 `CONTEXT.md`):重开条件必须外部可观察、可累计;满足即单独评估,**不自动进入路线图**。缺口与差异的完整对账见 `docs/research/mastra-gap-analysis.md`(对比视图,不复制条件)。M5 能力包(OTLP exporter / MCP server + client / SQLite adapter / AI SDK 互操作)已在路线图内,不属本清单。
 
-> 修订(2026-09-30,对比 ticket [#63](https://github.com/0xnicholas/balsats-framework/issues/63)):清单升级为四列表,重开条件统一为可观察、可累计的判定信号。
+> 修订(2026-09-30,对比 ticket [#63](https://github.com/0xnicholas/oribos-framework/issues/63)):清单升级为四列表,重开条件统一为可观察、可累计的判定信号。
 
-> 修订(2026-10-02,判定票 [#106](https://github.com/0xnicholas/balsats-framework/issues/106)):能力项 20 行(延后档 13 + 出域档 7)逐条判定为**有意分叉**——全部**原地留**、重开条件不变;新增「承接」列指到规范表行(判定与理由的单一真相源在 `docs/architecture/*.md` 的「砍单与承载缝」表,本清单不复制理由)。
+> 修订(2026-10-02,判定票 [#106](https://github.com/0xnicholas/oribos-framework/issues/106)):能力项 20 行(延后档 13 + 出域档 7)逐条判定为**有意分叉**——全部**原地留**、重开条件不变;新增「承接」列指到规范表行(判定与理由的单一真相源在 `docs/architecture/*.md` 的「砍单与承载缝」表,本清单不复制理由)。
 
 ### 延后档(触发式)
 
 | 缺口 | 重开条件(可观察) | 承载缝 | 承接(规范表行) |
 | --- | --- | --- | --- |
-| Supervisor 能力包(createSupervisor 类) | as-tool 组合的真实重复痛点 ≥3 次复述,或 ≥1 个真实项目因包装样板 / 传播遗漏 / 嵌套审批受阻 | 能力包优先;核心字段须重开 [决策:多 agent 协作语义](https://github.com/0xnicholas/balsats-framework/issues/19) 的演化门 | `agent.md`「多 agent 组合」演化门(ADR-0012) |
+| Supervisor 能力包(createSupervisor 类) | as-tool 组合的真实重复痛点 ≥3 次复述,或 ≥1 个真实项目因包装样板 / 传播遗漏 / 嵌套审批受阻 | 能力包优先;核心字段须重开 [决策:多 agent 协作语义](https://github.com/0xnicholas/oribos-framework/issues/19) 的演化门 | `agent.md`「多 agent 组合」演化门(ADR-0012) |
 | RAG / 语义召回 | ≥1 个真实用例要求跨会话语义检索(外部用户或自身产品场景) | memory 落库 hook + 能力包(复用模型契约的 embedding 模式) | `memory.md`(CUT-MEM1) |
 | 外部记忆引擎桥接(bunfold 类) | ≥1 个真实用例要求框架侧提供桥接包(而非宿主侧自组装),且接受外部常驻服务依赖(独立服务 + 其 LLM 抽取管线 + 数据落盘);或此类引擎出现可嵌入(库)形态(无需常驻服务) | 能力包;缝 = memory 落库 hook / recall 增强(实施期裁决) | `memory.md`(CUT-MEM2) |
 | Evals / scorers | ≥1 个用例要求在 CI 或线上做断言式评估 | Processor,或独立包消费 run 结果 | `agent.md`(CUT-AG1) |
@@ -205,7 +207,7 @@
 
 | 差距 | 条件 / 状态 | 承载缝 |
 | --- | --- | --- |
-| 发布 0.5.0 | **已发布(2026-10-02)**:七包 0.5.0 在 npm 上线,单 tag `v0.5.0` + Release;核对与冒烟见 [#97](https://github.com/0xnicholas/balsats-framework/issues/97),口径收口见 [#99](https://github.com/0xnicholas/balsats-framework/issues/99) | — |
+| 发布 0.5.0 | **已发布(2026-10-02)**:七包 0.5.0 在 npm 上线,单 tag `v0.5.0` + Release;核对与冒烟见 [#97](https://github.com/0xnicholas/oribos-framework/issues/97),口径收口见 [#99](https://github.com/0xnicholas/oribos-framework/issues/99) | — |
 | 公开上手面(文档站、对外 quick start) | quick start 已随 0.5.0 可用(README 安装命令 + 子路径面经注册表冒烟,#97);文档站归 `balsats-docs` 动线(本图只出交接口径) | README 已有 quick start |
 | 适配器生态 | ≥1 个真实第二后端诉求 | 社区 + 作者指南(`docs/architecture/storage.md`) |
 | 公开可检验性(轻量主张的外部证据) | **结案(2026-10-02 身份裁决)**:数字一律不对外——沿 ADR-0001 立场(依赖数/字节数仅内部 CI 回归参考,不作公开承诺),**机制可讲**(零依赖硬闸门、字节预算黄灯等);balsats-website 侧同口径(不写 KB / 测试数) | — |

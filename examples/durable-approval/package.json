@@ -1,8 +1,8 @@
 {
-  "name": "@balsats/example-durable-approval",
+  "name": "@oribos/example-durable-approval",
   "version": "0.0.0",
   "private": true,
-  "description": "Balsats durable example: a refund desk where a gated tool call suspends the run until a human approves or rejects it.",
+  "description": "Oribos durable example: a refund desk where a gated tool call suspends the run until a human approves or rejects it.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
-    "@balsats/core": "workspace:*",
+    "@oribos/core": "workspace:*",
     "zod": "^4.6.5"
   }
 }

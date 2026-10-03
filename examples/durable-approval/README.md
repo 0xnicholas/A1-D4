@@ -1,9 +1,9 @@
 # durable-approval
 
-Balsats's durable agent in one scripted session: a **tool call that needs a human** is held at the
+Oribos's durable agent in one scripted session: a **tool call that needs a human** is held at the
 loop's step boundary, the run's **loop snapshot** goes to an `AgentRunSnapshotStore`, the run lands
 `finishReason: 'suspended'`, and `resume(runId, { approved })` continues it — executing the held
-call, or answering it with a rejection result the model replans from. Balsats is an ultralight
+call, or answering it with a rejection result the model replans from. Oribos is an ultralight
 TypeScript agent framework — compose only what you use, run anywhere, no runtime baggage.
 
 The example is a single file (`src/index.ts`) with a fixed script — no interactive input. It drives
@@ -52,8 +52,8 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm build                 # examples consume @balsats/core through its package exports (dist)
-OPENAI_API_KEY=sk-... pnpm --filter @balsats/example-durable-approval start
+pnpm build                 # examples consume @oribos/core through its package exports (dist)
+OPENAI_API_KEY=sk-... pnpm --filter @oribos/example-durable-approval start
 ```
 
 Switch to an OpenAI-compatible endpoint the same way — the core has no special mechanism, install
@@ -61,7 +61,7 @@ the matching provider package:
 
 ```bash
 OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://localhost:11434/v1 \
-  pnpm --filter @balsats/example-durable-approval start
+  pnpm --filter @oribos/example-durable-approval start
 ```
 
 Without `OPENAI_API_KEY` the script exits immediately, asking for one. Expected output: the two runs'
@@ -88,5 +88,5 @@ two replies — the approved refund confirmed, the rejected one answered with an
 - **A second suspension overwrites the same `runId`** — a run that suspends again (another gated
   call) is resumable under the id it always had. This narrative does not stage that; the core's test
   suite does.
-- Like the other examples, the script consumes `@balsats/core` through its built package exports — run
+- Like the other examples, the script consumes `@oribos/core` through its built package exports — run
   `pnpm build` before `start`.
