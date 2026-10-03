@@ -27,6 +27,11 @@ const TWO_SUBPATHS = { '.': ROOT_ENTRY, './tools': TOOLS_ENTRY };
 const BAD_THEN_GOOD = { './tools': TOOLS_ENTRY, '.': ROOT_ENTRY };
 
 const ROOT_JS = "export const root = 'root';\n";
+/**
+ * top-level await 的 ESM 图:`import()` 可加载,`require()` 抛 ERR_REQUIRE_ASYNC_MODULE——
+ * 本套件全部夹具里唯一能把「`import()` 加载」与「`require()` 走通」两条路分开的产物。
+ */
+const ROOT_TLA_JS = "export const root = await Promise.resolve('root');\n";
 const ROOT_DTS = 'export declare const root: string;\n';
 const TOOLS_JS = "export const tools = 'tools';\n";
 const TOOLS_DTS = 'export declare const tools: string;\n';
@@ -84,6 +89,26 @@ describe('check-dist:exports 表逐子路径验真', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('fixture: 导入失败');
     expect(result.stderr).toContain('夹具产物加载失败');
+  });
+
+  it('产物 import() 通过但 require() 抛错时留 1:require 通路不被 import 通路掩盖', () => {
+    // 夹具只有 require 侧走不通——脚本若不再走 require 通路,这一例是唯一会变绿的
+    // (其余夹具两条路同真同假),即 require 通路被删 / 被绕过的回归由此例拦下。
+    const dir = packageFixture(ROOT_ONLY, {
+      'dist/index.js': ROOT_TLA_JS,
+      'dist/index.d.ts': ROOT_DTS,
+    });
+
+    const result = runScript('check-dist', [dir]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('fixture: 导入失败');
+    // 钉 require(esm) 的公开报错(ERR_REQUIRE_ASYNC_MODULE 的 message):脚本只印 error.message,
+    // 错误码本身不上 stderr;该消息在 Node 22.12–26.2 各版本上一致(实测,CI 基线 22.13 在内)。
+    expect(result.stderr).toContain(
+      'require() cannot be used on an ESM graph with top-level await',
+    );
+    expect(okSubpaths(result.stdout)).toEqual([]);
   });
 
   it('exports 表为空时以退出码 2 报错:没有子路径就没有校验对象', () => {
